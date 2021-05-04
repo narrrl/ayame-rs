@@ -1,18 +1,25 @@
+// models like music manager, yt downloader...
+pub mod model {
+    pub mod music;
+}
+
+// commands
+mod commands;
+
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
-    framework::{
-        standard::{macros::command, macros::group, CommandResult},
-        StandardFramework,
-    },
+    framework::{standard::macros::group, StandardFramework},
     http::Http,
-    model::{channel::Message, event::ResumedEvent, gateway::Ready},
+    model::{event::ResumedEvent, gateway::Ready},
     prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc};
 
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
+
+use commands::{general::*, music::*};
 
 pub struct ShardManagerContainer;
 
@@ -38,6 +45,10 @@ impl EventHandler for Handler {
 #[group]
 #[commands(ping)]
 struct General;
+
+#[group]
+#[commands(play, test)]
+struct Music;
 
 #[tokio::main]
 async fn main() {
@@ -71,7 +82,8 @@ async fn main() {
     // TODO: add commands
     let framework = StandardFramework::new()
         .configure(|c| c.owners(owners).prefix("?"))
-        .group(&GENERAL_GROUP);
+        .group(&GENERAL_GROUP)
+        .group(&MUSIC_GROUP);
 
     let mut client = Client::builder(&token)
         .framework(framework)
@@ -96,11 +108,4 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("Client error: {:?}", why);
     }
-}
-
-#[command]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(&ctx.http, "Pong!").await?;
-
-    Ok(())
 }
