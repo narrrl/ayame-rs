@@ -13,7 +13,7 @@ async fn test(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn play(ctx: &Context, msg: &Message) -> CommandResult {
-    let result = music_manager::play();
+    let result = music_manager::play(&ctx, &msg);
 
     match result {
         Ok(m) => msg.reply(&ctx.http, m).await?,

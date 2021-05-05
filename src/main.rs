@@ -6,6 +6,9 @@ pub mod model {
 // commands
 mod commands;
 
+//utilitys
+mod utils;
+
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
@@ -92,6 +95,7 @@ async fn main() {
     // Create bot
     // TODO: add commands
 
+    //load bot prefix from config
     let prefix: &str = &*config.get_str("prefix").unwrap();
 
     let framework = StandardFramework::new()
