@@ -18,6 +18,7 @@ use std::{collections::HashSet, env, sync::Arc};
 
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use config::*;
 
 use commands::{general::*, music::*};
 
@@ -50,10 +51,20 @@ struct General;
 #[commands(play, test)]
 struct Music;
 
+async fn load_config(path: &str) -> Config{
+    let mut settings = Config::default();
+    settings.merge(File::with_name(path)).unwrap();
+
+    settings
+}
+
 #[tokio::main]
 async fn main() {
     // load environment
     dotenv::dotenv().expect("Failed to load environment");
+
+    //load the config file
+    let config: Config = load_config("./config.yml").await;
 
     // init the logger to use environment variables
     let subscriber = FmtSubscriber::builder()
@@ -80,8 +91,11 @@ async fn main() {
 
     // Create bot
     // TODO: add commands
+
+    let prefix: &str = &*config.get_str("prefix").unwrap();
+
     let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix("?"))
+        .configure(|c| c.owners(owners).prefix(prefix))
         .group(&GENERAL_GROUP)
         .group(&MUSIC_GROUP);
 
