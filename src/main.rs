@@ -1,3 +1,5 @@
+mod basic_commands;
+
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
@@ -70,7 +72,9 @@ async fn main() {
     // Create bot
     // TODO: add commands
     let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix("?"))
+        .configure(|c| c
+            .owners(owners)
+            .prefix("?"))
         .group(&GENERAL_GROUP);
 
     let mut client = Client::builder(&token)
@@ -100,7 +104,5 @@ async fn main() {
 
 #[command]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(&ctx.http, "Pong!").await?;
-
-    Ok(())
+    basic_commands::ping(&ctx, &msg).await
 }
