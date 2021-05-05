@@ -15,6 +15,7 @@ use std::{collections::HashSet, env, sync::Arc};
 
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use config::*;
 
 pub struct ShardManagerContainer;
 
@@ -41,10 +42,21 @@ impl EventHandler for Handler {
 #[commands(ping)]
 struct General;
 
+
+async fn load_config(path: &str) -> Config{
+    let mut settings = Config::default();
+    settings.merge(File::with_name(path)).unwrap();
+
+    settings
+}
+
 #[tokio::main]
 async fn main() {
     // load environment
     dotenv::dotenv().expect("Failed to load environment");
+
+    //load the config file
+    let config: Config = load_config("./config.yml").await;
 
     // init the logger to use environment variables
     let subscriber = FmtSubscriber::builder()
@@ -74,7 +86,7 @@ async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c
             .owners(owners)
-            .prefix("?"))
+            .prefix(&*config.get_str("prefix").unwrap()))
         .group(&GENERAL_GROUP);
 
     let mut client = Client::builder(&token)
