@@ -1,3 +1,5 @@
+mod basic_commands;
+
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
@@ -13,6 +15,7 @@ use std::{collections::HashSet, env, sync::Arc};
 
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use config::*;
 
 pub struct ShardManagerContainer;
 
@@ -39,10 +42,21 @@ impl EventHandler for Handler {
 #[commands(ping)]
 struct General;
 
+
+async fn load_config(path: &str) -> Config{
+    let mut settings = Config::default();
+    settings.merge(File::with_name(path)).unwrap();
+
+    settings
+}
+
 #[tokio::main]
 async fn main() {
     // load environment
     dotenv::dotenv().expect("Failed to load environment");
+
+    //load the config file
+    let config: Config = load_config("./config.yml").await;
 
     // init the logger to use environment variables
     let subscriber = FmtSubscriber::builder()
@@ -70,7 +84,9 @@ async fn main() {
     // Create bot
     // TODO: add commands
     let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix("?"))
+        .configure(|c| c
+            .owners(owners)
+            .prefix(&*config.get_str("prefix").unwrap()))
         .group(&GENERAL_GROUP);
 
     let mut client = Client::builder(&token)
@@ -100,7 +116,5 @@ async fn main() {
 
 #[command]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(&ctx.http, "Pong!").await?;
-
-    Ok(())
+    basic_commands::ping(&ctx, &msg).await
 }
