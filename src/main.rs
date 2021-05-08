@@ -1,13 +1,11 @@
 // models like music manager, yt downloader...
 pub mod model {
+    pub mod database;
     pub mod music;
 }
 
 // commands
 mod commands;
-
-//utilitys
-mod utils;
 
 use serenity::{
     async_trait,
@@ -19,11 +17,12 @@ use serenity::{
 };
 use std::{collections::HashSet, env, sync::Arc};
 
+use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
-use config::*;
 
 use commands::{general::*, music::*};
+use model::database::guild_manager;
 
 pub struct ShardManagerContainer;
 
@@ -54,7 +53,7 @@ struct General;
 #[commands(play, test)]
 struct Music;
 
-async fn load_config(path: &str) -> Config{
+async fn load_config(path: &str) -> Config {
     let mut settings = Config::default();
     settings.merge(File::with_name(path)).unwrap();
 
@@ -93,10 +92,17 @@ async fn main() {
     };
 
     // Create bot
-    // TODO: add commands
-
     //load bot prefix from config
-    let prefix: &str = &*config.get_str("prefix").unwrap();
+    let prefix: &str = &*config
+        .get_str("prefix")
+        .expect("Couldn't find bot prefix in config");
+
+    // TODO: implement command framework that uses the database
+    // don't know how tho KEKW
+    let database = match guild_manager::create_connection() {
+        Ok(conn) => conn,
+        Err(err) => panic!("Error connecting to database {:?}", err),
+    };
 
     let framework = StandardFramework::new()
         .configure(|c| c.owners(owners).prefix(prefix))
