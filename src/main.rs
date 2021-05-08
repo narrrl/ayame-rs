@@ -1,14 +1,20 @@
-mod basic_commands;
+// models like music manager, yt downloader...
+pub mod model {
+    pub mod music;
+}
+
+// commands
+mod commands;
+
+//utilitys
+mod utils;
 
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
-    framework::{
-        standard::{macros::command, macros::group, CommandResult},
-        StandardFramework,
-    },
+    framework::{standard::macros::group, StandardFramework},
     http::Http,
-    model::{channel::Message, event::ResumedEvent, gateway::Ready},
+    model::{event::ResumedEvent, gateway::Ready},
     prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc};
@@ -16,6 +22,8 @@ use std::{collections::HashSet, env, sync::Arc};
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use config::*;
+
+use commands::{general::*, music::*};
 
 pub struct ShardManagerContainer;
 
@@ -42,6 +50,9 @@ impl EventHandler for Handler {
 #[commands(ping)]
 struct General;
 
+#[group]
+#[commands(play, test)]
+struct Music;
 
 async fn load_config(path: &str) -> Config{
     let mut settings = Config::default();
@@ -83,11 +94,14 @@ async fn main() {
 
     // Create bot
     // TODO: add commands
+
+    //load bot prefix from config
+    let prefix: &str = &*config.get_str("prefix").unwrap();
+
     let framework = StandardFramework::new()
-        .configure(|c| c
-            .owners(owners)
-            .prefix(&*config.get_str("prefix").unwrap()))
-        .group(&GENERAL_GROUP);
+        .configure(|c| c.owners(owners).prefix(prefix))
+        .group(&GENERAL_GROUP)
+        .group(&MUSIC_GROUP);
 
     let mut client = Client::builder(&token)
         .framework(framework)
@@ -112,9 +126,4 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("Client error: {:?}", why);
     }
-}
-
-#[command]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    basic_commands::ping(&ctx, &msg).await
 }
