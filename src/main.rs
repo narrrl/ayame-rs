@@ -22,7 +22,6 @@ use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use commands::{general::*, music::*};
-use model::database::guild_manager;
 
 pub struct ShardManagerContainer;
 
@@ -81,7 +80,7 @@ async fn main() {
     let http = Http::new_with_token(&token);
 
     // get owners and bot id from application
-    let (owners, _bot_id) = match http.get_current_application_info().await {
+    let (owners, bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
             let mut owners = HashSet::new();
             owners.insert(info.owner.id);
@@ -97,17 +96,21 @@ async fn main() {
         .get_str("prefix")
         .expect("Couldn't find bot prefix in config");
 
-    // TODO: implement command framework that uses the database
-    // don't know how tho KEKW
-    let database = match guild_manager::create_connection() {
-        Ok(conn) => conn,
-        Err(err) => panic!("Error connecting to database {:?}", err),
-    };
-
     let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix(prefix))
+        .configure(|c| {
+            c.owners(owners)
+                .prefix(prefix)
+                .on_mention(Some(bot_id))
+                .with_whitespace(true)
+                .delimiters(vec![", ", ","])
+        })
         .group(&GENERAL_GROUP)
-        .group(&MUSIC_GROUP);
+        .group(&MUSIC_GROUP)
+        // annote command with #[bucket = "basic"]
+        // to limit command usage to 3 uses per 10 secs with a 2 seconds delay
+        // between invocations
+        .bucket("basic", |b| b.delay(2).time_span(10).limit(3))
+        .await;
 
     let mut client = Client::builder(&token)
         .framework(framework)
