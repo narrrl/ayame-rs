@@ -16,12 +16,31 @@ use serenity::{
     prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc};
+use std::{io, path::PathBuf};
 
 use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use commands::{general::*, music::*, youtubedl::*};
+
+use lazy_static::*;
+
+lazy_static! {
+    pub static ref CONFIG: Config = {
+        let mut settings = Config::default();
+        settings
+            .merge(File::with_name(
+                get_file("config.yml")
+                    .expect("Couldn't get bot directory")
+                    .to_str()
+                    .expect("Couldn't get path of bot dir"),
+            ))
+            .expect("Expected config.yml in bot directory");
+
+        settings
+    };
+}
 
 pub struct ShardManagerContainer;
 
@@ -56,20 +75,17 @@ struct Music;
 #[commands(ytd)]
 struct YoutubeDL;
 
-async fn load_config(path: &str) -> Config {
-    let mut settings = Config::default();
-    settings.merge(File::with_name(path)).unwrap();
-
-    settings
+pub fn get_file(name: &str) -> io::Result<PathBuf> {
+    let mut dir = env::current_exe()?;
+    dir.pop();
+    dir.push(name);
+    Ok(dir)
 }
 
 #[tokio::main]
 async fn main() {
     // load environment
     dotenv::dotenv().expect("Failed to load environment");
-
-    //load the config file
-    let config: Config = load_config("./config.yml").await;
 
     // init the logger to use environment variables
     let subscriber = FmtSubscriber::builder()
@@ -96,7 +112,7 @@ async fn main() {
 
     // Create bot
     //load bot prefix from config
-    let prefix: &str = &*config
+    let prefix: &str = &CONFIG
         .get_str("prefix")
         .expect("Couldn't find bot prefix in config");
 

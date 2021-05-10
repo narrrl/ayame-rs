@@ -12,6 +12,7 @@ tracing-subscriber = "0.2"
 config = "0.11.0"
 rusqlite = "0.25.1"
 ytd-rs = {git = "https://github.com/Nirusu99/ytd-rs", branch = "main"}
+lazy_static = "1.4.0"
 
 [dependencies.tokio]
 version = "1.0"
