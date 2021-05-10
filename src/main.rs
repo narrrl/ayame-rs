@@ -21,7 +21,7 @@ use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use commands::{general::*, music::*};
+use commands::{general::*, music::*, youtubedl::*};
 
 pub struct ShardManagerContainer;
 
@@ -51,6 +51,10 @@ struct General;
 #[group]
 #[commands(play, test)]
 struct Music;
+
+#[group]
+#[commands(ytd)]
+struct YoutubeDL;
 
 async fn load_config(path: &str) -> Config {
     let mut settings = Config::default();
@@ -106,6 +110,7 @@ async fn main() {
         })
         .group(&GENERAL_GROUP)
         .group(&MUSIC_GROUP)
+        .group(&YOUTUBEDL_GROUP)
         // annote command with #[bucket = "basic"]
         // to limit command usage to 3 uses per 10 secs with a 2 seconds delay
         // between invocations
