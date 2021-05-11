@@ -1,4 +1,10 @@
 prefix: "~"
+# bot token, DON'T SHARE!
+token: "BOT_TOKEN"
+
+
+# hostname, webdir, webroot are optional if this is true
+disableWebserver: false
 # domain name with protocol
 hostname: "https://my.domain.com"
 # download location for download files
@@ -6,5 +12,7 @@ hostname: "https://my.domain.com"
 webdir: "path/in/url"
 # normally /var/www/html
 webroot: "/path/to/webroot"
-# bot token, DON'T SHARE!
-token: "BOT_TOKEN"
+
+# optional setting to ratelimit the bot (in byte)
+# this is the default value of 1mb/s
+downloadRateLimit: "1000K"

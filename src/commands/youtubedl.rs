@@ -249,7 +249,18 @@ async fn send_files_to_webserver(
     }
 
     // move all files to the webroot
-    if let Err(_) = fs_extra::move_items(&files, &final_dir, &dir::CopyOptions::new()) {
+    if let Err(_) = fs_extra::move_items(
+        &files,
+        &final_dir,
+        &dir::CopyOptions {
+            overwrite: true,
+            skip_exist: true,
+            buffer_size: 64000,
+            copy_inside: false,
+            content_only: true,
+            depth: 0,
+        },
+    ) {
         msg.reply(
             &http,
             "Error: couldn't move files to destination, contact bot owner",
