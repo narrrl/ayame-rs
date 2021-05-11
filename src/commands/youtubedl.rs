@@ -21,6 +21,10 @@ lazy_static! {
 async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     let content = msg.content_safe(&ctx.cache).await;
     let id = msg.author.id.as_u64();
+    let mut hasher = Sha256::new();
+    hasher.update(id.to_string());
+    let hash = hasher.finalize();
+    let hashed_id = &format!("{:x}", &hash);
 
     let (args, link) = match get_args(content) {
         Ok(tup) => tup,
@@ -33,7 +37,7 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     let mut dir = crate::BOT_DIR.clone();
     dir.push("tmp");
     dir.push("ytd");
-    dir.push(id.to_string());
+    dir.push(hashed_id);
 
     let download = match download(&dir, args, link).await {
         Ok(dl) => dl,
@@ -55,7 +59,7 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     if size < 8000000 {
         let _ = send_files_to_channel(msg, ctx, download).await;
     } else {
-        let _ = send_files_to_webserver(msg, ctx, download, &id).await;
+        let _ = send_files_to_webserver(msg, ctx, download, &hashed_id).await;
     }
     let _ = remove_dir_all(dir.as_path());
     Ok(())
@@ -66,17 +70,6 @@ async fn download(
     args: Vec<Arg>,
     link: String,
 ) -> std::result::Result<Vec<PathBuf>, String> {
-    //TODO: hash user id
-    // let mut hasher = Sha256::new();
-    // hasher.update(id.to_string());
-    // let hash = hasher.finalize();
-    // match std::str::from_utf8(&hash[..]) {
-    //     Ok(hash) => bot_dir.push(hash),
-    //     Err(_) => {
-    //         return Err("couldn't get user id".to_string());
-    //     }
-    // };
-
     if bot_dir.exists() {
         match read_dir(&bot_dir) {
             Ok(read) => {
@@ -138,7 +131,7 @@ async fn send_files_to_webserver(
     msg: &Message,
     ctx: &Context,
     files: Vec<PathBuf>,
-    id: &u64,
+    id: &str,
 ) -> CommandResult {
     let host = match crate::CONFIG.get_str("hostname") {
         Ok(host) => host,
@@ -229,6 +222,8 @@ fn get_all_files(file: &PathBuf) -> Result<Vec<PathBuf>, String> {
 
 fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> {
     let mut args: Vec<Arg> = Vec::new();
+    // download rate limit
+    args.push(Arg::new_with_arg("-r", "1000K"));
     let mut link = "".to_string();
 
     let user_inp: &str = match message.splitn(2, "ytd").collect::<Vec<&str>>().last() {
