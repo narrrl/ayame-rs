@@ -1,15 +1,20 @@
 use std::{
     fs::{create_dir_all, read_dir, remove_dir_all},
     path::PathBuf,
+    sync::Arc,
 };
 
 use fs_extra::dir::{self, get_size};
 use lazy_static::lazy_static;
 use regex::Regex;
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
 use serenity::prelude::*;
+use serenity::{client::Cache, model::prelude::*};
+use serenity::{
+    framework::standard::{macros::command, CommandResult},
+    http::Http,
+};
 use sha2::{Digest, Sha256};
+use tokio::task;
 use ytd_rs::ytd::{Arg, YoutubeDL};
 
 lazy_static! {
@@ -39,32 +44,55 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     dir.push("ytd");
     dir.push(hashed_id);
 
+    let cache = ctx.cache.clone();
+    let http = ctx.http.clone();
+
+    task::spawn(start(
+        http,
+        cache,
+        msg.clone(),
+        dir,
+        args,
+        link,
+        hashed_id.to_string(),
+    ));
+    Ok(())
+}
+
+async fn start(
+    http: Arc<Http>,
+    cache: Arc<Cache>,
+    msg: Message,
+    dir: PathBuf,
+    args: Vec<Arg>,
+    link: String,
+    hashed_id: String,
+) {
     let download = match download(&dir, args, link).await {
         Ok(dl) => dl,
         Err(why) => {
-            msg.reply(&ctx.http, format!("Error: {}", why)).await?;
+            let _ = msg.reply(&http, format!("Error: {}", &why)).await;
             if !why.eq("download runnig") {
                 let _ = remove_dir_all(dir.as_path());
             }
-            return Ok(());
+            return ();
         }
     };
 
     let size = match get_size(dir.as_path()) {
         Ok(size) => size,
         Err(why) => {
-            msg.reply(&ctx.http, format!("Error: {}", why)).await?;
-            return Ok(());
+            let _ = msg.reply(&http, format!("Error: {}", why)).await;
+            return ();
         }
     };
 
     if size < 8000000 {
-        let _ = send_files_to_channel(msg, ctx, download).await;
+        let _ = send_files_to_channel(&msg, http, cache, download).await;
     } else {
-        let _ = send_files_to_webserver(msg, ctx, download, &hashed_id).await;
+        let _ = send_files_to_webserver(&msg, http, download, &hashed_id).await;
     }
     let _ = remove_dir_all(dir.as_path());
-    Ok(())
 }
 
 async fn download(
@@ -110,19 +138,23 @@ async fn download(
     }
 }
 
-async fn send_files_to_channel(msg: &Message, ctx: &Context, files: Vec<PathBuf>) -> CommandResult {
-    match msg.channel(&ctx.cache).await {
+async fn send_files_to_channel(
+    msg: &Message,
+    http: Arc<Http>,
+    cache: Arc<Cache>,
+    files: Vec<PathBuf>,
+) -> CommandResult {
+    match msg.channel(&cache).await {
         Some(ch) => {
             if files.is_empty() {
-                msg.reply(&ctx.http, "Error: Couldn't download files")
-                    .await?;
+                msg.reply(&http, "Error: Couldn't download files").await?;
             }
             ch.id()
-                .send_files(&ctx.http, &files, |m| m.content("Here are your files:"))
+                .send_files(&http, &files, |m| m.content("Here are your files:"))
                 .await?;
         }
         None => {
-            msg.reply(&ctx.http, "Error: couldn't send files to channel")
+            msg.reply(&http, "Error: couldn't send files to channel")
                 .await?;
         }
     };
@@ -131,14 +163,14 @@ async fn send_files_to_channel(msg: &Message, ctx: &Context, files: Vec<PathBuf>
 
 async fn send_files_to_webserver(
     msg: &Message,
-    ctx: &Context,
+    http: Arc<Http>,
     files: Vec<PathBuf>,
     id: &str,
 ) -> CommandResult {
     let host = match crate::CONFIG.get_str("hostname") {
         Ok(host) => host,
         Err(_) => {
-            msg.reply(&ctx.http, "Error: couldn't find hostname in config.yml")
+            msg.reply(&http, "Error: couldn't find hostname in config.yml")
                 .await?;
             return Ok(());
         }
@@ -146,7 +178,7 @@ async fn send_files_to_webserver(
     let webdir = match crate::CONFIG.get_str("webdir") {
         Ok(host) => host,
         Err(_) => {
-            msg.reply(&ctx.http, "Error: couldn't find hostname in config.yml")
+            msg.reply(&http, "Error: couldn't find hostname in config.yml")
                 .await?;
             return Ok(());
         }
@@ -154,7 +186,7 @@ async fn send_files_to_webserver(
     let webroot = match crate::CONFIG.get_str("webroot") {
         Ok(root) => root,
         Err(_) => {
-            msg.reply(&ctx.http, "Error, couldn't find webroot in config.yml")
+            msg.reply(&http, "Error, couldn't find webroot in config.yml")
                 .await?;
             return Ok(());
         }
@@ -164,7 +196,7 @@ async fn send_files_to_webserver(
     if !final_dir.exists() {
         if let Err(_) = create_dir_all(&final_dir) {
             msg.reply(
-                &ctx.http,
+                &http,
                 "Error: couldn't create user's download directory, contact bot owner",
             )
             .await?;
@@ -173,14 +205,14 @@ async fn send_files_to_webserver(
     }
     if let Err(_) = fs_extra::move_items(&files, &final_dir, &dir::CopyOptions::new()) {
         msg.reply(
-            &ctx.http,
+            &http,
             "Error: couldn't move files to destination, contact bot owner",
         )
         .await?;
         return Ok(());
     }
     msg.reply(
-        &ctx.http,
+        &http,
         format!(
             "You can download your files here {}/{}/{}/",
             host, webdir, id
