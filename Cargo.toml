@@ -13,6 +13,9 @@ config = "0.11.0"
 rusqlite = "0.25.1"
 ytd-rs = {git = "https://github.com/Nirusu99/ytd-rs", branch = "main"}
 lazy_static = "1.4.0"
+regex = "1"
+sha2 = "0.9.4"
+fs_extra = "1.2.0"
 
 [dependencies.tokio]
 version = "1.0"

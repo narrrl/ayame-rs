@@ -15,7 +15,7 @@ use serenity::{
     model::{event::ResumedEvent, gateway::Ready},
     prelude::*,
 };
-use std::{collections::HashSet, env, sync::Arc};
+use std::{collections::HashSet, env, fs::remove_dir_all, sync::Arc};
 use std::{io, path::PathBuf};
 
 use config::*;
@@ -32,13 +32,17 @@ lazy_static! {
         settings
             .merge(File::with_name(
                 get_file("config.yml")
-                    .expect("Couldn't get bot directory")
                     .to_str()
                     .expect("Couldn't get path of bot dir"),
             ))
             .expect("Expected config.yml in bot directory");
 
         settings
+    };
+    pub static ref BOT_DIR: PathBuf = {
+        let mut dir = std::env::current_exe().expect("Couldn't get bot directory");
+        dir.pop();
+        dir
     };
 }
 
@@ -75,11 +79,10 @@ struct Music;
 #[commands(ytd)]
 struct YoutubeDL;
 
-pub fn get_file(name: &str) -> io::Result<PathBuf> {
-    let mut dir = env::current_exe()?;
-    dir.pop();
+pub fn get_file(name: &str) -> PathBuf {
+    let mut dir = BOT_DIR.clone();
     dir.push(name);
-    Ok(dir)
+    dir
 }
 
 #[tokio::main]
@@ -115,6 +118,9 @@ async fn main() {
     let prefix: &str = &CONFIG
         .get_str("prefix")
         .expect("Couldn't find bot prefix in config");
+
+    info!("Cleaning temporary directory");
+    let _ = remove_dir_all(get_file("tmp"));
 
     let framework = StandardFramework::new()
         .configure(|c| {
