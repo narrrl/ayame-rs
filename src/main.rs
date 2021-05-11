@@ -96,8 +96,14 @@ async fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to start the Logger");
 
-    let token =
-        env::var("DISCORD_TOKEN").expect("Failed to load DISCORD_TOKEN from the environment");
+    // get token from .evv
+    let token = env::var("DISCORD_TOKEN").map_or(
+        // or from config.yml
+        CONFIG
+            .get_str("token")
+            .expect("Failed to load DISCORD_TOKEN from the environment"),
+        |m| m.to_string(),
+    );
 
     let http = Http::new_with_token(&token);
 

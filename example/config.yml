@@ -6,3 +6,5 @@ hostname: "https://my.domain.com"
 webdir: "path/in/url"
 # normally /var/www/html
 webroot: "/path/to/webroot"
+# bot token, DON'T SHARE!
+token: "BOT_TOKEN"
