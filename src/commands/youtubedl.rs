@@ -195,6 +195,18 @@ async fn send_files_to_webserver(
     files: Vec<PathBuf>,
     id: &str,
 ) -> CommandResult {
+    // check if this option was disabled in config
+    if crate::CONFIG
+        .get_bool("disableWebserver")
+        .map_or(false, |m| m)
+    {
+        msg.reply(
+            &http,
+            "Bot owner disabled the option to upload files larger than 8mb",
+        )
+        .await?;
+        return Ok(());
+    }
     // first get all the configuration from the config.yml
     let host = match crate::CONFIG.get_str("hostname") {
         Ok(host) => host,
@@ -305,7 +317,13 @@ fn get_all_files(file: &PathBuf) -> Result<Vec<PathBuf>, String> {
 fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> {
     let mut args: Vec<Arg> = Vec::new();
     // download rate limit
-    args.push(Arg::new_with_arg("-r", "1000K"));
+    args.push(Arg::new_with_arg(
+        "-r",
+        crate::CONFIG
+            .get_str("downloadRateLimit")
+            .map_or("1000K".to_string(), |m| m)
+            .as_ref(),
+    ));
     let mut link = "".to_string();
 
     // split into 2 at the first "ytd" inside the userinput to separate
