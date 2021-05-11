@@ -43,7 +43,9 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
         Ok(dl) => dl,
         Err(why) => {
             msg.reply(&ctx.http, format!("Error: {}", why)).await?;
-            let _ = remove_dir_all(dir.as_path());
+            if !why.eq("download runnig") {
+                let _ = remove_dir_all(dir.as_path());
+            }
             return Ok(());
         }
     };
