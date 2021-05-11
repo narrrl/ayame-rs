@@ -186,7 +186,10 @@ async fn send_files_to_webserver(
     }
     msg.reply(
         &ctx.http,
-        format!("You can download your files here {}/{}", host, webdir),
+        format!(
+            "You can download your files here {}/{}/{}/",
+            host, webdir, id
+        ),
     )
     .await?;
     Ok(())
