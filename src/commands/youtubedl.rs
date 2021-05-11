@@ -248,19 +248,14 @@ async fn send_files_to_webserver(
         }
     }
 
+    // copy options
+    let mut copy_options = dir::CopyOptions::new();
+    copy_options.overwrite = true;
+    copy_options.skip_exist = true;
+    copy_options.copy_inside = true;
+
     // move all files to the webroot
-    if let Err(_) = fs_extra::move_items(
-        &files,
-        &final_dir,
-        &dir::CopyOptions {
-            overwrite: true,
-            skip_exist: true,
-            buffer_size: 64000,
-            copy_inside: false,
-            content_only: true,
-            depth: 0,
-        },
-    ) {
+    if let Err(_) = fs_extra::move_items(&files, &final_dir, &copy_options) {
         msg.reply(
             &http,
             "Error: couldn't move files to destination, contact bot owner",
