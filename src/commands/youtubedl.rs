@@ -7,12 +7,12 @@ use std::{
 use fs_extra::dir::{self, get_size};
 use lazy_static::lazy_static;
 use regex::Regex;
-use serenity::prelude::*;
 use serenity::{client::Cache, model::prelude::*};
 use serenity::{
     framework::standard::{macros::command, CommandResult},
     http::Http,
 };
+use serenity::{prelude::*, utils::Color};
 use sha2::{Digest, Sha256};
 use tokio::task;
 use ytd_rs::ytd::{Arg, YoutubeDL};
@@ -36,7 +36,7 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     let (args, link) = match get_args(content) {
         Ok(tup) => tup,
         Err(why) => {
-            msg.reply(&ctx.http, format!("Error: {}", why)).await?;
+            send_error(&msg, &ctx.http, &why).await?;
             return Ok(());
         }
     };
@@ -78,7 +78,7 @@ async fn start(
     let download = match download(&dir, args, link).await {
         Ok(dl) => dl,
         Err((clean_dir, why)) => {
-            msg.reply(&http, format!("Error: {}", &why)).await?;
+            send_error(&msg, &http, &why.replace("\\n", "\n").replace("\"", "")).await?;
 
             if clean_dir {
                 let _ = remove_dir_all(dir.as_path());
@@ -90,7 +90,7 @@ async fn start(
     let size = match get_size(dir.as_path()) {
         Ok(size) => size,
         Err(why) => {
-            msg.reply(&http, format!("Error: {}", why)).await?;
+            send_error(&msg, &http, &format!("{}", why)).await?;
             return Ok(());
         }
     };
@@ -174,15 +174,14 @@ async fn send_files_to_channel(
     match msg.channel(&cache).await {
         Some(ch) => {
             if files.is_empty() {
-                msg.reply(&http, "Error: Couldn't download files").await?;
+                send_error(&msg, &http, "Could't download files").await?;
             }
             ch.id()
                 .send_files(&http, &files, |m| m.content("Here are your files:"))
                 .await?;
         }
         None => {
-            msg.reply(&http, "Error: couldn't send files to channel")
-                .await?;
+            send_error(&msg, &http, "Couldn't send files to channel").await?;
         }
     };
     Ok(())
@@ -200,7 +199,8 @@ async fn send_files_to_webserver(
         .get_bool("disableWebserver")
         .map_or(false, |m| m)
     {
-        msg.reply(
+        send_error(
+            &msg,
             &http,
             "Bot owner disabled the option to upload files larger than 8mb",
         )
@@ -211,24 +211,21 @@ async fn send_files_to_webserver(
     let host = match crate::CONFIG.get_str("hostname") {
         Ok(host) => host,
         Err(_) => {
-            msg.reply(&http, "Error: couldn't find hostname in config.yml")
-                .await?;
+            send_error(&msg, &http, "Couldn't find hostname in config.yml").await?;
             return Ok(());
         }
     };
     let webdir = match crate::CONFIG.get_str("webdir") {
         Ok(host) => host,
         Err(_) => {
-            msg.reply(&http, "Error: couldn't find hostname in config.yml")
-                .await?;
+            send_error(&msg, &http, "Couldn't find hostname in config.yml").await?;
             return Ok(());
         }
     };
     let webroot = match crate::CONFIG.get_str("webroot") {
         Ok(root) => root,
         Err(_) => {
-            msg.reply(&http, "Error, couldn't find webroot in config.yml")
-                .await?;
+            send_error(&msg, &http, "Couldn't find webroot in config.yml").await?;
             return Ok(());
         }
     };
@@ -239,9 +236,10 @@ async fn send_files_to_webserver(
     // create if it doesn't exists
     if !final_dir.exists() {
         if let Err(_) = create_dir_all(&final_dir) {
-            msg.reply(
+            send_error(
+                &msg,
                 &http,
-                "Error: couldn't create user's download directory, contact bot owner",
+                "Couldn't create user's download directory, contact bot owner",
             )
             .await?;
             return Ok(());
@@ -256,23 +254,28 @@ async fn send_files_to_webserver(
 
     // move all files to the webroot
     if let Err(_) = fs_extra::move_items(&files, &final_dir, &copy_options) {
-        msg.reply(
+        send_error(
+            &msg,
             &http,
-            "Error: couldn't move files to destination, contact bot owner",
+            "Couldn't move files to destination, contact bot owner",
         )
         .await?;
         return Ok(());
     }
     // inform user about the download
     // {hostname}/{webdir}/{id}/
-    msg.reply(
-        &http,
-        format!(
-            "You can download your files here {}/{}/{}/",
-            host, webdir, id
-        ),
-    )
-    .await?;
+    msg.channel_id
+        .send_message(&http, |m| {
+            m.embed(|e| {
+                e.title("Your download is ready!");
+                e.url(format!("{}/{}/{}/", host, webdir, id));
+                e.description(format!("Your files were to big to upload to Discord!\nBut we got you covered and provided a download on our (webserver)[{}/{}/{}/]\n{}/{}/{}/",
+                        host, webdir, id, host, webdir, id));
+                e.color(Color::from_rgb(238, 14, 97));
+                e
+            })
+        })
+        .await?;
     Ok(())
 }
 
@@ -375,4 +378,18 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
     }
 
     Ok((args, link))
+}
+
+async fn send_error(msg: &Message, http: &Arc<Http>, error_msg: &str) -> CommandResult {
+    msg.channel_id
+        .send_message(&http, |m| {
+            m.embed(|e| {
+                e.title("Error");
+                e.description(error_msg);
+                e.color(Color::from_rgb(238, 14, 97));
+                e
+            })
+        })
+        .await?;
+    Ok(())
 }
