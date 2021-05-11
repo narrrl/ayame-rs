@@ -1,6 +1,5 @@
 // models like music manager, yt downloader...
 pub mod model {
-    pub mod database;
     pub mod music;
 }
 

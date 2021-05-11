@@ -228,12 +228,12 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
     let mut args: Vec<Arg> = Vec::new();
     let mut link = "".to_string();
 
-    let user_inp: &str = match message.split("ytd").collect::<Vec<&str>>().last() {
+    let user_inp: &str = match message.splitn(2, "ytd").collect::<Vec<&str>>().last() {
         Some(inp) => inp,
         None => return Err("couldn't get user input".to_string()),
     };
 
-    for s in user_inp.trim().split(" ").collect::<Vec<&str>>().iter() {
+    for s in user_inp.trim().split_whitespace() {
         if URL_REGEX.is_match(s) {
             if !link.eq("") {
                 return Err("you can only download one source at a time!".to_string());
@@ -255,7 +255,7 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
                 }
             }
             None => {
-                return Err("{} is not an option".to_string());
+                return Err(format!("{} is not an option", s));
             }
         }
     }
