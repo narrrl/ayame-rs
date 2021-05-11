@@ -1,1 +1,8 @@
 prefix: "~"
+# domain name with protocol
+hostname: "https://my.domain.com"
+# download location for download files
+# https://my.domain.com/path/in/url
+webdir: "path/in/url"
+# normally /var/www/html
+webroot: "/path/to/webroot"
