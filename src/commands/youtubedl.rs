@@ -269,7 +269,7 @@ async fn send_files_to_webserver(
             m.embed(|e| {
                 e.title("Your download is ready!");
                 e.url(format!("{}/{}/{}/", host, webdir, id));
-                e.description(format!("Your files were to big to upload to Discord!\nBut we got you covered and provided a download on our (webserver)[{}/{}/{}/]\n{}/{}/{}/",
+                e.description(format!("Your files were to big to upload to Discord!\nBut we got you covered and provided a download on our [webserver]({}/{}/{}/):\n{}/{}/{}/",
                         host, webdir, id, host, webdir, id));
                 e.color(Color::from_rgb(238, 14, 97));
                 e
