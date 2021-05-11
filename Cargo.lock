@@ -1653,4 +1653,4 @@ dependencies = [
 [[package]]
 name = "ytd-rs"
 version = "0.1.0"
-source = "git+https://github.com/Nirusu99/ytd-rs?branch=main#bac1a5c8b0d90b245b7bcbbd41cfc2e54929b19f"
+source = "git+https://github.com/Nirusu99/ytd-rs?branch=main#82b5c6ec9fd5f8d29e482ee859728a54a8d6a7c2"
