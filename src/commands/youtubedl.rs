@@ -44,6 +44,7 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
         }
     };
 
+    //TODO: seperate into two different targets to improve readability
     if let Some(files) = dl {
         match msg.channel(&ctx.cache).await {
             Some(ch) => {
@@ -94,6 +95,7 @@ async fn download(
     args: Vec<Arg>,
     link: String,
 ) -> std::result::Result<Option<Vec<PathBuf>>, String> {
+    //TODO: hash user id
     // let mut hasher = Sha256::new();
     // hasher.update(id.to_string());
     // let hash = hasher.finalize();
@@ -153,10 +155,12 @@ fn make_download_ready(download: &PathBuf) -> std::result::Result<Option<Vec<Pat
             }
         })
     } else {
+        //TODO: implement
         Err("not implemented yet".to_string())
     }
 }
 
+//TODO: reimplement that beauty
 fn get_all_files(file: &PathBuf) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     if file.is_dir() {
@@ -197,6 +201,7 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
     let mut link = "".to_string();
 
     for s in message.split(" ").collect::<Vec<&str>>().iter() {
+        //TODO: find out how to get args without the prefix and command
         if s.to_string().eq("ytd")
             || s.to_string().eq("@Nirust#4234")
             || s.to_string().eq("@Nirust#4234ytd")
