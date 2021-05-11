@@ -128,6 +128,7 @@ async fn main() {
                 .on_mention(Some(bot_id))
                 .with_whitespace(true)
                 .delimiters(vec![", ", ","])
+                .no_dm_prefix(true)
         })
         .group(&GENERAL_GROUP)
         .group(&MUSIC_GROUP)
