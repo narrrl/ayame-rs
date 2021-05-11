@@ -1,9 +1,9 @@
 use std::{
-    fs::{read_dir, remove_dir_all},
+    fs::{create_dir_all, read_dir, remove_dir_all},
     path::PathBuf,
 };
 
-use fs_extra::dir::get_size;
+use fs_extra::dir::{self, get_size};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serenity::framework::standard::{macros::command, CommandResult};
@@ -35,7 +35,7 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     dir.push("ytd");
     dir.push(id.to_string());
 
-    let dl = match download(&dir, args, link).await {
+    let download = match download(&dir, args, link).await {
         Ok(dl) => dl,
         Err(why) => {
             msg.reply(&ctx.http, format!("Error: {}", why)).await?;
@@ -44,47 +44,18 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
         }
     };
 
-    //TODO: seperate into two different targets to improve readability
-    if let Some(files) = dl {
-        match msg.channel(&ctx.cache).await {
-            Some(ch) => {
-                if files.is_empty() {
-                    msg.reply(&ctx.http, "Error: Couldn't download files")
-                        .await?;
-                }
-                ch.id()
-                    .send_files(&ctx.http, &files, |m| m.content("Here are your files:"))
-                    .await?;
-            }
-            None => {
-                msg.reply(&ctx.http, "Error: couldn't send files to channel")
-                    .await?;
-            }
-        };
+    let size = match get_size(dir.as_path()) {
+        Ok(size) => size,
+        Err(why) => {
+            msg.reply(&ctx.http, format!("Error: {}", why)).await?;
+            return Ok(());
+        }
+    };
+
+    if size < 8000000 {
+        let _ = send_files_to_channel(msg, ctx, download).await;
     } else {
-        let host = match crate::CONFIG.get_str("hostname") {
-            Ok(host) => host,
-            Err(_) => {
-                msg.reply(&ctx.http, "Error: couldn't find hostname in config.yml")
-                    .await?;
-                let _ = remove_dir_all(dir.as_path());
-                return Ok(());
-            }
-        };
-        let webdir = match crate::CONFIG.get_str("webdir") {
-            Ok(host) => host,
-            Err(_) => {
-                msg.reply(&ctx.http, "Error: couldn't find hostname in config.yml")
-                    .await?;
-                let _ = remove_dir_all(dir.as_path());
-                return Ok(());
-            }
-        };
-        msg.reply(
-            &ctx.http,
-            format!("You can download your files here {}/{}", host, webdir),
-        )
-        .await?;
+        let _ = send_files_to_webserver(msg, ctx, download, &id).await;
     }
     let _ = remove_dir_all(dir.as_path());
     Ok(())
@@ -94,7 +65,7 @@ async fn download(
     bot_dir: &PathBuf,
     args: Vec<Arg>,
     link: String,
-) -> std::result::Result<Option<Vec<PathBuf>>, String> {
+) -> std::result::Result<Vec<PathBuf>, String> {
     //TODO: hash user id
     // let mut hasher = Sha256::new();
     // hasher.update(id.to_string());
@@ -136,33 +107,94 @@ async fn download(
         }
     };
 
-    make_download_ready(download)
-}
-
-fn make_download_ready(download: &PathBuf) -> std::result::Result<Option<Vec<PathBuf>>, String> {
-    let size = match get_size(download.as_path()) {
-        Ok(read) => read,
+    match get_all_files(download) {
+        Ok(files) => Ok(files),
         Err(_) => {
             return Err("couldn't read download dir".to_string());
         }
+    }
+}
+
+async fn send_files_to_channel(msg: &Message, ctx: &Context, files: Vec<PathBuf>) -> CommandResult {
+    match msg.channel(&ctx.cache).await {
+        Some(ch) => {
+            if files.is_empty() {
+                msg.reply(&ctx.http, "Error: Couldn't download files")
+                    .await?;
+            }
+            ch.id()
+                .send_files(&ctx.http, &files, |m| m.content("Here are your files:"))
+                .await?;
+        }
+        None => {
+            msg.reply(&ctx.http, "Error: couldn't send files to channel")
+                .await?;
+        }
+    };
+    Ok(())
+}
+
+async fn send_files_to_webserver(
+    msg: &Message,
+    ctx: &Context,
+    files: Vec<PathBuf>,
+    id: &u64,
+) -> CommandResult {
+    let host = match crate::CONFIG.get_str("hostname") {
+        Ok(host) => host,
+        Err(_) => {
+            msg.reply(&ctx.http, "Error: couldn't find hostname in config.yml")
+                .await?;
+            return Ok(());
+        }
+    };
+    let webdir = match crate::CONFIG.get_str("webdir") {
+        Ok(host) => host,
+        Err(_) => {
+            msg.reply(&ctx.http, "Error: couldn't find hostname in config.yml")
+                .await?;
+            return Ok(());
+        }
+    };
+    let webroot = match crate::CONFIG.get_str("webroot") {
+        Ok(root) => root,
+        Err(_) => {
+            msg.reply(&ctx.http, "Error, couldn't find webroot in config.yml")
+                .await?;
+            return Ok(());
+        }
     };
 
-    if size < 8000000 {
-        Ok(match get_all_files(download) {
-            Ok(files) => Some(files),
-            Err(_) => {
-                return Err("couldn't read download dir".to_string());
-            }
-        })
-    } else {
-        //TODO: implement
-        Err("not implemented yet".to_string())
+    let final_dir = PathBuf::from(format!("{}/{}/{}", webroot, webdir, id));
+    if !final_dir.exists() {
+        if let Err(_) = create_dir_all(&final_dir) {
+            msg.reply(
+                &ctx.http,
+                "Error: couldn't create user's download directory, contact bot owner",
+            )
+            .await?;
+            return Ok(());
+        }
     }
+    if let Err(_) = fs_extra::move_items(&files, &final_dir, &dir::CopyOptions::new()) {
+        msg.reply(
+            &ctx.http,
+            "Error: couldn't move files to destination, contact bot owner",
+        )
+        .await?;
+        return Ok(());
+    }
+    msg.reply(
+        &ctx.http,
+        format!("You can download your files here {}/{}", host, webdir),
+    )
+    .await?;
+    Ok(())
 }
 
 //TODO: reimplement that beauty
 fn get_all_files(file: &PathBuf) -> Result<Vec<PathBuf>, String> {
-    let mut files = Vec::new();
+    let mut files: Vec<PathBuf> = Vec::new();
     if file.is_dir() {
         for path in match read_dir(file.as_path()) {
             Ok(read) => read,
@@ -171,24 +203,20 @@ fn get_all_files(file: &PathBuf) -> Result<Vec<PathBuf>, String> {
             }
         } {
             match path {
-                Ok(p) => {
-                    if p.path().is_dir() {
-                        for f in match get_all_files(&p.path()) {
-                            Ok(v) => v,
-                            Err(why) => {
-                                return Err(why);
-                            }
-                        } {
-                            files.push(f)
+                Ok(p) => match get_all_files(&p.path().to_path_buf()) {
+                    Ok(vec) => {
+                        for f in vec {
+                            files.push(f);
                         }
-                    } else {
-                        files.push(p.path().to_path_buf());
                     }
-                }
+                    Err(why) => {
+                        return Err(why);
+                    }
+                },
                 Err(_) => {
                     return Err("couldn't read download directory".to_string());
                 }
-            }
+            };
         }
     } else {
         files.push(file.clone());
@@ -200,15 +228,12 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
     let mut args: Vec<Arg> = Vec::new();
     let mut link = "".to_string();
 
-    for s in message.split(" ").collect::<Vec<&str>>().iter() {
-        //TODO: find out how to get args without the prefix and command
-        if s.to_string().eq("ytd")
-            || s.to_string().eq("@Nirust#4234")
-            || s.to_string().eq("@Nirust#4234ytd")
-            || s.to_string().eq("~ytd")
-        {
-            continue;
-        }
+    let user_inp: &str = match message.split("ytd").collect::<Vec<&str>>().last() {
+        Some(inp) => inp,
+        None => return Err("couldn't get user input".to_string()),
+    };
+
+    for s in user_inp.split(" ").collect::<Vec<&str>>().iter() {
         if URL_REGEX.is_match(s) {
             if !link.eq("") {
                 return Err("you can only download one source at a time!".to_string());
