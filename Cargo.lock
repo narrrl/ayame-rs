@@ -1565,6 +1565,9 @@ dependencies = [
 
 [[package]]
 name = "ytd-rs"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efb23082211ab2dae79a8534b647ac932879ec4aab169277f1b53ae33e22cbbe"
+checksum = "05d5f8da5062a82ccdf0295b8b2b2c0f95f614c3b7802fcef748954f8c7a388e"
+dependencies = [
+ "regex",
+]

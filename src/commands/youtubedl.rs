@@ -15,7 +15,7 @@ use serenity::{
 use serenity::{prelude::*, utils::Color};
 use sha2::{Digest, Sha256};
 use tokio::task;
-use ytd_rs::ytd::{Arg, ResultType, YoutubeDL};
+use ytd_rs::{Arg, ResultType, YoutubeDL};
 
 lazy_static! {
     static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
@@ -137,7 +137,7 @@ async fn download(
 
     // get the youtubedl task
     let ytd = match bot_dir.to_str() {
-        Some(path) => match YoutubeDL::new(path, args, link) {
+        Some(path) => match YoutubeDL::new(path, args, &link) {
             Ok(ytd) => ytd,
             Err(why) => {
                 return Err((true, format!("couldn't create download: {:?}", why)));
