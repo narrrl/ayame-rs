@@ -1,8 +1,3 @@
-// models like music manager, yt downloader...
-pub mod model {
-    pub mod music;
-}
-
 // commands
 mod commands;
 
