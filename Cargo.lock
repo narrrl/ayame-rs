@@ -1566,4 +1566,5 @@ dependencies = [
 [[package]]
 name = "ytd-rs"
 version = "0.1.0"
-source = "git+https://github.com/Nirusu99/ytd-rs?branch=main#3906d48469af3492607a6a75f377fc1388a6a2f8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efb23082211ab2dae79a8534b647ac932879ec4aab169277f1b53ae33e22cbbe"

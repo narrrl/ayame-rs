@@ -339,6 +339,7 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
             .as_ref(),
     ));
     args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
+    args.push(Arg::new("--quiet"));
     let mut link = "".to_string();
 
     // split into 2 at the first "ytd" inside the userinput to separate
