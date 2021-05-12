@@ -34,7 +34,7 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     let hashed_id = &format!("{:x}", &hash);
 
     // get arguments and the download link
-    let (args, link) = match get_args(content) {
+    let (args, links) = match get_args(content) {
         Ok(tup) => tup,
         Err(why) => {
             send_error(&msg, &ctx.http, &why).await?;
@@ -59,7 +59,7 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
         msg.clone(),
         dir,
         args,
-        link,
+        links,
         hashed_id.to_string(),
     ));
     Ok(())
@@ -70,7 +70,7 @@ async fn start(
     msg: Message,
     dir: PathBuf,
     args: Vec<Arg>,
-    link: String,
+    link: Vec<String>,
     hashed_id: String,
 ) -> CommandResult {
     let (output, download) = match download(&dir, args, link).await {
@@ -116,7 +116,7 @@ async fn start(
 async fn download(
     bot_dir: &PathBuf,
     args: Vec<Arg>,
-    link: String,
+    links: Vec<String>,
 ) -> std::result::Result<(String, Vec<PathBuf>), (bool, String)> {
     // check if another download by that user is running
     if bot_dir.exists() {
@@ -135,7 +135,7 @@ async fn download(
 
     // get the youtubedl task
     let ytd = match bot_dir.to_str() {
-        Some(path) => match YoutubeDL::new(path, args, &link) {
+        Some(path) => match YoutubeDL::new_multiple_links(path, args, links) {
             Ok(ytd) => ytd,
             Err(why) => {
                 return Err((true, format!("couldn't create download: {:?}", why)));
@@ -332,7 +332,7 @@ fn get_all_files(file: &PathBuf) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
-fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> {
+fn get_args(message: String) -> std::result::Result<(Vec<Arg>, Vec<String>), String> {
     let mut args: Vec<Arg> = Vec::new();
     // download rate limit
     args.push(Arg::new_with_arg(
@@ -343,7 +343,7 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
             .as_ref(),
     ));
     args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
-    let mut link = "".to_string();
+    let mut links: Vec<String> = Vec::new();
 
     // split into 2 at the first "youtube-dl" inside the userinput to separate
     // {prefix}youtube-dl from the {args.../link}
@@ -361,10 +361,7 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
         // check if an link was already found
         // because we don't want mass downloads
         if URL_REGEX.is_match(s) {
-            if !link.eq("") {
-                return Err("you can only download one source at a time!".to_string());
-            }
-            link = s.to_string();
+            links.push(s.to_string());
             continue;
         }
         // check if its an arg with input or not
@@ -391,7 +388,7 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
         }
     }
 
-    Ok((args, link))
+    Ok((args, links))
 }
 
 async fn send_error(msg: &Message, http: &Arc<Http>, error_msg: &str) -> CommandResult {
