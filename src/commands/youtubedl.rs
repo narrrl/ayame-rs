@@ -372,6 +372,9 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, Vec<String>), Str
                 // inp is "" when its just an arg
                 let arg = cap.get(1).map_or("", |m| m.as_str());
                 let inp = cap.get(2).map_or("", |m| m.as_str());
+                if inp.eq("--exec") {
+                    return Err(format!("Nice try with exec"));
+                }
                 if !inp.eq("") {
                     args.push(Arg::new_with_arg(
                         &arg,
