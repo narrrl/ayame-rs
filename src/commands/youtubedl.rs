@@ -153,7 +153,13 @@ async fn download(
         ResultType::IOERROR | ResultType::FAILURE => {
             return Err((
                 true,
-                format!("couldn't start download: {}", download.output()),
+                format!(
+                    "couldn't start download: {}",
+                    download
+                        .output()
+                        // remove basic usage ouput of youtube-dl
+                        .replace("Usage: youtube-dl [OPTIONS] URL [URL...]", "")
+                ),
             ));
         }
     };
