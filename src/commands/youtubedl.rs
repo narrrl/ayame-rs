@@ -1,13 +1,14 @@
 use std::{
-    fs::{create_dir_all, read_dir, remove_dir_all},
+    fs::{create_dir_all, read_dir, remove_dir_all, File},
+    io::prelude::*,
     path::PathBuf,
     sync::Arc,
 };
 
-use fs_extra::dir::{self, get_size};
+use fs_extra::dir::{self, create_all, get_size};
 use lazy_static::lazy_static;
 use regex::Regex;
-use serenity::{client::Cache, model::prelude::*};
+use serenity::model::prelude::*;
 use serenity::{
     framework::standard::{macros::command, CommandResult},
     http::Http,
@@ -22,7 +23,7 @@ lazy_static! {
     static ref ARG_REGEX: Regex = Regex::new(r"(--?[a-zA-Z\-]+)(\([a-zA-Z0-9\-]+\))?").expect("Couldn't build args Regex");
 }
 
-#[command]
+#[command("youtube-dl")]
 async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     let content = msg.content_safe(&ctx.cache).await;
     let id = msg.author.id.as_u64();
@@ -49,14 +50,12 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
     dir.push(hashed_id);
 
     // clone values for passing into another thread
-    let cache = ctx.cache.clone();
     let http = ctx.http.clone();
 
     // spawn a new thread that handles the download
     // because we don't want to block this thread
     task::spawn(start(
         http,
-        cache,
         msg.clone(),
         dir,
         args,
@@ -68,14 +67,13 @@ async fn ytd(ctx: &Context, msg: &Message) -> CommandResult {
 
 async fn start(
     http: Arc<Http>,
-    cache: Arc<Cache>,
     msg: Message,
     dir: PathBuf,
     args: Vec<Arg>,
     link: String,
     hashed_id: String,
 ) -> CommandResult {
-    let download = match download(&dir, args, link).await {
+    let (output, download) = match download(&dir, args, link).await {
         Ok(dl) => dl,
         Err((clean_dir, why)) => {
             send_error(&msg, &http, &why.replace("\\n", "\n").replace("\"", "")).await?;
@@ -96,7 +94,7 @@ async fn start(
     };
 
     if size < 8000000 {
-        send_files_to_channel(&msg, http, cache, download).await?;
+        send_files_to_channel(&msg, http, download, output, dir.clone()).await?;
     } else {
         send_files_to_webserver(&msg, http, download, &hashed_id).await?;
     }
@@ -119,7 +117,7 @@ async fn download(
     bot_dir: &PathBuf,
     args: Vec<Arg>,
     link: String,
-) -> std::result::Result<Vec<PathBuf>, (bool, String)> {
+) -> std::result::Result<(String, Vec<PathBuf>), (bool, String)> {
     // check if another download by that user is running
     if bot_dir.exists() {
         match read_dir(&bot_dir) {
@@ -130,7 +128,7 @@ async fn download(
                 }
             }
             Err(why) => {
-                return Err((true, format!("could't read download directory: {:?}", why)));
+                return Err((true, format!("couldn't read download directory: {:?}", why)));
             }
         }
     }
@@ -165,39 +163,39 @@ async fn download(
     };
 
     // get all files in that directory that aren't directories and return them as result
-    match get_all_files(path) {
-        Ok(files) => Ok(files),
+    let all_files = match get_all_files(path) {
+        Ok(files) => files,
         Err(_) => {
             return Err((true, "couldn't read download dir".to_string()));
         }
-    }
+    };
+
+    Ok((download.output().to_string(), all_files))
 }
 
 async fn send_files_to_channel(
     msg: &Message,
     http: Arc<Http>,
-    cache: Arc<Cache>,
     files: Vec<PathBuf>,
+    output: String,
+    dir: PathBuf,
 ) -> CommandResult {
     // simply send alle files to the channel
     // becareful when the files are succeeding a size of around 8mb
-    match msg.channel(&cache).await {
-        Some(ch) => {
-            if files.is_empty() {
-                send_error(&msg, &http, "Could't download files").await?;
-            }
-            ch.id()
-                .send_files(&http, &files, |m| m.content("Here are your files:"))
+    if files.is_empty() {
+        if let Ok(file) = make_output_file(dir, output) {
+            msg.channel_id
+                .send_files(&http, &vec![file], |m| m.content(""))
                 .await?;
         }
-        None => {
-            send_error(&msg, &http, "Couldn't send files to channel").await?;
-        }
-    };
+        return Ok(());
+    }
+    msg.channel_id
+        .send_files(&http, &files, |m| m.content("Here are your files:"))
+        .await?;
     Ok(())
 }
 
-// TODO: make configuration to disable that feature
 async fn send_files_to_webserver(
     msg: &Message,
     http: Arc<Http>,
@@ -345,12 +343,15 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
             .as_ref(),
     ));
     args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
-    args.push(Arg::new("--quiet"));
     let mut link = "".to_string();
 
-    // split into 2 at the first "ytd" inside the userinput to separate
-    // {prefix}ytd from the {args.../link}
-    let user_inp: &str = match message.splitn(2, "ytd").collect::<Vec<&str>>().last() {
+    // split into 2 at the first "youtube-dl" inside the userinput to separate
+    // {prefix}youtube-dl from the {args.../link}
+    let user_inp: &str = match message
+        .splitn(2, "youtube-dl")
+        .collect::<Vec<&str>>()
+        .last()
+    {
         Some(inp) => inp,
         None => return Err("couldn't get user input".to_string()),
     };
@@ -405,4 +406,15 @@ async fn send_error(msg: &Message, http: &Arc<Http>, error_msg: &str) -> Command
         })
         .await?;
     Ok(())
+}
+
+fn make_output_file(mut dir: PathBuf, output: String) -> std::io::Result<PathBuf> {
+    let _ = create_all(&dir, true);
+    dir.push("message.txt");
+
+    let mut file = File::create(&dir)?;
+
+    file.write_all(output.as_bytes())?;
+
+    Ok(dir)
 }
