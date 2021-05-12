@@ -15,7 +15,7 @@ use serenity::{
 use serenity::{prelude::*, utils::Color};
 use sha2::{Digest, Sha256};
 use tokio::task;
-use ytd_rs::ytd::{Arg, YoutubeDL};
+use ytd_rs::ytd::{Arg, ResultType, YoutubeDL};
 
 lazy_static! {
     static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
@@ -147,15 +147,19 @@ async fn download(
     };
 
     // download via youtubedl and get the directory
-    let download = match ytd.download() {
-        Ok(dl) => dl,
-        Err(why) => {
-            return Err((true, format!("couldn't start download: {:?}", why)));
+    let download = ytd.download();
+    let path = match download.result_type() {
+        ResultType::SUCCESS => download.output_dir(),
+        ResultType::IOERROR | ResultType::FAILURE => {
+            return Err((
+                true,
+                format!("couldn't start download: {}", download.output()),
+            ));
         }
     };
 
     // get all files in that directory that aren't directories and return them as result
-    match get_all_files(download) {
+    match get_all_files(path) {
         Ok(files) => Ok(files),
         Err(_) => {
             return Err((true, "couldn't read download dir".to_string()));
@@ -334,6 +338,7 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, String), String> 
             .map_or("1000K".to_string(), |m| m)
             .as_ref(),
     ));
+    args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
     let mut link = "".to_string();
 
     // split into 2 at the first "ytd" inside the userinput to separate
