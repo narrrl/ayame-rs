@@ -1,21 +1,44 @@
-mod basic_commands;
+// commands
+mod commands;
 
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
-    framework::{
-        standard::{macros::command, macros::group, CommandResult},
-        StandardFramework,
-    },
+    framework::{standard::macros::group, StandardFramework},
     http::Http,
-    model::{channel::Message, event::ResumedEvent, gateway::Ready},
+    model::{event::ResumedEvent, gateway::Ready},
     prelude::*,
 };
-use std::{collections::HashSet, env, sync::Arc};
+use std::{collections::HashSet, env, fs::remove_dir_all, sync::Arc};
+use std::{io, path::PathBuf};
 
+use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
-use config::*;
+
+use commands::{general::*, music::*, youtubedl::*};
+
+use lazy_static::*;
+
+lazy_static! {
+    pub static ref CONFIG: Config = {
+        let mut settings = Config::default();
+        settings
+            .merge(File::with_name(
+                get_file("config.yml")
+                    .to_str()
+                    .expect("Couldn't get path of bot dir"),
+            ))
+            .expect("Expected config.yml in bot directory");
+
+        settings
+    };
+    pub static ref BOT_DIR: PathBuf = {
+        let mut dir = std::env::current_exe().expect("Couldn't get bot directory");
+        dir.pop();
+        dir
+    };
+}
 
 pub struct ShardManagerContainer;
 
@@ -42,21 +65,24 @@ impl EventHandler for Handler {
 #[commands(ping)]
 struct General;
 
+#[group]
+#[commands(play, test)]
+struct Music;
 
-async fn load_config(path: &str) -> Config{
-    let mut settings = Config::default();
-    settings.merge(File::with_name(path)).unwrap();
+#[group]
+#[commands(ytd)]
+struct YoutubeDL;
 
-    settings
+pub fn get_file(name: &str) -> PathBuf {
+    let mut dir = BOT_DIR.clone();
+    dir.push(name);
+    dir
 }
 
 #[tokio::main]
 async fn main() {
     // load environment
     dotenv::dotenv().expect("Failed to load environment");
-
-    //load the config file
-    let config: Config = load_config("./config.yml").await;
 
     // init the logger to use environment variables
     let subscriber = FmtSubscriber::builder()
@@ -65,13 +91,19 @@ async fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to start the Logger");
 
-    let token =
-        env::var("DISCORD_TOKEN").expect("Failed to load DISCORD_TOKEN from the environment");
+    // get token from .evv
+    let token = env::var("DISCORD_TOKEN").map_or(
+        // or from config.yml
+        CONFIG
+            .get_str("token")
+            .expect("Failed to load DISCORD_TOKEN from the environment"),
+        |m| m.to_string(),
+    );
 
     let http = Http::new_with_token(&token);
 
     // get owners and bot id from application
-    let (owners, _bot_id) = match http.get_current_application_info().await {
+    let (owners, bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
             let mut owners = HashSet::new();
             owners.insert(info.owner.id);
@@ -82,12 +114,31 @@ async fn main() {
     };
 
     // Create bot
-    // TODO: add commands
+    //load bot prefix from config
+    let prefix: &str = &CONFIG
+        .get_str("prefix")
+        .expect("Couldn't find bot prefix in config");
+
+    info!("Cleaning temporary directory");
+    let _ = remove_dir_all(get_file("tmp"));
+
     let framework = StandardFramework::new()
-        .configure(|c| c
-            .owners(owners)
-            .prefix(&*config.get_str("prefix").unwrap()))
-        .group(&GENERAL_GROUP);
+        .configure(|c| {
+            c.owners(owners)
+                .prefix(prefix)
+                .on_mention(Some(bot_id))
+                .with_whitespace(true)
+                .delimiters(vec![", ", ","])
+                .no_dm_prefix(true)
+        })
+        .group(&GENERAL_GROUP)
+        .group(&MUSIC_GROUP)
+        .group(&YOUTUBEDL_GROUP)
+        // annote command with #[bucket = "basic"]
+        // to limit command usage to 3 uses per 10 secs with a 2 seconds delay
+        // between invocations
+        .bucket("basic", |b| b.delay(2).time_span(10).limit(3))
+        .await;
 
     let mut client = Client::builder(&token)
         .framework(framework)
@@ -112,9 +163,4 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("Client error: {:?}", why);
     }
-}
-
-#[command]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    basic_commands::ping(&ctx, &msg).await
 }

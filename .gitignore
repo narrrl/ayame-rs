@@ -1,5 +1,7 @@
 /target
 /.env
+/config.yml
+/tmp
 
 #Intellij
 /.idea
