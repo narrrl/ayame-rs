@@ -9,14 +9,14 @@ use serenity::{
     model::{event::ResumedEvent, gateway::Ready},
     prelude::*,
 };
+use std::path::PathBuf;
 use std::{collections::HashSet, env, fs::remove_dir_all, sync::Arc};
-use std::{io, path::PathBuf};
 
 use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use commands::{general::*, music::*, youtubedl::*};
+use commands::{general::*, youtubedl::*};
 
 use lazy_static::*;
 
@@ -64,10 +64,6 @@ impl EventHandler for Handler {
 #[group]
 #[commands(ping)]
 struct General;
-
-#[group]
-#[commands(play, test)]
-struct Music;
 
 #[group]
 #[commands(ytd)]
@@ -132,7 +128,6 @@ async fn main() {
                 .no_dm_prefix(true)
         })
         .group(&GENERAL_GROUP)
-        .group(&MUSIC_GROUP)
         .group(&YOUTUBEDL_GROUP)
         // annote command with #[bucket = "basic"]
         // to limit command usage to 3 uses per 10 secs with a 2 seconds delay
