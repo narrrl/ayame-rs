@@ -334,15 +334,6 @@ fn get_all_files(file: &PathBuf) -> Result<Vec<PathBuf>, String> {
 
 fn get_args(message: String) -> std::result::Result<(Vec<Arg>, Vec<String>), String> {
     let mut args: Vec<Arg> = Vec::new();
-    // download rate limit
-    args.push(Arg::new_with_arg(
-        "-r",
-        crate::CONFIG
-            .get_str("downloadRateLimit")
-            .map_or("1000K".to_string(), |m| m)
-            .as_ref(),
-    ));
-    args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
     let mut links: Vec<String> = Vec::new();
 
     // split into 2 at the first "youtube-dl" inside the userinput to separate
@@ -373,7 +364,10 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, Vec<String>), Str
                 let arg = cap.get(1).map_or("", |m| m.as_str());
                 let inp = cap.get(2).map_or("", |m| m.as_str());
                 if inp.eq("--exec") {
-                    return Err(format!("Nice try with exec"));
+                    return Err(format!("Nice try"));
+                }
+                if arg.eq("--exec") {
+                    return Err(format!("Nice try"));
                 }
                 if !inp.eq("") {
                     args.push(Arg::new_with_arg(
@@ -390,6 +384,16 @@ fn get_args(message: String) -> std::result::Result<(Vec<Arg>, Vec<String>), Str
             }
         }
     }
+    // download rate limit
+    args.push(Arg::new_with_arg(
+        "-r",
+        crate::CONFIG
+            .get_str("downloadRateLimit")
+            .map_or("1000K".to_string(), |m| m)
+            .as_ref(),
+    ));
+    // output format
+    args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
 
     Ok((args, links))
 }
