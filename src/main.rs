@@ -16,7 +16,7 @@ use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use commands::{general::*, youtubedl::*};
+use commands::{admin::*, general::*, youtubedl::*};
 
 use lazy_static::*;
 
@@ -68,6 +68,10 @@ struct General;
 #[group]
 #[commands(ytd)]
 struct YoutubeDL;
+
+#[group]
+#[commands(addemote)]
+struct Admin;
 
 pub fn get_file(name: &str) -> PathBuf {
     let mut dir = BOT_DIR.clone();
@@ -129,6 +133,7 @@ async fn main() {
         })
         .group(&GENERAL_GROUP)
         .group(&YOUTUBEDL_GROUP)
+        .group(&ADMIN_GROUP)
         // annote command with #[bucket = "basic"]
         // to limit command usage to 3 uses per 10 secs with a 2 seconds delay
         // between invocations
