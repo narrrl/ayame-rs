@@ -1,5 +1,7 @@
 // commands
 mod commands;
+// utility
+mod util;
 
 use serenity::{
     async_trait,
