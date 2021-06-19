@@ -6,7 +6,11 @@ use serenity::{
     client::bridge::gateway::ShardManager,
     framework::{standard::macros::group, StandardFramework},
     http::Http,
-    model::{event::ResumedEvent, gateway::Ready},
+    model::{
+        event::ResumedEvent,
+        gateway::Ready,
+        interactions::{ApplicationCommand, Interaction, InteractionResponseType},
+    },
     prelude::*,
 };
 use std::path::PathBuf;
@@ -52,8 +56,30 @@ struct Handler;
 // Ready and Resumed events to notify if the bot has started/resumed
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        let _ = interaction
+            .create_interaction_response(&ctx.http, |response| {
+                response
+                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                    .interaction_response_data(|message| message.content("Received event!"))
+            })
+            .await;
+    }
+
+    async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
+
+        let _ = ApplicationCommand::create_global_application_command(&ctx.http, |a| {
+            a.name("ping").description("A simple ping command")
+        })
+        .await;
+
+        let interactions = ApplicationCommand::get_global_application_commands(&ctx.http).await;
+
+        println!(
+            "I have the following global slash command(s): {:?}",
+            interactions
+        );
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
@@ -139,10 +165,15 @@ async fn main() {
         // between invocations
         .bucket("basic", |b| b.delay(2).time_span(10).limit(3))
         .await;
+    let application_id: u64 = env::var("APPLICATION_ID")
+        .expect("Expected an application id in the environment")
+        .parse()
+        .expect("application id is not a valid id");
 
     let mut client = Client::builder(&token)
         .framework(framework)
         .event_handler(Handler)
+        .application_id(application_id)
         .await
         .expect("Err creating client");
 

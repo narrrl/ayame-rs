@@ -22,4 +22,4 @@ features = ["macros", "signal", "rt-multi-thread"]
 
 [dependencies.serenity]
 version = "0.10"
-features = ["cache", "framework", "standard_framework", "rustls_backend"]
+features = ["cache", "framework", "standard_framework", "rustls_backend", "client", "gateway", "model", "unstable_discord_api"]
