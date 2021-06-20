@@ -1,10 +1,13 @@
 prefix: "~"
 # bot token, DON'T SHARE!
 token: "BOT_TOKEN"
+# application id for slash commands
+# usually the bot user id
+application_id: "APPLICATION_ID"
 
 
 # hostname, webdir, webroot are optional if this is true
-disableWebserver: false
+disableWebserver: true
 # domain name with protocol
 hostname: "https://my.domain.com"
 # download location for download files

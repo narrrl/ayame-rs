@@ -166,7 +166,13 @@ async fn main() {
         .bucket("basic", |b| b.delay(2).time_span(10).limit(3))
         .await;
     let application_id: u64 = env::var("APPLICATION_ID")
-        .expect("Expected an application id in the environment")
+        .map_or(
+            // or from config.yml
+            CONFIG
+                .get_str("application_id")
+                .expect("Failed to load APPLICATION_ID from the environment"),
+            |m| m.to_string(),
+        )
         .parse()
         .expect("application id is not a valid id");
 
