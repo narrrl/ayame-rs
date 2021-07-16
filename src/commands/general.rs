@@ -10,7 +10,7 @@ use serenity::{
 use tokio::task;
 
 lazy_static! {
-    static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
+    pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
 }
 
 #[command("youtube-dl")]
@@ -34,7 +34,7 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let id = msg.author.id.as_u64();
 
     task::spawn(crate::model::youtubedl::start_download(
-        msg.clone(),
+        msg.channel_id.clone(),
         id.clone(),
         ctx.http.clone(),
         url,

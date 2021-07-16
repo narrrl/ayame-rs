@@ -13,7 +13,7 @@ lazy_static! {
     pub static ref MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
 }
 
-pub async fn start_download(msg: Message, id: u64, http: Arc<Http>, url: String) -> CommandResult {
+pub async fn start_download(ch: ChannelId, id: u64, http: Arc<Http>, url: String) -> CommandResult {
     // create the download directory
     let dir = create_download_dir(id).await?;
     // check if download directory is empty
@@ -22,13 +22,12 @@ pub async fn start_download(msg: Message, id: u64, http: Arc<Http>, url: String)
         if read.count() != 0 {
             // we don't want the directory to be cleaned
             // because a download is running
-            return send_error(&msg, &http, "download running").await;
+            return send_error(&ch, &http, "download running").await;
         }
     }
 
     // create an update message to inform user about the current download state
-    let mut update_message = msg
-        .channel_id
+    let mut update_message = ch
         .send_message(&http, |m| m.content("Starting download ..."))
         .await?;
 
@@ -36,7 +35,7 @@ pub async fn start_download(msg: Message, id: u64, http: Arc<Http>, url: String)
     let file = match make_download(&dir, &url).await {
         Err(why) => {
             remove_dir_all(&dir)?; // clean dir on error
-            return send_error(&msg, &http, &why).await;
+            return send_error(&ch, &http, &why).await;
         }
         Ok(path) => path,
     };
@@ -46,7 +45,7 @@ pub async fn start_download(msg: Message, id: u64, http: Arc<Http>, url: String)
         Ok(size) => size,
         Err(why) => {
             remove_dir_all(&dir)?; // clean dir on error
-            return send_error(&msg, &http, &format!("{}", why)).await;
+            return send_error(&ch, &http, &format!("{}", why)).await;
         }
     };
 
@@ -55,18 +54,18 @@ pub async fn start_download(msg: Message, id: u64, http: Arc<Http>, url: String)
         update_message
             .edit(&http, |m| m.content("Uploading to Discord ..."))
             .await?;
-        send_file_to_channel(file, &msg, &http).await?;
+        send_file_to_channel(file, &ch, &http).await?;
         // if file is below the setted limit but above the 8mb we can upload it to transfer.sh
     } else if size < *MAX_FILE_SIZE {
         update_message
             .edit(&http, |m| m.content("Uploading to transfer.sh ..."))
             .await?;
-        send_file_to_transfersh(file, &msg, &http, &id.to_string()).await?;
+        send_file_to_transfersh(file, &ch, &http, &id.to_string()).await?;
         // else we have to inform the user that the file was too chonky
     } else {
         let max_mb = *MAX_FILE_SIZE / 1_000_000;
         send_error(
-            &msg,
+            &ch,
             &http,
             &format!("Your download was larger than {}mb", max_mb),
         )
@@ -75,6 +74,7 @@ pub async fn start_download(msg: Message, id: u64, http: Arc<Http>, url: String)
 
     // finally clear everything
     // to be ready for the next download
+    update_message.edit(&http, |m| m.content("Done!")).await?;
     remove_dir_all(&dir)?;
 
     Ok(())
@@ -138,39 +138,34 @@ async fn get_downloaded_file(ytd: YoutubeDL, url: &str) -> Result<PathBuf, Strin
     Err("Couldn't find downloaded file".to_string())
 }
 
-async fn send_file_to_channel(file: PathBuf, msg: &Message, http: &Arc<Http>) -> CommandResult {
+async fn send_file_to_channel(file: PathBuf, ch: &ChannelId, http: &Arc<Http>) -> CommandResult {
     // send files to discord
-    msg.channel_id
-        .send_files(&http, &vec![file], |m| m.content(""))
-        .await?;
+    ch.send_files(&http, &vec![file], |m| m.content("")).await?;
     Ok(())
 }
 
 async fn send_file_to_transfersh(
     file: PathBuf,
-    msg: &Message,
+    ch: &ChannelId,
     http: &Arc<Http>,
     safe_name: &str,
 ) -> CommandResult {
     // upload via transfer.sh
     let link = crate::model::upload_file(&file, safe_name)?;
     // send user the output (link/error)
-    msg.channel_id
-        .send_message(&http, |m| m.content(link))
-        .await?;
+    ch.send_message(&http, |m| m.content(link)).await?;
     Ok(())
 }
 
-async fn send_error(msg: &Message, http: &Arc<Http>, error_msg: &str) -> CommandResult {
-    msg.channel_id
-        .send_message(&http, |m| {
-            m.embed(|e| {
-                e.title("Error");
-                e.description(error_msg);
-                e.color(Color::from_rgb(238, 14, 97));
-                e
-            })
+async fn send_error(ch: &ChannelId, http: &Arc<Http>, error_msg: &str) -> CommandResult {
+    ch.send_message(&http, |m| {
+        m.embed(|e| {
+            e.title("Error");
+            e.description(error_msg);
+            e.color(Color::from_rgb(238, 14, 97));
+            e
         })
-        .await?;
+    })
+    .await?;
     Ok(())
 }
