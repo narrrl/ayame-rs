@@ -7,10 +7,11 @@ use tokio::task;
 
 lazy_static! {
     static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
-    static ref ARG_REGEX: Regex = Regex::new(r"(--?[a-zA-Z\-]+)(\([a-zA-Z0-9\-]+\))?").expect("Couldn't build args Regex");
 }
 
 #[command("youtube-dl")]
+#[bucket = "really_slow"]
+#[aliases("ytd", "dl")]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     if args.len() != 1 {
         msg.reply(&ctx.http, "Please provide a link to a video source")

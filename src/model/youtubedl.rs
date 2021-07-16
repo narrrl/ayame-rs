@@ -3,14 +3,12 @@ use std::{fs::read_dir, path::PathBuf, sync::Arc};
 
 use fs_extra::dir::get_size;
 use lazy_static::lazy_static;
-use regex::Regex;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
 use serenity::{framework::standard::CommandResult, http::Http};
 use ytd_rs::{ResultType, YoutubeDL};
 
 lazy_static! {
-    pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
     pub static ref MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
     pub static ref MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
 }
