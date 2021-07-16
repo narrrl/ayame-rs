@@ -3,6 +3,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
+use serenity::utils::Color;
 use serenity::{
     client::bridge::gateway::ShardId,
     framework::standard::{macros::command, Args, CommandResult},
@@ -73,5 +74,26 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
         }
         None => msg.reply(&ctx.http, "Pong!").await?,
     };
+    Ok(())
+}
+
+#[command]
+async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
+    let application_id = crate::CONFIG
+        .get_str("application_id")
+        .expect("expected application_id in config.yml");
+    let invite_link = format!("https://discord.com/api/oauth2/authorize?client_id={}&permissions=8&scope=applications.commands%20bot", application_id);
+    msg.channel_id
+        .send_message(&ctx.http, |m| {
+            m.embed(|e| {
+                e.title("Invite the bot to your server");
+                e.url(invite_link);
+                e.image("https://media1.tenor.com/images/6f0ba23f8a1abe87629c1309bdaa57d7/tenor.gif?itemid=20472559");
+                e.color(Color::from_rgb(238, 14, 97));
+                e
+            })
+        })
+        .await?;
+
     Ok(())
 }
