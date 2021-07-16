@@ -18,7 +18,7 @@ use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use commands::{admin::*, general::*, youtubedl::*};
+use commands::{admin::*, general::*};
 
 use lazy_static::*;
 
@@ -134,7 +134,6 @@ async fn main() {
                 .no_dm_prefix(true)
         })
         .group(&GENERAL_GROUP)
-        .group(&YOUTUBEDL_GROUP)
         .group(&ADMIN_GROUP)
         // annote command with #[bucket = "really_slow"]
         // to limit command usage to 1 uses per 10 minutes
