@@ -184,16 +184,6 @@ async fn main() {
             .expect("Failed to load DISCORD_TOKEN from the environment"),
         |m| m.to_string(),
     );
-    let application_id: u64 = env::var("APPLICATION_ID")
-        .map_or(
-            // or from config.yml
-            CONFIG
-                .get_str("application_id")
-                .expect("Failed to load APPLICATION_ID from the environment"),
-            |m| m.to_string(),
-        )
-        .parse()
-        .expect("application id is not a valid id");
 
     let http = Http::new_with_token(&token);
 
