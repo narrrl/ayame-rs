@@ -10,4 +10,4 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 
 ## Contact
 - **Discord**: ニールス#0420
-- **Email**: nils.pukropp@outlook.de
+- **Email**: nils@nirusu.codes

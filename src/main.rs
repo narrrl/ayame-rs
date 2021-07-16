@@ -1,6 +1,8 @@
 // commands
 mod commands;
 
+mod model;
+
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
@@ -20,7 +22,7 @@ use config::*;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use commands::{admin::*, general::*, youtubedl::*};
+use commands::{admin::*, general::*};
 
 use lazy_static::*;
 
@@ -88,12 +90,8 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(ping)]
+#[commands(ping, ytd)]
 struct General;
-
-#[group]
-#[commands(ytd)]
-struct YoutubeDL;
 
 #[group]
 #[commands(addemote)]
@@ -158,12 +156,10 @@ async fn main() {
                 .no_dm_prefix(true)
         })
         .group(&GENERAL_GROUP)
-        .group(&YOUTUBEDL_GROUP)
         .group(&ADMIN_GROUP)
-        // annote command with #[bucket = "basic"]
-        // to limit command usage to 3 uses per 10 secs with a 2 seconds delay
-        // between invocations
-        .bucket("basic", |b| b.delay(2).time_span(10).limit(3))
+        // annote command with #[bucket = "really_slow"]
+        // to limit command usage to 1 uses per 10 minutes
+        .bucket("really_slow", |b| b.time_span(600).limit(1))
         .await;
     let application_id: u64 = env::var("APPLICATION_ID")
         .map_or(

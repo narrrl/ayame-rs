@@ -4,18 +4,6 @@ token: "BOT_TOKEN"
 # application id for slash commands
 # usually the bot user id
 application_id: "APPLICATION_ID"
-
-
-# hostname, webdir, webroot are optional if this is true
-disableWebserver: true
-# domain name with protocol
-hostname: "https://my.domain.com"
-# download location for download files
-# https://my.domain.com/path/in/url
-webdir: "path/in/url"
-# normally /var/www/html
-webroot: "/path/to/webroot"
-
 # optional setting to ratelimit the bot (in byte)
 # this is the default value of 1mb/s
 downloadRateLimit: "1000K"
