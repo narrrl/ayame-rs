@@ -64,12 +64,8 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(ping)]
+#[commands(ping, ytd)]
 struct General;
-
-#[group]
-#[commands(ytd)]
-struct YoutubeDL;
 
 #[group]
 #[commands(addemote)]
