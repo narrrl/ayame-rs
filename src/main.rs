@@ -3,6 +3,7 @@ mod commands;
 
 mod model;
 
+use model::youtubedl;
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
@@ -11,10 +12,17 @@ use serenity::{
     model::{
         event::ResumedEvent,
         gateway::Ready,
-        interactions::{ApplicationCommand, Interaction, InteractionResponseType},
+        interactions::{
+            application_command::{
+                ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
+                ApplicationCommandOptionType,
+            },
+            Interaction, InteractionResponseType,
+        },
     },
     prelude::*,
 };
+
 use std::path::PathBuf;
 use std::{collections::HashSet, env, fs::remove_dir_all, sync::Arc};
 
@@ -59,16 +67,69 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        let _ = interaction
-            .create_interaction_response(&ctx.http, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| message.content("Received event!"))
-            })
-            .await;
+        if let Interaction::ApplicationCommand(command) = interaction {
+            let content = match command.data.name.as_str() {
+                "youtubedl" => {
+                    let options = command
+                        .data
+                        .options
+                        .get(0)
+                        .expect("Expected user option")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected String object");
+                    if let ApplicationCommandInteractionDataOptionValue::String(url) = options {
+                        let mut content = "Recieved URL".to_string();
+                        if crate::commands::general::URL_REGEX.is_match(url) {
+                            tokio::spawn(youtubedl::start_download(
+                                command.channel_id.clone(),
+                                command.user.id.as_u64().clone(),
+                                ctx.http.clone(),
+                                url.to_string(),
+                            ));
+                        } else {
+                            content = "Invalid URL".to_string();
+                        }
+                        content
+                    } else {
+                        "Expect URL".to_string()
+                    }
+                }
+                _ => "Not implemented :(".to_string(),
+            };
+            if let Err(why) = command
+                .create_interaction_response(&ctx.http, |response| {
+                    response
+                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|message| message.content(content))
+                })
+                .await
+            {
+                println!("Cannot respond to slash command: {}", why);
+            }
+        }
     }
-
     async fn ready(&self, ctx: Context, ready: Ready) {
+        let commands = ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
+            commands.create_application_command(|command| {
+                command
+                    .name("youtubedl")
+                    .description("Download Videos from a lot of sites")
+                    .create_option(|option| {
+                        option
+                            .name("link")
+                            .description("A link to a video source")
+                            .kind(ApplicationCommandOptionType::String)
+                            .required(true)
+                    })
+            })
+        })
+        .await;
+
+        println!(
+            "I now have the following global slash commands {:#?}",
+            commands
+        );
         info!("Connected as {}", ready.user.name);
 
         let _ = ApplicationCommand::create_global_application_command(&ctx.http, |a| {
@@ -123,6 +184,16 @@ async fn main() {
             .expect("Failed to load DISCORD_TOKEN from the environment"),
         |m| m.to_string(),
     );
+    let application_id: u64 = env::var("APPLICATION_ID")
+        .map_or(
+            // or from config.yml
+            CONFIG
+                .get_str("application_id")
+                .expect("Failed to load APPLICATION_ID from the environment"),
+            |m| m.to_string(),
+        )
+        .parse()
+        .expect("application id is not a valid id");
 
     let http = Http::new_with_token(&token);
 
