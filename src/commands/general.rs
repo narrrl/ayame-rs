@@ -18,13 +18,20 @@ lazy_static! {
 #[bucket = "really_slow"]
 #[aliases("ytd", "dl")]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    if args.len() != 1 {
-        msg.reply(&ctx.http, "Please provide a link to a video source")
+    if args.len() < 1 || args.len() > 2 {
+        msg.reply(&ctx.http, "Please provide a single link to a video source")
             .await?;
         return Ok(());
     }
-
     let url = args.single::<String>()?;
+    let mut as_audio = false;
+    if args.len() == 2 {
+        let option = args.single::<String>()?;
+
+        if option.eq("-audio") {
+            as_audio = true;
+        }
+    }
 
     if !URL_REGEX.is_match(&url) {
         msg.reply(&ctx.http, format!("{} is not a valid url", url))
@@ -39,6 +46,7 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         id.clone(),
         ctx.http.clone(),
         url,
+        as_audio,
     ));
     Ok(())
 }

@@ -78,6 +78,18 @@ impl EventHandler for Handler {
                         .resolved
                         .as_ref()
                         .expect("Expected String object");
+                    let as_mp3 = match command.data.options.get(1) {
+                        Some(value) => {
+                            let value = value.resolved.as_ref().expect("Expected bool object");
+                            match value {
+                                ApplicationCommandInteractionDataOptionValue::Boolean(b) => {
+                                    b.clone()
+                                }
+                                _ => false,
+                            }
+                        }
+                        None => false,
+                    };
                     if let ApplicationCommandInteractionDataOptionValue::String(url) = options {
                         let mut content = "Recieved URL".to_string();
                         if crate::commands::general::URL_REGEX.is_match(url) {
@@ -86,6 +98,7 @@ impl EventHandler for Handler {
                                 command.user.id.as_u64().clone(),
                                 ctx.http.clone(),
                                 url.to_string(),
+                                as_mp3,
                             ));
                         } else {
                             content = "Invalid URL".to_string();
@@ -121,6 +134,13 @@ impl EventHandler for Handler {
                             .description("A link to a video source")
                             .kind(ApplicationCommandOptionType::String)
                             .required(true)
+                    })
+                    .create_option(|option| {
+                        option
+                            .name("audio_only")
+                            .description("Download the video as mp3")
+                            .kind(ApplicationCommandOptionType::Boolean)
+                            .required(false)
                     })
             })
         })

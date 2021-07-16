@@ -6,14 +6,28 @@ use lazy_static::lazy_static;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
 use serenity::{framework::standard::CommandResult, http::Http};
-use ytd_rs::{ResultType, YoutubeDL};
+use ytd_rs::{Arg, ResultType, YoutubeDL};
 
 lazy_static! {
     pub static ref MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
     pub static ref MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
+    static ref DEFAULT_ARGS: Vec<Arg> = {
+        let mut args = Vec::new();
+        // output format
+        args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
+        args.push(Arg::new_with_arg("--age-limit", "69"));
+        args.push(Arg::new("--add-metadata"));
+        args
+    };
 }
 
-pub async fn start_download(ch: ChannelId, id: u64, http: Arc<Http>, url: String) -> CommandResult {
+pub async fn start_download(
+    ch: ChannelId,
+    id: u64,
+    http: Arc<Http>,
+    url: String,
+    audio_only: bool,
+) -> CommandResult {
     // create the download directory
     let dir = create_download_dir(id).await?;
     // check if download directory is empty
@@ -32,7 +46,7 @@ pub async fn start_download(ch: ChannelId, id: u64, http: Arc<Http>, url: String
         .await?;
 
     // download the video
-    let file = match make_download(&dir, &url).await {
+    let file = match make_download(&dir, &url, audio_only).await {
         Err(why) => {
             remove_dir_all(&dir)?; // clean dir on error
             return send_error(&ch, &http, &why).await;
@@ -80,10 +94,19 @@ pub async fn start_download(ch: ChannelId, id: u64, http: Arc<Http>, url: String
     Ok(())
 }
 
-async fn make_download(dir: &PathBuf, url: &str) -> Result<PathBuf, String> {
+async fn make_download(dir: &PathBuf, url: &str, audio_only: bool) -> Result<PathBuf, String> {
     // get the youtubedl task
+    let mut args = Vec::new();
+    if audio_only {
+        args.push(Arg::new("--extract-audio"));
+        args.push(Arg::new_with_arg("--audio-format", "mp3"));
+        args.push(Arg::new("--embed-thumbnail"));
+    }
+    for arg in DEFAULT_ARGS.to_vec().iter() {
+        args.push(arg.clone());
+    }
     let ytd: YoutubeDL = match dir.to_str() {
-        Some(path) => YoutubeDL::new(path, vec![], url)?,
+        Some(path) => YoutubeDL::new(path, args, url)?,
         None => return Err("couldn't get directory for download".to_string()),
     };
 
