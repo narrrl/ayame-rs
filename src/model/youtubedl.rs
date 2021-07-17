@@ -34,6 +34,10 @@ impl YTDL {
         }
     }
 
+    ///
+    /// Set default options to convert the file to a mp3.
+    /// Also embeds the thumbnail as cover art
+    ///
     pub fn set_audio_only<'a>(&'a mut self) -> &'a mut YTDL {
         self.args.push(Arg::new("--extract-audio"));
         self.args.push(Arg::new_with_arg("--audio-format", "mp3"));
@@ -41,6 +45,13 @@ impl YTDL {
         self
     }
 
+    ///
+    /// Sets some nice defaults to have a better youtubedl experience.
+    ///
+    /// Adds an age limit to bypass age restrictions
+    /// Adds an output size limit because especially twitter videos keeps exploading
+    /// Adds metadata to the file
+    ///
     pub fn set_defaults<'a>(&'a mut self) -> &'a mut YTDL {
         self.args.push(Arg::new_with_arg("--age-limit", "69"));
         self.args
@@ -48,18 +59,24 @@ impl YTDL {
         self.args.push(Arg::new("--add-metadata"));
         self
     }
-
+    #[allow(dead_code)]
     pub fn arg<'a>(&'a mut self, arg: Arg) -> &'a mut YTDL {
         self.args.push(arg);
         self
     }
-
+    #[allow(dead_code)]
     pub fn args<'a>(&'a mut self, args: &Vec<Arg>) -> &'a mut YTDL {
         for arg in args.iter() {
             self.args.push(arg.clone());
         }
         self
     }
+
+    ///
+    /// Starts the YoutubeDL download and sends it to the user.
+    ///
+    /// It also checks if the user is already downloading and if the file is too chonky
+    ///
     pub async fn start_download(&self, url: String) -> CommandResult {
         // create the download directory
         let dir = match self.get_download_directory().await {
@@ -92,6 +109,11 @@ impl YTDL {
 
         Ok(())
     }
+
+    ///
+    /// gets the download directory, but returns an error if it exists
+    /// because then the user is already downloading something
+    ///
     async fn get_download_directory(&self) -> Result<PathBuf, String> {
         // tmp download directory is
         // {bot_dir}/tmp/ytd/id
@@ -106,6 +128,7 @@ impl YTDL {
         Ok(dir)
     }
 
+    ///  creates the 'YoutubeDL' and runs it, then returns the first file that it finds
     async fn download_file(&self, dir: &PathBuf, url: &str) -> Result<PathBuf, String> {
         // get the youtubedl task
         let ytd: YoutubeDL = match dir.to_str() {
@@ -121,6 +144,9 @@ impl YTDL {
         Ok(file)
     }
 
+    ///
+    /// runs the youtubedl thread and prints eny error via the logger
+    ///
     async fn run_youtubedl(&self, ytd: &YoutubeDL, url: &str) -> Result<PathBuf, String> {
         // start download
         let result = ytd.download();
@@ -141,6 +167,9 @@ impl YTDL {
         }
     }
 
+    ///
+    /// returns the file that was downloaded
+    ///
     async fn get_file(&self, download_dir: &PathBuf) -> Result<PathBuf, String> {
         // read dir
         let dir_entry = match read_dir(download_dir.as_path()) {
@@ -164,6 +193,11 @@ impl YTDL {
         Err("Couldn't find downloaded file".to_string())
     }
 
+    ///
+    ///  Uploads the file to either discord or transfer.sh depending on the file size.
+    ///
+    ///  Returns an error if the file is way to chonky
+    ///
     async fn upload_file(&self, update_message: &mut Message, file: PathBuf) -> CommandResult {
         // get size of the file
         let size = get_size(file.as_path())?;

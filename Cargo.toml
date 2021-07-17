@@ -9,12 +9,14 @@ edition = "2018"
 dotenv = "0.15"
 tracing = "0.1.23"
 tracing-subscriber = "0.2"
-config = "0.11.0"
+# config = "0.11.0"
 ytd-rs = { git = "https://github.com/nirusu99/ytd-rs" }
 lazy_static = "1.4.0"
 regex = "1"
-sha2 = "0.9.4"
+toml = "0.5"
+# sha2 = "0.9.4"
 fs_extra = "1.2.0"
+serde = "1.0"
 
 [dependencies.tokio]
 version = "1.0"
