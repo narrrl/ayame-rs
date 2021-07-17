@@ -45,6 +45,7 @@ impl YTDL {
     pub fn set_audio_only<'a>(&'a mut self) -> &'a mut YTDL {
         self.args.push(Arg::new("--extract-audio"));
         self.args.push(Arg::new_with_arg("--audio-format", "mp3"));
+        self.args.push(Arg::new("--embed-thumbnail"));
         self
     }
 
