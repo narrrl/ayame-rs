@@ -1,6 +1,0 @@
-prefix: "~"
-# bot token, DON'T SHARE!
-token: "BOT_TOKEN"
-# application id for slash commands
-# usually the bot user id
-application_id: "APPLICATION_ID"
