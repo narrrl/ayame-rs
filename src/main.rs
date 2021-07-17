@@ -207,7 +207,7 @@ If you want more information about a specific command, just pass the command as 
 #[lacking_permissions = "Hide"]
 #[lacking_role = "Nothing"]
 #[wrong_channel = "Strike"]
-async fn my_help(
+async fn help(
     context: &Context,
     msg: &Message,
     args: Args,
@@ -279,6 +279,7 @@ async fn main() {
         })
         .group(&GENERAL_GROUP)
         .group(&ADMIN_GROUP)
+        .help(&HELP)
         // annote command with #[bucket = "really_slow"]
         // to limit command usage to 1 uses per 10 minutes
         .bucket("really_slow", |b| b.time_span(600).limit(1))
