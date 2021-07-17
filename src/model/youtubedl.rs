@@ -5,167 +5,224 @@ use fs_extra::dir::get_size;
 use lazy_static::lazy_static;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
-use serenity::{framework::standard::CommandResult, http::Http};
-use ytd_rs::{ResultType, YoutubeDL};
+use serenity::{
+    framework::standard::{CommandError, CommandResult},
+    http::Http,
+};
+use tracing::error;
+use ytd_rs::{Arg, ResultType, YoutubeDL};
 
 lazy_static! {
     pub static ref MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
     pub static ref MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
 }
 
-pub async fn start_download(ch: ChannelId, id: u64, http: Arc<Http>, url: String) -> CommandResult {
-    // create the download directory
-    let dir = create_download_dir(id).await?;
-    // check if download directory is empty
-    if let Ok(read) = read_dir(&dir) {
-        // if not, download is running
-        if read.count() != 0 {
-            // we don't want the directory to be cleaned
-            // because a download is running
-            return send_error(&ch, &http, "download running").await;
+pub struct YTDL {
+    channel: ChannelId,
+    author_id: u64,
+    http: Arc<Http>,
+    args: Vec<Arg>,
+}
+
+impl YTDL {
+    pub fn new(channel: ChannelId, author_id: u64, http: Arc<Http>) -> YTDL {
+        YTDL {
+            channel,
+            author_id,
+            http,
+            args: Vec::new(),
         }
     }
 
-    // create an update message to inform user about the current download state
-    let mut update_message = ch
-        .send_message(&http, |m| m.content("Starting download ..."))
-        .await?;
-
-    // download the video
-    let file = match make_download(&dir, &url).await {
-        Err(why) => {
-            remove_dir_all(&dir)?; // clean dir on error
-            return send_error(&ch, &http, &why).await;
-        }
-        Ok(path) => path,
-    };
-
-    // get size of the file
-    let size = match get_size(file.as_path()) {
-        Ok(size) => size,
-        Err(why) => {
-            remove_dir_all(&dir)?; // clean dir on error
-            return send_error(&ch, &http, &format!("{}", why)).await;
-        }
-    };
-
-    // sizes smaller than 8mb can be uploaded to discord directly
-    if size < *MAX_FILE_SIZE && size < *MAX_DISCORD_FILE_SIZE {
-        update_message
-            .edit(&http, |m| m.content("Uploading to Discord ..."))
-            .await?;
-        send_file_to_channel(file, &ch, &http).await?;
-        // if file is below the setted limit but above the 8mb we can upload it to transfer.sh
-    } else if size < *MAX_FILE_SIZE {
-        update_message
-            .edit(&http, |m| m.content("Uploading to transfer.sh ..."))
-            .await?;
-        send_file_to_transfersh(file, &ch, &http, &id.to_string()).await?;
-        // else we have to inform the user that the file was too chonky
-    } else {
-        let max_mb = *MAX_FILE_SIZE / 1_000_000;
-        send_error(
-            &ch,
-            &http,
-            &format!("Your download was larger than {}mb", max_mb),
-        )
-        .await?;
+    pub fn set_audio_only<'a>(&'a mut self) -> &'a mut YTDL {
+        self.args.push(Arg::new("--extract-audio"));
+        self.args.push(Arg::new_with_arg("--audio-format", "mp3"));
+        self
     }
 
-    // finally clear everything
-    // to be ready for the next download
-    update_message.edit(&http, |m| m.content("Done!")).await?;
-    remove_dir_all(&dir)?;
+    pub fn set_defaults<'a>(&'a mut self) -> &'a mut YTDL {
+        self.args.push(Arg::new_with_arg("--age-limit", "69"));
+        self.args
+            .push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
+        self.args.push(Arg::new("--add-metadata"));
+        self
+    }
 
-    Ok(())
-}
+    pub fn arg<'a>(&'a mut self, arg: Arg) -> &'a mut YTDL {
+        self.args.push(arg);
+        self
+    }
 
-async fn make_download(dir: &PathBuf, url: &str) -> Result<PathBuf, String> {
-    // get the youtubedl task
-    let ytd: YoutubeDL = match dir.to_str() {
-        Some(path) => YoutubeDL::new(path, vec![], url)?,
-        None => return Err("couldn't get directory for download".to_string()),
-    };
-
-    // get the downloaded file
-    let file = get_downloaded_file(ytd, &url).await?;
-
-    Ok(file)
-}
-
-async fn create_download_dir(id: u64) -> Result<PathBuf, String> {
-    // tmp download directory is
-    // {bot_dir}/tmp/ytd/id
-    let mut dir = crate::BOT_DIR.clone();
-    dir.push("tmp");
-    dir.push("ytd");
-    dir.push(format!("{}", id));
-    Ok(dir)
-}
-
-async fn get_downloaded_file(ytd: YoutubeDL, url: &str) -> Result<PathBuf, String> {
-    // start download
-    let result = ytd.download();
-
-    // check output
-    let path = match result.result_type() {
-        ResultType::SUCCESS => result.output_dir(),
-        ResultType::IOERROR | ResultType::FAILURE => {
-            // return if error
-            return Err(format!("Couldn't download {}", url));
+    pub fn args<'a>(&'a mut self, args: &Vec<Arg>) -> &'a mut YTDL {
+        for arg in args.iter() {
+            self.args.push(arg.clone());
         }
-    };
+        self
+    }
+    pub async fn start_download(&self, url: String) -> CommandResult {
+        // create the download directory
+        let dir = match self.get_download_directory().await {
+            Ok(dir) => dir,
+            Err(why) => return self.send_error(&why).await,
+        };
 
-    // read dir
-    let dir_entry = match read_dir(path.as_path()) {
-        Ok(read) => read,
-        Err(_) => {
-            return Err("couldn't read download directory".to_string());
+        // create an update message to inform user about the current download state
+        let mut update_message = self
+            .channel
+            .send_message(&self.http, |m| m.content("Starting download ..."))
+            .await?;
+
+        // download the video
+        let file = match self.download_file(&dir, &url).await {
+            Err(why) => {
+                remove_dir_all(&dir)?; // clean dir on error
+                return self.send_error(&why).await;
+            }
+            Ok(path) => path,
+        };
+
+        if let Err(why) = self.upload_file(&mut update_message, file).await {
+            remove_dir_all(&dir)?;
+            self.send_error(&format!("{}", why)).await?;
         }
-    };
 
-    for entry in dir_entry {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            // just return the first file that we'll find
-            if path.is_file() {
-                return Ok(path);
+        // finally clear everything
+        remove_dir_all(&dir)?;
+
+        Ok(())
+    }
+    async fn get_download_directory(&self) -> Result<PathBuf, String> {
+        // tmp download directory is
+        // {bot_dir}/tmp/ytd/id
+        let mut dir = crate::BOT_DIR.clone();
+        dir.push("tmp");
+        dir.push("ytd");
+        dir.push(format!("{}", &self.author_id));
+
+        if dir.exists() {
+            return Err("Download running!".to_string());
+        }
+        Ok(dir)
+    }
+
+    async fn download_file(&self, dir: &PathBuf, url: &str) -> Result<PathBuf, String> {
+        // get the youtubedl task
+        let ytd: YoutubeDL = match dir.to_str() {
+            Some(path) => YoutubeDL::new(path, self.args.clone(), url)?,
+            None => return Err("couldn't get directory for download".to_string()),
+        };
+
+        let download_dir = self.run_youtubedl(&ytd, url).await?;
+
+        // get the downloaded file
+        let file = self.get_file(&download_dir).await?;
+
+        Ok(file)
+    }
+
+    async fn run_youtubedl(&self, ytd: &YoutubeDL, url: &str) -> Result<PathBuf, String> {
+        // start download
+        let result = ytd.download();
+
+        // check output
+        match result.result_type() {
+            ResultType::SUCCESS => Ok(result.output_dir().clone()),
+            ResultType::IOERROR | ResultType::FAILURE => {
+                error!(
+                    "YoutubeDL exited with error: {:?}",
+                    result
+                        .output()
+                        .replace("Usage: youtube-dl [OPTIONS] URL [URL...]\\n\\n", "")
+                );
+                // return if error
+                return Err(format!("Couldn't download {}", url));
             }
         }
     }
 
-    // if no file was found, return error
-    Err("Couldn't find downloaded file".to_string())
-}
+    async fn get_file(&self, download_dir: &PathBuf) -> Result<PathBuf, String> {
+        // read dir
+        let dir_entry = match read_dir(download_dir.as_path()) {
+            Ok(read) => read,
+            Err(_) => {
+                return Err("couldn't read download directory".to_string());
+            }
+        };
 
-async fn send_file_to_channel(file: PathBuf, ch: &ChannelId, http: &Arc<Http>) -> CommandResult {
-    // send files to discord
-    ch.send_files(&http, &vec![file], |m| m.content("")).await?;
-    Ok(())
-}
+        for entry in dir_entry {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                // just return the first file that we find
+                if path.is_file() {
+                    return Ok(path);
+                }
+            }
+        }
 
-async fn send_file_to_transfersh(
-    file: PathBuf,
-    ch: &ChannelId,
-    http: &Arc<Http>,
-    safe_name: &str,
-) -> CommandResult {
-    // upload via transfer.sh
-    let link = crate::model::upload_file(&file, safe_name)?;
-    // send user the output (link/error)
-    ch.send_message(&http, |m| m.content(link)).await?;
-    Ok(())
-}
+        // if no file was found, return error
+        Err("Couldn't find downloaded file".to_string())
+    }
 
-async fn send_error(ch: &ChannelId, http: &Arc<Http>, error_msg: &str) -> CommandResult {
-    ch.send_message(&http, |m| {
-        m.embed(|e| {
-            e.title("Error");
-            e.description(error_msg);
-            e.color(Color::from_rgb(238, 14, 97));
-            e
-        })
-    })
-    .await?;
-    Ok(())
+    async fn upload_file(&self, update_message: &mut Message, file: PathBuf) -> CommandResult {
+        // get size of the file
+        let size = get_size(file.as_path())?;
+
+        // sizes smaller than 8mb can be uploaded to discord directly
+        if size < *MAX_FILE_SIZE && size < *MAX_DISCORD_FILE_SIZE {
+            update_message
+                .edit(&self.http, |m| m.content("Uploading to Discord ..."))
+                .await?;
+            self.send_file_to_channel(file).await?;
+            // if file is below the setted limit but above the 8mb we can upload it to transfer.sh
+        } else if size < *MAX_FILE_SIZE {
+            update_message
+                .edit(&self.http, |m| m.content("Uploading to transfer.sh ..."))
+                .await?;
+            self.send_file_to_transfersh(&file).await?;
+            // else we have to inform the user that the file was too chonky
+        } else {
+            let max_mb = *MAX_FILE_SIZE / 1_000_000;
+            return Err(CommandError::from(format!(
+                "Your download was larger than {}mb",
+                max_mb
+            )));
+        }
+
+        update_message
+            .edit(&self.http, |m| m.content("Done!"))
+            .await?;
+        Ok(())
+    }
+
+    async fn send_file_to_channel(&self, file: PathBuf) -> CommandResult {
+        // send files to discord
+        self.channel
+            .send_files(&self.http, &vec![file], |m| m.content(""))
+            .await?;
+        Ok(())
+    }
+
+    async fn send_file_to_transfersh(&self, file: &PathBuf) -> CommandResult {
+        // upload via transfer.sh
+        let output = crate::model::upload_file(file, &self.author_id.to_string())?;
+        // send user the output (link/error)
+        self.channel
+            .send_message(&self.http, |m| m.content(output))
+            .await?;
+        Ok(())
+    }
+
+    async fn send_error(&self, error_msg: &str) -> CommandResult {
+        self.channel
+            .send_message(&self.http, |m| {
+                m.embed(|e| {
+                    e.title("Error");
+                    e.description(error_msg);
+                    e.color(Color::from_rgb(238, 14, 97));
+                    e
+                })
+            })
+            .await?;
+        Ok(())
+    }
 }
