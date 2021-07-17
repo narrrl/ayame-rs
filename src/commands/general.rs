@@ -95,9 +95,8 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
-    let application_id = crate::CONFIG
-        .get_str("application_id")
-        .expect("expected application_id in config.yml");
+    let current_user = ctx.http.get_current_user().await?;
+    let application_id = current_user.id.as_u64();
     let invite_link = format!("https://discord.com/api/oauth2/authorize?client_id={}&permissions=8&scope=applications.commands%20bot", application_id);
     msg.channel_id
         .send_message(&ctx.http, |m| {
@@ -105,6 +104,9 @@ async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
                 e.title("Invite the bot to your server");
                 e.url(invite_link);
                 e.image("https://media1.tenor.com/images/6f0ba23f8a1abe87629c1309bdaa57d7/tenor.gif?itemid=20472559");
+                if let Some(url) = current_user.avatar_url() {
+                    e.thumbnail(&url);
+                }
                 e.color(Color::from_rgb(238, 14, 97));
                 e
             })
