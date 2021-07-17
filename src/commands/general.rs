@@ -103,7 +103,6 @@ async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
             m.embed(|e| {
                 e.title("Invite the bot to your server");
                 e.url(invite_link);
-                e.image("https://media1.tenor.com/images/6f0ba23f8a1abe87629c1309bdaa57d7/tenor.gif?itemid=20472559");
                 if let Some(url) = current_user.avatar_url() {
                     e.thumbnail(&url);
                 }
