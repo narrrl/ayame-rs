@@ -1,17 +1,27 @@
 // commands
 mod commands;
 
+// models like the youtube downloader
 mod model;
 
-use model::youtubedl;
+use model::youtubedl::YTDL;
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
-    framework::{standard::macros::group, StandardFramework},
+    framework::{
+        standard::{
+            help_commands,
+            macros::{group, help},
+            Args, CommandGroup, CommandResult, HelpOptions,
+        },
+        StandardFramework,
+    },
     http::Http,
     model::{
+        channel::Message,
         event::ResumedEvent,
         gateway::Ready,
+        id::UserId,
         interactions::{
             application_command::{
                 ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
@@ -22,6 +32,7 @@ use serenity::{
     },
     prelude::*,
 };
+use tokio::task;
 
 use std::path::PathBuf;
 use std::{collections::HashSet, env, fs::remove_dir_all, sync::Arc};
@@ -78,7 +89,7 @@ impl EventHandler for Handler {
                         .resolved
                         .as_ref()
                         .expect("Expected String object");
-                    let as_mp3 = match command.data.options.get(1) {
+                    let audio_only = match command.data.options.get(1) {
                         Some(value) => {
                             let value = value.resolved.as_ref().expect("Expected bool object");
                             match value {
@@ -93,13 +104,20 @@ impl EventHandler for Handler {
                     if let ApplicationCommandInteractionDataOptionValue::String(url) = options {
                         let mut content = "Recieved URL".to_string();
                         if crate::commands::general::URL_REGEX.is_match(url) {
-                            tokio::spawn(youtubedl::start_download(
-                                command.channel_id.clone(),
-                                command.user.id.as_u64().clone(),
-                                ctx.http.clone(),
-                                url.to_string(),
-                                as_mp3,
-                            ));
+                            let id = command.user.id.as_u64().clone();
+                            let channel_id = command.channel_id.clone();
+                            let http = ctx.http.clone();
+                            let audio_only = audio_only;
+                            let url = url.to_string();
+
+                            task::spawn(async move {
+                                let mut ytdl = YTDL::new(channel_id, id, http);
+                                ytdl.set_defaults();
+                                if audio_only {
+                                    ytdl.set_audio_only();
+                                }
+                                ytdl.start_download(url.to_string()).await
+                            });
                         } else {
                             content = "Invalid URL".to_string();
                         }
@@ -172,11 +190,34 @@ impl EventHandler for Handler {
 
 #[group]
 #[commands(ping, ytd, invite)]
+#[description = "A group with lots of different commands"]
 struct General;
 
 #[group]
 #[commands(addemote)]
+#[description = "A group for admin utility to manage your server"]
+#[summary = "Admin utility"]
 struct Admin;
+
+#[help]
+#[individual_command_tip = "Hewwo! こんにちは！안녕하세요~\n\n\
+If you want more information about a specific command, just pass the command as argument."]
+#[command_not_found_text = "Could not find: `{}`."]
+#[max_levenshtein_distance(3)]
+#[lacking_permissions = "Hide"]
+#[lacking_role = "Nothing"]
+#[wrong_channel = "Strike"]
+async fn my_help(
+    context: &Context,
+    msg: &Message,
+    args: Args,
+    help_options: &'static HelpOptions,
+    groups: &[&'static CommandGroup],
+    owners: HashSet<UserId>,
+) -> CommandResult {
+    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+    Ok(())
+}
 
 pub fn get_file(name: &str) -> PathBuf {
     let mut dir = BOT_DIR.clone();
@@ -233,7 +274,7 @@ async fn main() {
                 .prefix(prefix)
                 .on_mention(Some(bot_id))
                 .with_whitespace(true)
-                .delimiters(vec![", ", ","])
+                .delimiters(vec![" "])
                 .no_dm_prefix(true)
         })
         .group(&GENERAL_GROUP)

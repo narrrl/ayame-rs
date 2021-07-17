@@ -1,3 +1,4 @@
+use crate::model::youtubedl::YTDL;
 use crate::ShardManagerContainer;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -12,42 +13,49 @@ use tokio::task;
 
 lazy_static! {
     pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
+    pub static ref AUDIO_ONLY_REGEX: Regex = Regex::new(r"-audio").expect("Couldn't build URL Regex");
 }
 
 #[command("youtube-dl")]
 #[bucket = "really_slow"]
 #[aliases("ytd", "dl")]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    if args.len() < 1 || args.len() > 2 {
-        msg.reply(&ctx.http, "Please provide a single link to a video source")
+    if args.len() < 1 && args.len() > 2 {
+        msg.reply(&ctx.http, "Please provide only one link to a video source")
             .await?;
         return Ok(());
     }
-    let url = args.single::<String>()?;
-    let mut as_audio = false;
-    if args.len() == 2 {
-        let option = args.single::<String>()?;
 
-        if option.eq("-audio") {
-            as_audio = true;
+    let mut url = String::new();
+    let mut audio_only = false;
+
+    while !args.is_empty() {
+        if let Ok(arg) = args.single::<String>() {
+            if URL_REGEX.is_match(&arg) {
+                url = arg;
+            } else if AUDIO_ONLY_REGEX.is_match(&arg) {
+                audio_only = true;
+            }
         }
     }
 
-    if !URL_REGEX.is_match(&url) {
-        msg.reply(&ctx.http, format!("{} is not a valid url", url))
-            .await?;
+    if url.is_empty() {
+        msg.reply(&ctx.http, "Not a valid url").await?;
         return Ok(());
     }
 
-    let id = msg.author.id.as_u64();
+    let id = msg.author.id.as_u64().clone();
+    let channel_id = msg.channel_id.clone();
+    let http = ctx.http.clone();
 
-    task::spawn(crate::model::youtubedl::start_download(
-        msg.channel_id.clone(),
-        id.clone(),
-        ctx.http.clone(),
-        url,
-        as_audio,
-    ));
+    task::spawn(async move {
+        let mut ytdl = YTDL::new(channel_id, id, http);
+        ytdl.set_defaults();
+        if audio_only {
+            ytdl.set_audio_only();
+        }
+        ytdl.start_download(url).await
+    });
     Ok(())
 }
 
