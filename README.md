@@ -4,8 +4,6 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 ## building
 - run `cargo build --release`
 - move the executable to your desired final bot directory `mv target/release/nirust to/your/desired/directory/`
-- create a `config.yml` or copy the example from `example/config.yml` to your bot directory
-- set the `prefix` and the `token` \([Where do I get a discord bot token?](https://discord.com/developers/docs/intro)\) in your `config.yml`
 - execute the executable with `./nirust`
 - the bot will ask you for a bot token \([Where do I get a discord bot token?](https://discord.com/developers/docs/intro)\), a prefix (which will trigger the bot in guilds).
 
