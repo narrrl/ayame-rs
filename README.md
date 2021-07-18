@@ -7,6 +7,7 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 - create a `config.yml` or copy the example from `example/config.yml` to your bot directory
 - set the `prefix` and the `token` \([Where do I get a discord bot token?](https://discord.com/developers/docs/intro)\) in your `config.yml`
 - execute the executable with `./nirust`
+- the bot will ask you for a bot token \([Where do I get a discord bot token?](https://discord.com/developers/docs/intro)\), a prefix (which will trigger the bot in guilds).
 
 ## Contact
 - **Discord**: ニールス#0420
