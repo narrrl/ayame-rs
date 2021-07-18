@@ -1458,7 +1458,7 @@ dependencies = [
 [[package]]
 name = "ytd-rs"
 version = "0.1.2"
-source = "git+https://github.com/nirusu99/ytd-rs#eacdceaaafe46b06ac29815b2c230abc275a26bb"
+source = "git+https://github.com/nirusu99/ytd-rs#cfa2303d46b930b027119582d5d0b64f41d60dcd"
 dependencies = [
  "regex",
 ]
