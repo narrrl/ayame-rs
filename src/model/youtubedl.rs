@@ -139,9 +139,9 @@ impl YTDL {
     ///  creates the 'YoutubeDL' and runs it, then returns the first file that it finds
     async fn download_file(&self, dir: &PathBuf, url: &str) -> Result<PathBuf, String> {
         // get the youtubedl task
-        let ytd: YoutubeDL = match dir.to_str() {
-            Some(path) => YoutubeDL::new(path, self.args.clone(), url)?,
-            None => return Err("couldn't get directory for download".to_string()),
+        let ytd = match YoutubeDL::new(dir, self.args.clone(), url) {
+            Ok(ytd) => ytd,
+            Err(why) => return Err(why.to_string()),
         };
 
         let download_dir = self.run_youtubedl(&ytd, url).await?;
