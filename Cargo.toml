@@ -10,7 +10,7 @@ dotenv = "0.15"
 tracing = "0.1.23"
 tracing-subscriber = "0.2"
 # config = "0.11.0"
-ytd-rs = { git = "https://github.com/nirusu99/ytd-rs" }
+ytd-rs = "0.1.4"
 lazy_static = "1.4.0"
 regex = "1"
 toml = "0.5"
