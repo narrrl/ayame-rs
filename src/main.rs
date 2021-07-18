@@ -11,7 +11,7 @@ use configuration::Config;
 use model::youtubedl::YTDL;
 use serenity::{
     async_trait,
-    client::bridge::gateway::ShardManager,
+    client::bridge::gateway::{GatewayIntents, ShardManager},
     framework::{
         standard::{
             help_commands,
@@ -187,7 +187,6 @@ struct General;
 #[group]
 #[commands(addemote)]
 #[description = "A group for admin utility to manage your server"]
-#[summary = "Admin utility"]
 struct Admin;
 
 #[help]
@@ -265,6 +264,7 @@ async fn main() {
 
     let mut client = Client::builder(&token)
         .framework(framework)
+        .intents(GatewayIntents::all())
         .event_handler(Handler)
         .application_id(application_id)
         .await
