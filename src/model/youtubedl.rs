@@ -30,6 +30,7 @@ pub struct YTDL {
     author_id: u64,
     http: Arc<Http>,
     args: Vec<Arg>,
+    msg: Option<Message>,
 }
 
 impl YTDL {
@@ -39,6 +40,7 @@ impl YTDL {
             author_id,
             http,
             args: Vec::new(),
+            msg: None,
         }
     }
 
@@ -67,11 +69,19 @@ impl YTDL {
         self.args.push(Arg::new("--add-metadata"));
         self
     }
+
+    #[allow(dead_code)]
+    pub fn set_update_message<'a>(&'a mut self, msg: &Message) -> &'a mut YTDL {
+        self.msg = Some(msg.clone());
+        self
+    }
+
     #[allow(dead_code)]
     pub fn arg<'a>(&'a mut self, arg: Arg) -> &'a mut YTDL {
         self.args.push(arg);
         self
     }
+
     #[allow(dead_code)]
     pub fn args<'a>(&'a mut self, args: &Vec<Arg>) -> &'a mut YTDL {
         for arg in args.iter() {
@@ -85,7 +95,7 @@ impl YTDL {
     ///
     /// It also checks if the user is already downloading and if the file is too chonky
     ///
-    pub async fn start_download(&self, url: String) -> CommandResult {
+    pub async fn start_download(&mut self, url: String) -> CommandResult {
         // create the download directory
         let dir = match self.get_download_directory().await {
             Ok(dir) => dir,
@@ -93,10 +103,19 @@ impl YTDL {
         };
 
         // create an update message to inform user about the current download state
-        let mut update_message = self
-            .channel
-            .send_message(&self.http, |m| m.content("Starting download ..."))
-            .await?;
+        let mut update_message = match self.msg {
+            Some(ref mut message) => {
+                message
+                    .edit(&self.http, |m| m.content("Starting download ..."))
+                    .await?;
+                message.clone()
+            }
+            None => {
+                self.channel
+                    .send_message(&self.http, |m| m.content("Starting download ..."))
+                    .await?
+            }
+        };
 
         // download the video
         let file = match self.download_file(&dir, &url).await {

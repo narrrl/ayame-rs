@@ -70,7 +70,7 @@ struct Handler;
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            let content = match command.data.name.as_str() {
+            match command.data.name.as_str() {
                 "youtubedl" => {
                     let options = command
                         .data
@@ -93,13 +93,21 @@ impl EventHandler for Handler {
                         None => false,
                     };
                     if let ApplicationCommandInteractionDataOptionValue::String(url) = options {
-                        let mut content = "Recieved URL".to_string();
                         if crate::commands::general::URL_REGEX.is_match(url) {
                             let id = command.user.id.as_u64().clone();
                             let channel_id = command.channel_id.clone();
                             let http = ctx.http.clone();
                             let audio_only = audio_only;
                             let url = url.to_string();
+                            let _ = command
+                                .create_interaction_response(&ctx.http, |response| {
+                                    response
+                                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                                        .interaction_response_data(|message| {
+                                            message.content("Revieved Event")
+                                        })
+                                })
+                                .await;
 
                             task::spawn(async move {
                                 let mut ytdl = YTDL::new(channel_id, id, http);
@@ -107,28 +115,28 @@ impl EventHandler for Handler {
                                 if audio_only {
                                     ytdl.set_audio_only();
                                 }
+                                if let Ok(message) =
+                                    command.get_interaction_response(&ctx.http).await
+                                {
+                                    ytdl.set_update_message(&message);
+                                }
                                 ytdl.start_download(url.to_string()).await
                             });
                         } else {
-                            content = "Invalid URL".to_string();
+                            let _ = command
+                                .create_interaction_response(&ctx.http, |response| {
+                                    response
+                                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                                        .interaction_response_data(|message| {
+                                            message.content("Invalid URL")
+                                        })
+                                })
+                                .await;
                         }
-                        content
-                    } else {
-                        "Expect URL".to_string()
                     }
                 }
-                _ => "Not implemented :(".to_string(),
+                _ => return (),
             };
-            if let Err(why) = command
-                .create_interaction_response(&ctx.http, |response| {
-                    response
-                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|message| message.content(content))
-                })
-                .await
-            {
-                println!("Cannot respond to slash command: {}", why);
-            }
         }
     }
     async fn ready(&self, ctx: Context, ready: Ready) {
