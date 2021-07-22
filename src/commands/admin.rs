@@ -1,3 +1,4 @@
+use crate::model::image_processing;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
 
@@ -12,6 +13,7 @@ use serenity::utils::read_image;
 lazy_static! {
     pub static ref IMAGE_REGEX: Regex =
         Regex::new(r".+\.(gif|png|jpg|jpeg)").expect("Couldn't create image regex");
+    pub static ref MAX_EMOTE_SIZE: u64 = 256_000; // kb
 }
 
 #[command]
@@ -75,13 +77,19 @@ async fn addemote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     };
 
     // check if image succeedes the size limit
-    if content.len() > 256000 {
-        msg.reply(&ctx.http, "Image is too big!").await?;
-        return Ok(());
-    }
 
     // write image to disk
     buf.write_all(&content)?;
+
+    if content.len() > *MAX_EMOTE_SIZE as usize {
+        match image_processing::reduce_emote_size(&path) {
+            Ok(p) => p,
+            Err(_) => {
+                msg.reply(&ctx.http, "Image was to chonky").await?;
+                return Ok(());
+            }
+        };
+    }
 
     let guild = match msg.guild(&ctx.cache).await {
         Some(guild) => guild,
