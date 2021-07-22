@@ -17,6 +17,7 @@ toml = "0.5"
 # sha2 = "0.9.4"
 fs_extra = "1.2.0"
 serde = "1.0"
+image = "0.23.14"
 
 [dependencies.tokio]
 version = "1.0"
