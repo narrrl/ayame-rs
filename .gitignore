@@ -5,4 +5,7 @@
 
 #Intellij
 /.idea
+/config.toml
+/nirust
 
+/nirust.pid
