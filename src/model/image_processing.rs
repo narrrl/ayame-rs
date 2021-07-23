@@ -22,6 +22,13 @@ pub fn reduce_emote_size(image: &PathBuf) -> Result<PathBuf, Error> {
         }
     };
 
+    if ext == ImageFormat::Gif {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Can't resize gif's and gif was too large",
+        ));
+    }
+
     while meta.len() > *admin::MAX_EMOTE_SIZE {
         let image_buf = match image::open(image) {
             Ok(i) => i,
