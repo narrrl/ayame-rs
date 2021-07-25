@@ -114,3 +114,15 @@ async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+
+#[command]
+async fn mock(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let channel_id = msg.channel_id;
+    msg.delete(&ctx.http).await?;
+    let msg = crate::model::mock_text(&args.message());
+
+    channel_id
+        .send_message(&ctx.http, |m| m.content(msg))
+        .await?;
+    Ok(())
+}
