@@ -168,18 +168,6 @@ impl EventHandler for Handler {
             commands
         );
         info!("Connected as {}", ready.user.name);
-
-        let _ = ApplicationCommand::create_global_application_command(&ctx.http, |a| {
-            a.name("ping").description("A simple ping command")
-        })
-        .await;
-
-        let interactions = ApplicationCommand::get_global_application_commands(&ctx.http).await;
-
-        println!(
-            "I have the following global slash command(s): {:?}",
-            interactions
-        );
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
