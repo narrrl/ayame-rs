@@ -1,6 +1,7 @@
 pub mod image_processing;
 pub mod youtubedl;
 
+use rand::Rng;
 use std::{
     fs::canonicalize,
     io::Error,
@@ -79,4 +80,19 @@ fn run_upload(file: &str, file_name: &str, extension: &str) -> Result<Output, Er
         Ok(process) => process,
     }
     .wait_with_output() // get output
+}
+
+pub fn mock_text(text: &str) -> String {
+    let mut mock_str = String::new();
+
+    let mut rng = rand::thread_rng();
+
+    for ch in text.chars() {
+        if rng.gen() {
+            mock_str.push_str(&ch.to_uppercase().collect::<String>());
+        } else {
+            mock_str.push_str(&ch.to_lowercase().collect::<String>());
+        }
+    }
+    mock_str
 }

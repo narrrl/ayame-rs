@@ -188,7 +188,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(ping, ytd, invite)]
+#[commands(ping, ytd, invite, mock)]
 #[description = "A group with lots of different commands"]
 struct General;
 
