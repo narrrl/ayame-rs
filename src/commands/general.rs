@@ -126,3 +126,27 @@ async fn mock(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
         .await?;
     Ok(())
 }
+
+#[command("guildicon")]
+#[aliases("gi", "icon")]
+#[only_in(guilds)]
+async fn guild_icon(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).await.expect("Couldn't get guild");
+    let icon = match guild.icon_url() {
+        Some(url) => url,
+        None => {
+            msg.reply(&ctx.http, "Guild has no icon").await?;
+            return Ok(());
+        }
+    };
+    msg.channel_id
+        .send_message(&ctx.http, |m| {
+            m.embed(|e| {
+                e.image(icon);
+                e.color(Color::from_rgb(238, 14, 97));
+                e
+            })
+        })
+        .await?;
+    Ok(())
+}
