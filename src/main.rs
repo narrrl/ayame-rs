@@ -105,10 +105,6 @@ async fn main() {
     }
     tracing_subscriber::fmt::init();
 
-    if !get_file("config.toml").exists() {
-        let _ = configuration::create_config_interactive();
-    }
-
     let token = CONFIG.token();
 
     let http = Http::new_with_token(&token);
