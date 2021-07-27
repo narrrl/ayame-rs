@@ -48,7 +48,7 @@ use commands::{admin::*, general::*};
 use lazy_static::*;
 
 lazy_static! {
-    pub static ref CONFIG: Config = configuration::get_config();
+    pub static ref CONFIG: Config = configuration::config();
     pub static ref BOT_DIR: PathBuf = {
         let mut dir = std::env::current_exe().expect("Couldn't get bot directory");
         dir.pop();
@@ -176,7 +176,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(ping, ytd, invite, mock)]
+#[commands(ping, ytd, invite, mock, guild_icon)]
 #[description = "A group with lots of different commands"]
 struct General;
 
@@ -218,7 +218,11 @@ async fn main() {
     }
     tracing_subscriber::fmt::init();
 
-    let token = CONFIG.get_token();
+    if !get_file("config.toml").exists() {
+        let _ = configuration::create_config_interactive();
+    }
+
+    let token = CONFIG.token();
 
     let http = Http::new_with_token(&token);
 
@@ -235,7 +239,7 @@ async fn main() {
 
     // Create bot
     //load bot prefix from config
-    let prefix: &str = &CONFIG.get_prefix();
+    let prefix: &str = &CONFIG.prefix();
 
     info!("Cleaning temporary directory");
     let _ = remove_dir_all(get_file("tmp"));
