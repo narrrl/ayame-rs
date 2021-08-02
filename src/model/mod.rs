@@ -1,5 +1,6 @@
 pub mod image_processing;
 pub mod youtubedl;
+pub mod discord_commands;
 
 use rand::Rng;
 use std::{

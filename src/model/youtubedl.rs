@@ -67,6 +67,12 @@ impl YTDL {
         self.args
             .push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
         self.args.push(Arg::new("--add-metadata"));
+        let mut dir = crate::BOT_DIR.clone();
+        dir.push("cookies.txt");
+        if dir.exists() {
+            let dir = dir.to_str().expect("Couldn't convert Path to cookie file");
+            self.args.push(Arg::new_with_arg("--cookies", dir));
+        }
         self
     }
 
