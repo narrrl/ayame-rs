@@ -19,13 +19,10 @@ lazy_static! {
 #[command("youtube-dl")]
 #[bucket = "really_slow"]
 #[aliases("ytd", "dl")]
+#[usage("youtube-dl (-audio) [link]")]
+#[min_args(1)]
+#[max_args(2)]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    if args.len() < 1 && args.len() > 2 {
-        msg.reply(&ctx.http, "Please provide only one link to a video source")
-            .await?;
-        return Ok(());
-    }
-
     let mut url = String::new();
     let mut audio_only = false;
 
@@ -60,6 +57,7 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 }
 
 #[command]
+#[num_args(0)]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
     let shard_manager = match data.get::<ShardManagerContainer>() {
@@ -148,5 +146,38 @@ async fn guild_icon(ctx: &Context, msg: &Message) -> CommandResult {
             })
         })
         .await?;
+    Ok(())
+}
+
+#[command("avatar")]
+#[aliases("av", "pb")]
+#[only_in(guilds)]
+#[num_args(1)]
+async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
+    let user = match msg.mentions.get(msg.mentions.len() - 1) {
+        Some(user) => user,
+        None => {
+            msg.reply(&ctx.http, "No user specified").await?;
+            return Ok(());
+        }
+    };
+
+    let icon = match user.avatar_url() {
+        Some(user) => user,
+        None => {
+            msg.reply(&ctx.http, "User has no avatar").await?;
+            return Ok(());
+        }
+    };
+    msg.channel_id
+        .send_message(&ctx.http, |m| {
+            m.embed(|e| {
+                e.image(icon);
+                e.color(Color::from_rgb(238, 14, 97));
+                e
+            })
+        })
+        .await?;
+
     Ok(())
 }
