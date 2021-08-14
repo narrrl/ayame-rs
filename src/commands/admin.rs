@@ -22,7 +22,7 @@ lazy_static! {
 #[num_args(1)]
 #[usage("[emote_name]")]
 #[description(
-    "Uploads the attached image as emote with the given [emote_name].
+    "Uploads the attached image as emote with the given `emote_name`.
     Resizes images until the image is small enough."
 )]
 async fn addemote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
