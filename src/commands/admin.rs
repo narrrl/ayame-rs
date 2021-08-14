@@ -19,12 +19,13 @@ lazy_static! {
 #[command]
 #[only_in(guilds)]
 #[required_permissions("ADMINISTRATOR")]
+#[num_args(1)]
+#[usage("[emote_name]")]
+#[description(
+    "Uploads the attached image as emote with the given [emote_name].
+    Resizes images until the image is small enough."
+)]
 async fn addemote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    // check if user provided a emote name
-    if args.len() != 1 {
-        return Ok(());
-    }
-
     // get emote name
     let emote_name = match args.current() {
         Some(arg) => arg,
