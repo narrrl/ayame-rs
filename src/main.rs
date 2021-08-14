@@ -48,7 +48,7 @@ use std::{path::PathBuf, sync::atomic::AtomicBool};
 
 use tracing::{error, info};
 
-use commands::{admin::*, general::*};
+use commands::{admin::*, general::*, owner::*};
 
 use lazy_static::*;
 
@@ -212,6 +212,11 @@ async fn set_status_to_current_time(ctx: Arc<Context>) {
 struct General;
 
 #[group]
+#[commands(shutdown)]
+#[description = "Bot-owner commands"]
+struct Owner;
+
+#[group]
 #[commands(addemote)]
 #[description = "A group for admin utility to manage your server"]
 struct Admin;
@@ -281,6 +286,7 @@ async fn main() {
                 .no_dm_prefix(true)
         })
         .group(&GENERAL_GROUP)
+        .group(&OWNER_GROUP)
         .group(&ADMIN_GROUP)
         .help(&HELP)
         // annote command with #[bucket = "really_slow"]
