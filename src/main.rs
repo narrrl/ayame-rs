@@ -7,7 +7,7 @@ mod model;
 // Config, etc ...
 mod configuration;
 
-use chrono::offset::Local;
+use chrono::{offset::Local, Timelike};
 use configuration::Config;
 use serenity::{
     async_trait,
@@ -75,7 +75,8 @@ impl EventHandler for Handler {
             tokio::spawn(async move {
                 loop {
                     set_status_to_current_time(Arc::clone(&ctx_clone)).await;
-                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    let sleep_timer = (60 - Local::now().second()) as u64;
+                    tokio::time::sleep(Duration::from_secs(sleep_timer)).await;
                 }
             });
 
