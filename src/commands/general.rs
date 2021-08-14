@@ -19,7 +19,8 @@ lazy_static! {
 #[command("youtube-dl")]
 #[bucket = "really_slow"]
 #[aliases("ytd", "dl")]
-#[usage("youtube-dl (-audio) [link]")]
+#[usage("(-audio) [link]")]
+#[description("Download videos/audio from different sources")]
 #[min_args(1)]
 #[max_args(2)]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
@@ -92,6 +93,7 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[num_args(0)]
 async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
     let current_user = ctx.http.get_current_user().await?;
     let application_id = current_user.id.as_u64();
@@ -114,6 +116,9 @@ async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[min_args(1)]
+#[usage("[text...]")]
+#[description("Converts your message to random upper and lower cases")]
 async fn mock(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let channel_id = msg.channel_id;
     msg.delete(&ctx.http).await?;
@@ -128,6 +133,7 @@ async fn mock(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 #[command("guildicon")]
 #[aliases("gi", "icon")]
 #[only_in(guilds)]
+#[num_args(0)]
 async fn guild_icon(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.expect("Couldn't get guild");
     let icon = match guild.icon_url() {
@@ -153,11 +159,12 @@ async fn guild_icon(ctx: &Context, msg: &Message) -> CommandResult {
 #[aliases("av", "pb")]
 #[only_in(guilds)]
 #[num_args(1)]
+#[usage("[@user]")]
 async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
     let user = match msg.mentions.get(msg.mentions.len() - 1) {
         Some(user) => user,
         None => {
-            msg.reply(&ctx.http, "No user specified").await?;
+            msg.reply(&ctx.http, "Invalid user specified").await?;
             return Ok(());
         }
     };
