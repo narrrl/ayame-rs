@@ -7,9 +7,13 @@ mod model;
 // Config, etc ...
 mod configuration;
 
+use chrono::offset::Local;
 use configuration::Config;
 use serenity::{
     async_trait,
+    model::{gateway::Activity, id::GuildId},
+};
+use serenity::{
     client::bridge::gateway::{GatewayIntents, ShardManager},
     framework::{
         standard::{
@@ -23,8 +27,9 @@ use serenity::{
     model::{channel::Message, event::ResumedEvent, gateway::Ready, id::UserId},
     prelude::*,
 };
-use std::path::PathBuf;
-use std::{collections::HashSet, fs::remove_dir_all, sync::Arc};
+use std::sync::atomic::Ordering;
+use std::{collections::HashSet, fs::remove_dir_all, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::atomic::AtomicBool};
 
 use tracing::{error, info};
 
@@ -48,7 +53,9 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
-struct Handler;
+struct Handler {
+    is_loop_running: AtomicBool,
+}
 
 // Ready and Resumed events to notify if the bot has started/resumed
 #[async_trait]
@@ -60,10 +67,33 @@ impl EventHandler for Handler {
     async fn resume(&self, _: Context, _: ResumedEvent) {
         info!("Resumed");
     }
+    async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
+        info!("Cache built successfully!");
+        let ctx = Arc::new(ctx);
+        if !self.is_loop_running.load(Ordering::Relaxed) {
+            let ctx_clone = Arc::clone(&ctx);
+            tokio::spawn(async move {
+                loop {
+                    set_status_to_current_time(Arc::clone(&ctx_clone)).await;
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                }
+            });
+
+            // Now that the loop is running, we set the bool to true
+            self.is_loop_running.swap(true, Ordering::Relaxed);
+        }
+    }
+}
+
+async fn set_status_to_current_time(ctx: Arc<Context>) {
+    let current_time = Local::now();
+    let formatted_time = current_time.format("%H:%M, %a %b %e").to_string();
+
+    ctx.set_activity(Activity::playing(&formatted_time)).await;
 }
 
 #[group]
-#[commands(ping, ytd, invite, mock, guild_icon)]
+#[commands(ping, ytd, invite, mock, guild_icon, avatar)]
 #[description = "A group with lots of different commands"]
 struct General;
 
@@ -147,7 +177,9 @@ async fn main() {
     let mut client = Client::builder(&token)
         .framework(framework)
         .intents(GatewayIntents::all())
-        .event_handler(Handler)
+        .event_handler(Handler {
+            is_loop_running: AtomicBool::new(false),
+        })
         .await
         .expect("Err creating client");
 

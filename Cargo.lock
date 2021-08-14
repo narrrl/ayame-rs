@@ -723,6 +723,7 @@ dependencies = [
 name = "nirust"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "dotenv",
  "fs_extra",
  "image",
