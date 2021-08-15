@@ -2,13 +2,15 @@ use crate::ShardManagerContainer;
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
+use tracing::info;
 
-#[command]
+#[command("shutdown")]
 #[aliases("shutd", "sh")]
 #[description("Shutdown bot")]
 #[owners_only]
 #[num_args(0)]
 async fn shutdown(ctx: &Context, msg: &Message) -> CommandResult {
+    info!("Recieved shutdown event");
     let data = ctx.data.read().await;
 
     if let Some(manager) = data.get::<ShardManagerContainer>() {
