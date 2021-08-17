@@ -7,6 +7,8 @@ mod model;
 // Config, etc ...
 mod configuration;
 
+mod framework;
+
 use chrono::{offset::Local, Timelike};
 use configuration::Config;
 use model::youtubedl::YTDL;
@@ -142,31 +144,69 @@ impl EventHandler for Handler {
                         }
                     }
                 }
+                "invite" => {
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.content("✅"))
+                        })
+                        .await;
+                    let channel_id = command.channel_id;
+                    let _ = framework::invite(&ctx.http, &channel_id).await;
+                }
+                "mock" => {
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.content("✅"))
+                        })
+                        .await;
+                }
                 _ => return (),
             };
         }
     }
     async fn ready(&self, ctx: Context, ready: Ready) {
         let commands = ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
-            commands.create_application_command(|command| {
-                command
-                    .name("youtubedl")
-                    .description("Download Videos from a lot of sites")
-                    .create_option(|option| {
-                        option
-                            .name("link")
-                            .description("A link to a video source")
-                            .kind(ApplicationCommandOptionType::String)
-                            .required(true)
-                    })
-                    .create_option(|option| {
-                        option
-                            .name("audio_only")
-                            .description("Download the video as mp3")
-                            .kind(ApplicationCommandOptionType::Boolean)
-                            .required(false)
-                    })
-            })
+            commands
+                .create_application_command(|command| {
+                    command
+                        .name("youtubedl")
+                        .description("Download Videos from a lot of sites")
+                        .create_option(|option| {
+                            option
+                                .name("link")
+                                .description("A link to a video source")
+                                .kind(ApplicationCommandOptionType::String)
+                                .required(true)
+                        })
+                        .create_option(|option| {
+                            option
+                                .name("audio_only")
+                                .description("Download the video as mp3")
+                                .kind(ApplicationCommandOptionType::Boolean)
+                                .required(false)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("invite")
+                        .description("Invite the bot to your server")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("mock")
+                        .description("Converts your message to random upper and lower case")
+                        .create_option(|option| {
+                            option
+                                .name("message")
+                                .description("Your message that gets converted")
+                                .kind(ApplicationCommandOptionType::String)
+                                .required(true)
+                        })
+                })
         })
         .await;
 
