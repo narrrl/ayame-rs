@@ -96,16 +96,54 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
     let current_user = ctx.http.get_current_user().await?;
-    let application_id = current_user.id.as_u64();
-    let invite_link = format!("https://discord.com/api/oauth2/authorize?client_id={}&permissions=8&scope=applications.commands%20bot", application_id);
+    let invite_url = current_user
+        .invite_url_with_oauth2_scopes(
+            &ctx.http,
+            Permissions::ADMINISTRATOR,
+            &[OAuth2Scope::ApplicationsCommands, OAuth2Scope::Bot],
+        )
+        .await?;
+    let guild_amount = current_user.guilds(&ctx.http).await?.len();
     msg.channel_id
         .send_message(&ctx.http, |m| {
             m.embed(|e| {
-                e.title("Invite the bot to your server");
-                e.url(invite_link);
+                e.title("Invite the Bot!");
+                e.url(&invite_url);
                 if let Some(url) = current_user.avatar_url() {
                     e.thumbnail(&url);
                 }
+                e.footer(|f| {
+                    if let Some(url) = current_user.avatar_url() {
+                        f.icon_url(&url);
+                    }
+                    f.text(&format!("Joined Guilds: {}", guild_amount));
+                    f
+                });
+                e.author(|a| {
+                    if let Some(url) = current_user.avatar_url() {
+                        a.icon_url(&url);
+                    }
+                    a.name(&current_user.name);
+                    a
+                });
+                e.description(
+                    "This are the requirements for the bot to run without any restrictions.
+                    **Required [Permissions]\
+                    (https://discord.com/developers/docs/topics/permissions#permissions-bitwise-permission-flags)**:
+                    - ADMINISTRATOR 
+
+                    **Required [OAuth2Scopes]\
+                    (https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes)**:
+                    - Create ApplicationsCommands (Slash Commands)
+                    - Bot (Well I guess)
+
+                    The bot is open source and the source code can be found on \
+                    [Github](https://github.com/nirusu99/nirust). 
+
+                    [Click here](invite_url) to get the bot to join your server
+                "
+                    .replace("invite_url", &invite_url),
+                );
                 e.color(Color::from_rgb(238, 14, 97));
                 e
             })
