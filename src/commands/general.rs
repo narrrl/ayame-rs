@@ -127,14 +127,14 @@ async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
                     a
                 });
                 e.description(
-                    "This are the requirements for the bot to run without any restrictions.
+                    "Those are the requirements for the bot to run without any restrictions.
                     **Required [Permissions]\
                     (https://discord.com/developers/docs/topics/permissions#permissions-bitwise-permission-flags)**:
                     - ADMINISTRATOR 
 
                     **Required [OAuth2Scopes]\
                     (https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes)**:
-                    - Create ApplicationsCommands (Slash Commands)
+                    - ApplicationsCommands (Slash Commands)
                     - Bot (Well I guess)
 
                     The bot is open source and the source code can be found on \
