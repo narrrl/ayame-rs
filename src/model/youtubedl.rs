@@ -2,7 +2,6 @@ use std::fs::remove_dir_all;
 use std::{fs::read_dir, path::PathBuf, sync::Arc};
 
 use fs_extra::dir::get_size;
-use lazy_static::lazy_static;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
 use serenity::{
@@ -12,10 +11,8 @@ use serenity::{
 use tracing::error;
 use ytd_rs::{Arg, ResultType, YoutubeDL};
 
-lazy_static! {
-    pub static ref MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
-    pub static ref MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
-}
+pub const MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
+pub const MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
 
 pub struct YTDL {
     channel: ChannelId,
@@ -203,20 +200,20 @@ impl YTDL {
         let size = get_size(file.as_path())?;
 
         // sizes smaller than 8mb can be uploaded to discord directly
-        if size < *MAX_FILE_SIZE && size < *MAX_DISCORD_FILE_SIZE {
+        if size < MAX_FILE_SIZE && size < MAX_DISCORD_FILE_SIZE {
             update_message
                 .edit(&self.http, |m| m.content("Uploading to Discord ..."))
                 .await?;
             self.send_file_to_channel(file).await?;
             // if file is below the setted limit but above the 8mb we can upload it to transfer.sh
-        } else if size < *MAX_FILE_SIZE {
+        } else if size < MAX_FILE_SIZE {
             update_message
                 .edit(&self.http, |m| m.content("Uploading to transfer.sh ..."))
                 .await?;
             self.send_file_to_transfersh(&file).await?;
             // else we have to inform the user that the file was too chonky
         } else {
-            let max_mb = *MAX_FILE_SIZE / 1_000_000;
+            let max_mb = MAX_FILE_SIZE / 1_000_000;
             return Err(CommandError::from(format!(
                 "Your download was larger than {}mb",
                 max_mb

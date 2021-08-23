@@ -29,7 +29,7 @@ pub fn reduce_emote_size(image: &PathBuf) -> Result<PathBuf, Error> {
         ));
     }
 
-    while meta.len() > *admin::MAX_EMOTE_SIZE {
+    while meta.len() > admin::MAX_EMOTE_SIZE {
         let image_buf = match image::open(image) {
             Ok(i) => i,
             Err(_) => {

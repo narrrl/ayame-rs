@@ -13,8 +13,8 @@ use serenity::utils::read_image;
 lazy_static! {
     pub static ref IMAGE_REGEX: Regex =
         Regex::new(r".+\.(gif|png|jpg|jpeg)").expect("Couldn't create image regex");
-    pub static ref MAX_EMOTE_SIZE: u64 = 256_000; // kb
 }
+pub const MAX_EMOTE_SIZE: u64 = 256_000; // kb
 
 #[command]
 #[only_in(guilds)]
@@ -82,7 +82,7 @@ async fn addemote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     // write image to disk
     buf.write_all(&content)?;
 
-    if content.len() > *MAX_EMOTE_SIZE as usize {
+    if content.len() > MAX_EMOTE_SIZE as usize {
         match image_processing::reduce_emote_size(&path) {
             Ok(p) => p,
             Err(_) => {
