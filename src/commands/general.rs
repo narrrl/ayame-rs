@@ -12,6 +12,7 @@ use serenity::{
 lazy_static! {
     pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
     pub static ref AUDIO_ONLY_REGEX: Regex = Regex::new(r"-audio").expect("Couldn't build URL Regex");
+    pub static ref TIMESTAMP_REGEX: Regex = Regex::new(r"(\d{2}:)?(\d{2}:)?(\d{2}\d*)(\.\d{2})?").expect("Couldn't build URL Regex");
 }
 
 #[command("youtube-dl")]
@@ -20,10 +21,12 @@ lazy_static! {
 #[usage("(-audio) [link]")]
 #[description("Download videos/audio from different sources")]
 #[min_args(1)]
-#[max_args(2)]
+#[max_args(4)]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let mut url = String::new();
     let mut audio_only = false;
+    let mut start = None;
+    let mut end = None;
 
     while !args.is_empty() {
         if let Ok(arg) = args.single::<String>() {
@@ -31,7 +34,26 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 url = arg;
             } else if AUDIO_ONLY_REGEX.is_match(&arg) {
                 audio_only = true;
+            } else if TIMESTAMP_REGEX.is_match(&arg) {
+                let stamp = match crate::model::Timestamp::from_string(&arg) {
+                    Ok(stömp) => stömp,
+                    Err(_why) => {
+                        return Ok(());
+                    }
+                };
+
+                if let Some(_) = start {
+                    end = Some(stamp);
+                } else {
+                    start = Some(stamp);
+                }
+            } else {
+                msg.reply(&ctx.http, &format!("Invalid input {}", &arg))
+                    .await?;
+                return Ok(());
             }
+        } else {
+            return Ok(());
         }
     }
 
@@ -41,7 +63,7 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     }
 
     let id = msg.author.id.as_u64().clone();
-    framework::ytd(&ctx.http, url, id, msg.channel_id, audio_only).await
+    framework::ytd_with_stamps(&ctx.http, url, id, msg.channel_id, audio_only, start, end).await
 }
 
 #[command]

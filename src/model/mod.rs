@@ -4,6 +4,7 @@ pub mod discord_commands;
 
 use rand::Rng;
 use std::{
+    fmt,
     fs::canonicalize,
     io::Error,
     path::PathBuf,
@@ -96,4 +97,153 @@ pub fn mock_text(text: &str) -> String {
         }
     }
     mock_str
+}
+
+pub struct Timestamp {
+    h: u32,
+    m: u32,
+    s: u32,
+    ms: u32,
+}
+
+impl Timestamp {
+    #[allow(dead_code)]
+    pub fn from(h: u32, m: u32, s: u32, ms: u32) -> Result<Timestamp, Box<dyn std::error::Error>> {
+        if m > 60 {
+            return Err(Box::from(TimeFormatError {
+                msg: format!("Expected minutes amount below 60, got {}", &m),
+            }));
+        } else if s > 60 {
+            return Err(Box::from(TimeFormatError {
+                msg: format!("Expected seconds amount below 60, got {}", &s),
+            }));
+        } else if ms > 1000 {
+            return Err(Box::from(TimeFormatError {
+                msg: format!("Expected milliseconds amount below 1000, got {}", &ms),
+            }));
+        }
+        Ok(Timestamp { h, m, s, ms })
+    }
+
+    #[allow(dead_code)]
+    pub fn from_secs(s: u32) -> Result<Timestamp, Box<dyn std::error::Error>> {
+        let m = s / 60 - s / 3600;
+        let h = s / 3600;
+        Timestamp::from(h, m, s - (h * 3600 + m * 60), 0)
+    }
+
+    #[allow(dead_code)]
+    pub fn from_string(input: &str) -> Result<Timestamp, Box<dyn std::error::Error>> {
+        let mut split = input.split(r"\.").collect::<Vec<&str>>();
+        if split.len() == 1 {
+            return Timestamp::from_string_without_ms(input);
+        }
+        let hms = split.remove(0);
+        for s in hms.split(r":").collect::<Vec<&str>>().iter() {
+            split.push(s);
+        }
+        let (h, m, s, ms) = match split.len() {
+            4 => (
+                split.get(3).unwrap().parse::<u32>()?,
+                split.get(2).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(0).unwrap().parse::<u32>()?,
+            ),
+            3 => (
+                0,
+                split.get(2).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(0).unwrap().parse::<u32>()?,
+            ),
+            2 => (
+                0,
+                0,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(0).unwrap().parse::<u32>()?,
+            ),
+            1 => (0, 0, 0, split.get(0).unwrap().parse::<u32>()?),
+            _ => {
+                return Err(Box::from(TimeFormatError {
+                    msg: "Invalid amount of arguments".to_string(),
+                }));
+            }
+        };
+
+        Timestamp::from(h, m, s, ms)
+    }
+
+    fn from_string_without_ms(input: &str) -> Result<Timestamp, Box<dyn std::error::Error>> {
+        let split = input.split(r":").collect::<Vec<&str>>();
+        let (h, m, s) = match split.len() {
+            3 => (
+                split.get(2).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(0).unwrap().parse::<u32>()?,
+            ),
+            2 => (
+                0,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(0).unwrap().parse::<u32>()?,
+            ),
+            1 => (0, 0, split.get(0).unwrap().parse::<u32>()?),
+            _ => {
+                return Err(Box::from(TimeFormatError {
+                    msg: "Invalid amount of arguments".to_string(),
+                }));
+            }
+        };
+
+        Timestamp::from(h, m, s, 0)
+    }
+
+    #[allow(dead_code)]
+    pub fn seconds(&self) -> u32 {
+        self.s
+    }
+
+    #[allow(dead_code)]
+    pub fn in_seconds(&self) -> u32 {
+        self.s + self.m * 60 + self.h * 3600
+    }
+
+    #[allow(dead_code)]
+    pub fn hours(&self) -> u32 {
+        self.h
+    }
+
+    #[allow(dead_code)]
+    pub fn minutes(&self) -> u32 {
+        self.m
+    }
+
+    #[allow(dead_code)]
+    pub fn milliseconds(&self) -> u32 {
+        self.ms
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TimeFormatError {
+    msg: String,
+}
+
+impl std::fmt::Display for TimeFormatError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl std::error::Error for TimeFormatError {
+    fn description(&self) -> &str {
+        self.msg.as_ref()
+    }
+}
+
+impl std::string::ToString for Timestamp {
+    fn to_string(&self) -> String {
+        format!(
+            "{:0>2}:{:0>2}:{:0>2}.{:0>2}",
+            self.h, self.m, self.s, self.ms
+        )
+    }
 }

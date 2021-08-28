@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::model::youtubedl::YTDL;
+use crate::model::Timestamp;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serenity::client::bridge::gateway::ShardRunnerInfo;
@@ -15,6 +16,32 @@ lazy_static! {
     pub static ref AUDIO_ONLY_REGEX: Regex = Regex::new(r"-audio").expect("Couldn't build URL Regex");
 }
 
+pub async fn ytd_with_stamps(
+    http: &Arc<Http>,
+    url: String,
+    author_id: u64,
+    channel_id: ChannelId,
+    audio_only: bool,
+    start: Option<Timestamp>,
+    end: Option<Timestamp>,
+) -> CommandResult {
+    let http = http.clone();
+    task::spawn(async move {
+        let mut ytdl = YTDL::new(channel_id, author_id, http);
+        ytdl.set_defaults();
+        if let Some(start) = start {
+            ytdl.set_start(start);
+        }
+        if let Some(end) = end {
+            ytdl.set_end(end);
+        }
+        if audio_only {
+            ytdl.set_audio_only();
+        }
+        ytdl.start_download(url).await
+    });
+    Ok(())
+}
 pub async fn ytd(
     http: &Arc<Http>,
     url: String,

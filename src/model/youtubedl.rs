@@ -1,6 +1,8 @@
 use std::fs::remove_dir_all;
+use std::process::{Command, Stdio};
 use std::{fs::read_dir, path::PathBuf, sync::Arc};
 
+use super::Timestamp;
 use fs_extra::dir::get_size;
 use lazy_static::lazy_static;
 use serenity::model::prelude::*;
@@ -9,12 +11,10 @@ use serenity::{
     framework::standard::{CommandError, CommandResult},
     http::Http,
 };
-use tracing::error;
+use tracing::{debug, error, warn};
 use ytd_rs::{Arg, ResultType, YoutubeDL};
 
 lazy_static! {
-    pub static ref MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
-    pub static ref MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
     static ref DEFAULT_ARGS: Vec<Arg> = {
         let mut args = Vec::new();
         // output format
@@ -25,12 +25,17 @@ lazy_static! {
     };
 }
 
+pub const MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
+pub const MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
+
 pub struct YTDL {
     channel: ChannelId,
     author_id: u64,
     http: Arc<Http>,
     args: Vec<Arg>,
     msg: Option<Message>,
+    start: Option<crate::model::Timestamp>,
+    end: Option<crate::model::Timestamp>,
 }
 
 impl YTDL {
@@ -41,6 +46,8 @@ impl YTDL {
             http,
             args: Vec::new(),
             msg: None,
+            start: None,
+            end: None,
         }
     }
 
@@ -52,6 +59,15 @@ impl YTDL {
         self.args.push(Arg::new("--extract-audio"));
         self.args.push(Arg::new_with_arg("--audio-format", "mp3"));
         self.args.push(Arg::new("--embed-thumbnail"));
+        self
+    }
+
+    pub fn set_start<'a>(&'a mut self, stamp: Timestamp) -> &'a mut YTDL {
+        self.start = Some(stamp);
+        self
+    }
+    pub fn set_end<'a>(&'a mut self, stamp: Timestamp) -> &'a mut YTDL {
+        self.end = Some(stamp);
         self
     }
 
@@ -232,24 +248,34 @@ impl YTDL {
     ///  Returns an error if the file is way to chonky
     ///
     async fn upload_file(&self, update_message: &mut Message, file: PathBuf) -> CommandResult {
-        // get size of the file
+        let file = match &self.start {
+            Some(_) => match self.cut_file(&file).await {
+                Err(why) => {
+                    return self
+                        .send_error(&format!("could'nt create ffmpeg: {:}", why))
+                        .await;
+                }
+                Ok(path) => path,
+            },
+            None => file,
+        }; // get size of the file
         let size = get_size(file.as_path())?;
 
         // sizes smaller than 8mb can be uploaded to discord directly
-        if size < *MAX_FILE_SIZE && size < *MAX_DISCORD_FILE_SIZE {
+        if size < MAX_FILE_SIZE && size < MAX_DISCORD_FILE_SIZE {
             update_message
                 .edit(&self.http, |m| m.content("Uploading to Discord ..."))
                 .await?;
             self.send_file_to_channel(file).await?;
             // if file is below the setted limit but above the 8mb we can upload it to transfer.sh
-        } else if size < *MAX_FILE_SIZE {
+        } else if size < MAX_FILE_SIZE {
             update_message
                 .edit(&self.http, |m| m.content("Uploading to transfer.sh ..."))
                 .await?;
             self.send_file_to_transfersh(&file).await?;
             // else we have to inform the user that the file was too chonky
         } else {
-            let max_mb = *MAX_FILE_SIZE / 1_000_000;
+            let max_mb = MAX_FILE_SIZE / 1_000_000;
             return Err(CommandError::from(format!(
                 "Your download was larger than {}mb",
                 max_mb
@@ -292,5 +318,62 @@ impl YTDL {
             })
             .await?;
         Ok(())
+    }
+
+    async fn cut_file(&self, file: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error + Send>> {
+        let mut new_path = file.clone();
+        let ext = file.extension().unwrap();
+        new_path.pop();
+        new_path.push(format!("cutted_file.{}", ext.to_str().unwrap()));
+        let in_path = file
+            .as_path()
+            .to_str()
+            .expect(&format!("Couldn't get path to file {:#?}", file));
+        let out_path = new_path
+            .as_path()
+            .to_str()
+            .expect(&format!("Couldn't get path to file {:#?}", file));
+        let mut cmd = Command::new("ffmpeg");
+        cmd.env("LC_ALL", "en_US.UTF-8")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        cmd.arg("-i").arg(in_path);
+        if let Some(start) = &self.start {
+            cmd.arg("-ss").arg(&start.to_string());
+        }
+
+        if let Some(end) = &self.end {
+            cmd.arg("-to").arg(&end.to_string());
+        }
+
+        cmd.arg("-c").arg("copy").arg("-y").arg(out_path);
+
+        let process = match cmd.spawn() {
+            Ok(process) => process,
+            Err(why) => {
+                warn!("An error happend while spawning ffmgep {:#?}", why);
+                return Ok(file.clone());
+            }
+        };
+
+        let out = process.wait_with_output();
+        match out {
+            Err(why) => {
+                warn!("An error happend while spawning ffmgep {:#?}", why);
+                return Ok(file.clone());
+            }
+            Ok(out) => debug!(
+                "FFMGEP exited with
+                Output:
+                {}
+                Error:
+                {}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            ),
+        };
+
+        Ok(new_path)
     }
 }
