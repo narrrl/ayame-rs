@@ -12,16 +12,15 @@ use serenity::{
 lazy_static! {
     pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
     pub static ref AUDIO_ONLY_REGEX: Regex = Regex::new(r"-audio").expect("Couldn't build URL Regex");
-    pub static ref TIMESTAMP_REGEX: Regex = Regex::new(r"(\d{2}:)?(\d{2}:)?(\d{2}\d*)(\.\d{2})?").expect("Couldn't build URL Regex");
+    pub static ref TIMESTAMP_REGEX: Regex = Regex::new(r"(\d{2}:)?(\d{2}:)?(\d+)(\.\d{2})?").expect("Couldn't build URL Regex");
 }
 
 #[command("youtube-dl")]
-#[bucket = "really_slow"]
 #[aliases("ytd", "dl")]
-#[usage("(-audio) [link]")]
+#[usage("(-audio) [link] (hh:mm:ss:ms) (hh:mm:ss:ms)")]
 #[description("Download videos/audio from different sources")]
 #[min_args(1)]
-#[max_args(4)]
+#[max_args(5)]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let mut url = String::new();
     let mut audio_only = false;

@@ -1,6 +1,6 @@
+pub mod discord_commands;
 pub mod image_processing;
 pub mod youtubedl;
-pub mod discord_commands;
 
 use rand::Rng;
 use std::{
@@ -126,40 +126,47 @@ impl Timestamp {
     }
 
     #[allow(dead_code)]
-    pub fn from_secs(s: u32) -> Result<Timestamp, Box<dyn std::error::Error>> {
+    pub fn from_secs_with_ms(s: u32, ms: u32) -> Result<Timestamp, Box<dyn std::error::Error>> {
         let m = s / 60 - s / 3600;
         let h = s / 3600;
-        Timestamp::from(h, m, s - (h * 3600 + m * 60), 0)
+        Timestamp::from(h, m, s - (h * 3600 + m * 60), ms)
+    }
+
+    #[allow(dead_code)]
+    pub fn from_secs(s: u32) -> Result<Timestamp, Box<dyn std::error::Error>> {
+        Timestamp::from_secs_with_ms(s, 0)
     }
 
     #[allow(dead_code)]
     pub fn from_string(input: &str) -> Result<Timestamp, Box<dyn std::error::Error>> {
-        let mut split = input.split(r"\.").collect::<Vec<&str>>();
+        let mut split = input.split(".").collect::<Vec<&str>>();
         if split.len() == 1 {
             return Timestamp::from_string_without_ms(input);
         }
         let hms = split.remove(0);
-        for s in hms.split(r":").collect::<Vec<&str>>().iter() {
+        let ms = split.remove(0);
+        for s in hms.split(":").collect::<Vec<&str>>().iter() {
             split.push(s);
         }
+        split.push(ms);
         let (h, m, s, ms) = match split.len() {
             4 => (
-                split.get(3).unwrap().parse::<u32>()?,
-                split.get(2).unwrap().parse::<u32>()?,
-                split.get(1).unwrap().parse::<u32>()?,
                 split.get(0).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(2).unwrap().parse::<u32>()?,
+                split.get(3).unwrap().parse::<u32>()?,
             ),
             3 => (
                 0,
-                split.get(2).unwrap().parse::<u32>()?,
-                split.get(1).unwrap().parse::<u32>()?,
                 split.get(0).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(2).unwrap().parse::<u32>()?,
             ),
             2 => (
                 0,
                 0,
-                split.get(1).unwrap().parse::<u32>()?,
                 split.get(0).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
             ),
             1 => (0, 0, 0, split.get(0).unwrap().parse::<u32>()?),
             _ => {
@@ -169,21 +176,21 @@ impl Timestamp {
             }
         };
 
-        Timestamp::from(h, m, s, ms)
+        Timestamp::from_secs_with_ms(h * 3600 + m * 60 + s, ms)
     }
 
     fn from_string_without_ms(input: &str) -> Result<Timestamp, Box<dyn std::error::Error>> {
-        let split = input.split(r":").collect::<Vec<&str>>();
+        let split = input.split(":").collect::<Vec<&str>>();
         let (h, m, s) = match split.len() {
             3 => (
-                split.get(2).unwrap().parse::<u32>()?,
-                split.get(1).unwrap().parse::<u32>()?,
                 split.get(0).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
+                split.get(2).unwrap().parse::<u32>()?,
             ),
             2 => (
                 0,
-                split.get(1).unwrap().parse::<u32>()?,
                 split.get(0).unwrap().parse::<u32>()?,
+                split.get(1).unwrap().parse::<u32>()?,
             ),
             1 => (0, 0, split.get(0).unwrap().parse::<u32>()?),
             _ => {
@@ -193,7 +200,7 @@ impl Timestamp {
             }
         };
 
-        Timestamp::from(h, m, s, 0)
+        Timestamp::from_secs(h * 3600 + m * 60 + s)
     }
 
     #[allow(dead_code)]
@@ -245,5 +252,49 @@ impl std::string::ToString for Timestamp {
             "{:0>2}:{:0>2}:{:0>2}.{:0>2}",
             self.h, self.m, self.s, self.ms
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::model::Timestamp;
+    #[test]
+    fn some_tests() -> Result<(), Box<dyn std::error::Error>> {
+        let stamp = Timestamp::from_string("00:12:15.00")?;
+        assert_eq!(stamp.h, 0);
+        assert_eq!(stamp.m, 12);
+        assert_eq!(stamp.s, 15);
+        assert_eq!(stamp.ms, 0);
+        assert_eq!(stamp.to_string(), "00:12:15.00".to_string());
+        let stamp = Timestamp::from_string("12:15")?;
+        assert_eq!(stamp.h, 0);
+        assert_eq!(stamp.m, 12);
+        assert_eq!(stamp.s, 15);
+        assert_eq!(stamp.ms, 0);
+        assert_eq!(stamp.to_string(), "00:12:15.00".to_string());
+        let stamp = Timestamp::from_string("735")?;
+        assert_eq!(stamp.h, 0);
+        assert_eq!(stamp.m, 12);
+        assert_eq!(stamp.s, 15);
+        assert_eq!(stamp.ms, 0);
+        assert_eq!(stamp.to_string(), "00:12:15.00".to_string());
+        let stamp = Timestamp::from_string("05.50")?;
+        assert_eq!(stamp.h, 0);
+        assert_eq!(stamp.m, 0);
+        assert_eq!(stamp.s, 5);
+        assert_eq!(stamp.ms, 50);
+        assert_eq!(stamp.to_string(), "00:00:05.50".to_string());
+        Ok(())
+    }
+
+    #[test]
+    fn some_more_tests() -> Result<(), Box<dyn std::error::Error>> {
+        let stamp = Timestamp::from(0, 12, 15, 0)?;
+        assert_eq!(stamp.h, 0);
+        assert_eq!(stamp.m, 12);
+        assert_eq!(stamp.s, 15);
+        assert_eq!(stamp.ms, 0);
+        assert_eq!(stamp.to_string(), "00:12:15.00".to_string());
+        Ok(())
     }
 }

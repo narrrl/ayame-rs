@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs::remove_dir_all;
 use std::process::{Command, Stdio};
 use std::{fs::read_dir, path::PathBuf, sync::Arc};
@@ -11,7 +12,8 @@ use serenity::{
     framework::standard::{CommandError, CommandResult},
     http::Http,
 };
-use tracing::{debug, error, warn};
+use tracing::log::info;
+use tracing::{error, warn};
 use ytd_rs::{Arg, ResultType, YoutubeDL};
 
 lazy_static! {
@@ -322,9 +324,12 @@ impl YTDL {
 
     async fn cut_file(&self, file: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error + Send>> {
         let mut new_path = file.clone();
-        let ext = file.extension().unwrap();
+        let mut ext = file.extension().unwrap();
+        if ext.eq("mkv") {
+            ext = &OsStr::new("mp4");
+        }
         new_path.pop();
-        new_path.push(format!("cutted_file.{}", ext.to_str().unwrap()));
+        new_path.push(format!("cut_file.{}", ext.to_str().unwrap()));
         let in_path = file
             .as_path()
             .to_str()
@@ -363,7 +368,7 @@ impl YTDL {
                 warn!("An error happend while spawning ffmgep {:#?}", why);
                 return Ok(file.clone());
             }
-            Ok(out) => debug!(
+            Ok(out) => info!(
                 "FFMGEP exited with
                 Output:
                 {}
