@@ -324,6 +324,11 @@ impl YTDL {
         Ok(())
     }
 
+    ///
+    /// Cuts the downloaded file to the given timestamps.
+    /// If no end stamp was given, the cut goes from the given start time to the end.
+    ///
+    /// uses ffmpeg in ['crate::model::ffmpeg::FFmpeg'] to cut the files
     async fn cut_file(&self, file: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error + Send>> {
         let mut new_path = file.clone();
         let mut ext = file.extension().unwrap();

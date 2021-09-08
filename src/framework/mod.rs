@@ -16,6 +16,12 @@ lazy_static! {
     pub static ref AUDIO_ONLY_REGEX: Regex = Regex::new(r"-audio").expect("Couldn't build URL Regex");
 }
 
+//TODO: look for a way to merge slash and normal. Currently slash commands need to answer with
+// a message. It is not enough to just send a message to the same channel.
+//
+// One idea would be to look into ['serenity::model::prelude::Context'] and try to merge the
+// Context from slash and normal commands.
+
 pub async fn ytd_with_stamps(
     http: &Arc<Http>,
     url: String,
@@ -43,6 +49,7 @@ pub async fn ytd_with_stamps(
     Ok(())
 }
 
+//TODO: make timestapms with slash work
 #[allow(dead_code)]
 pub async fn ytd(
     http: &Arc<Http>,
