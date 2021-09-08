@@ -333,9 +333,7 @@ async fn main() {
         .group(&OWNER_GROUP)
         .group(&ADMIN_GROUP)
         .help(&HELP)
-        // annote command with #[bucket = "really_slow"]
-        // to limit command usage to 1 uses per 10 minutes
-        .bucket("really_slow", |b| b.time_span(600).limit(1))
+        .bucket("youtubedl", |b| b.time_span(180).limit(1))
         .await;
     let application_id: u64 = CONFIG.get_application_id();
 

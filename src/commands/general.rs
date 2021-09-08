@@ -23,6 +23,7 @@ lazy_static! {
 #[example("-audio https://www.youtube.com/watch?v=4Bw2GwAbPuQ 0 1.2")]
 #[min_args(1)]
 #[max_args(5)]
+#[bucket(youtubedl)]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let mut url = String::new();
     let mut audio_only = false;
