@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::fs::remove_dir_all;
-use std::process::{Command, Stdio};
 use std::{fs::read_dir, path::PathBuf, sync::Arc};
 
+use super::ffmpeg::FFmpeg;
 use super::Timestamp;
 use fs_extra::dir::get_size;
 use lazy_static::lazy_static;
@@ -12,8 +12,7 @@ use serenity::{
     framework::standard::{CommandError, CommandResult},
     http::Http,
 };
-use tracing::log::info;
-use tracing::{error, warn};
+use tracing::error;
 use ytd_rs::{Arg, ResultType, YoutubeDL};
 
 lazy_static! {
@@ -253,9 +252,7 @@ impl YTDL {
         let file = match &self.start {
             Some(_) => match self.cut_file(&file).await {
                 Err(why) => {
-                    return self
-                        .send_error(&format!("could'nt create ffmpeg: {:}", why))
-                        .await;
+                    return self.send_error(&format!("Error: {:}", why)).await;
                 }
                 Ok(path) => path,
             },
@@ -325,59 +322,19 @@ impl YTDL {
     async fn cut_file(&self, file: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error + Send>> {
         let mut new_path = file.clone();
         let mut ext = file.extension().unwrap();
+        // nicer for discord, because discord doesn't embed mkvs
         if ext.eq("mkv") {
             ext = &OsStr::new("mp4");
         }
         new_path.pop();
         new_path.push(format!("cut_file.{}", ext.to_str().unwrap()));
-        let in_path = file
-            .as_path()
-            .to_str()
-            .expect(&format!("Couldn't get path to file {:#?}", file));
-        let out_path = new_path
-            .as_path()
-            .to_str()
-            .expect(&format!("Couldn't get path to file {:#?}", file));
-        let mut cmd = Command::new("ffmpeg");
-        cmd.env("LC_ALL", "en_US.UTF-8")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        let mut ffmpeg = FFmpeg::new(file)?;
 
-        cmd.arg("-i").arg(in_path);
-        if let Some(start) = &self.start {
-            cmd.arg("-ss").arg(&start.to_string());
+        if let Some(start) = self.start {
+            ffmpeg.set_interval(start, self.end);
         }
 
-        if let Some(end) = &self.end {
-            cmd.arg("-to").arg(&end.to_string());
-        }
-
-        cmd.arg("-c").arg("copy").arg("-y").arg(out_path);
-
-        let process = match cmd.spawn() {
-            Ok(process) => process,
-            Err(why) => {
-                warn!("An error happend while spawning ffmgep {:#?}", why);
-                return Ok(file.clone());
-            }
-        };
-
-        let out = process.wait_with_output();
-        match out {
-            Err(why) => {
-                warn!("An error happend while spawning ffmgep {:#?}", why);
-                return Ok(file.clone());
-            }
-            Ok(out) => info!(
-                "FFMGEP exited with
-                Output:
-                {}
-                Error:
-                {}",
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
-            ),
-        };
+        ffmpeg.cut_file(&mut new_path, false)?;
 
         Ok(new_path)
     }

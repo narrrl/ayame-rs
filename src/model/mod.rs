@@ -1,4 +1,5 @@
 pub mod discord_commands;
+pub mod ffmpeg;
 pub mod image_processing;
 pub mod youtubedl;
 
@@ -99,6 +100,7 @@ pub fn mock_text(text: &str) -> String {
     mock_str
 }
 
+#[derive(Clone, Copy)]
 pub struct Timestamp {
     h: u32,
     m: u32,

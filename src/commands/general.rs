@@ -19,6 +19,8 @@ lazy_static! {
 #[aliases("ytd", "dl")]
 #[usage("(-audio) [link] (hh:mm:ss:ms) (hh:mm:ss:ms)")]
 #[description("Download videos/audio from different sources")]
+#[example("https://www.youtube.com/watch?v=dQw4w9WgXcQ 0 5")]
+#[example("-audio https://www.youtube.com/watch?v=4Bw2GwAbPuQ 0 1.2")]
 #[min_args(1)]
 #[max_args(5)]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
