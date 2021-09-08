@@ -149,6 +149,11 @@ impl YTDL {
             Ok(path) => path,
         };
 
+        // create an update message to inform user about the current state
+        update_message
+            .edit(&self.http, |m| m.content("Start converting ..."))
+            .await?;
+
         if let Err(why) = self.upload_file(&mut update_message, file).await {
             remove_dir_all(&dir)?;
             self.send_error(&format!("{}", why)).await?;

@@ -42,6 +42,8 @@ pub async fn ytd_with_stamps(
     });
     Ok(())
 }
+
+#[allow(dead_code)]
 pub async fn ytd(
     http: &Arc<Http>,
     url: String,
