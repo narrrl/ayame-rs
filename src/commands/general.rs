@@ -134,3 +134,12 @@ async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
     };
     framework::avatar(&ctx.http, msg, user).await
 }
+
+#[command("guild_info")]
+#[aliases("ginfo", "ginf")]
+#[only_in(guilds)]
+#[num_args(0)]
+async fn guild_info(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).await.expect("Couldn't get guild");
+    framework::guild_info(&ctx.http, guild, msg).await
+}

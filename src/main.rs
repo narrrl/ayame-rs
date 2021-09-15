@@ -247,7 +247,7 @@ async fn set_status_to_current_time(ctx: Arc<Context>) {
 }
 
 #[group]
-#[commands(ping, ytd, invite, mock, guild_icon, avatar)]
+#[commands(ping, ytd, invite, mock, guild_icon, avatar, guild_info)]
 #[description = "A group with lots of different commands"]
 struct General;
 

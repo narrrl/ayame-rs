@@ -186,3 +186,45 @@ pub async fn avatar(http: &Arc<Http>, msg: &Message, user: &User) -> CommandResu
 
     Ok(())
 }
+
+pub async fn guild_info(http: &Arc<Http>, guild: Guild, msg: &Message) -> CommandResult {
+    let icon = match guild.icon_url() {
+        Some(url) => {
+            let mut url = url.to_string();
+            url.push_str("?size=512");
+            url
+        }
+        None => String::new(),
+    };
+
+    let mut message = format!(
+        "
+        Name: {}
+        Bot joined: {}
+        Owner: <@!{}>
+        Members: {}
+        ",
+        guild.name,
+        guild.joined_at.to_rfc2822(),
+        guild.owner_id.as_u64(),
+        guild.member_count
+    );
+
+    if let Some(ch) = guild.afk_channel_id {
+        message.push_str(&format!("AFK-Channel: <#{}>", ch.as_u64()));
+    }
+
+    msg.channel_id
+        .send_message(http, |m| {
+            m.embed(|e| {
+                e.image(icon);
+                e.color(Color::from_rgb(238, 14, 97));
+                e.title(guild.name);
+                e.description(message);
+                e
+            })
+        })
+        .await?;
+
+    Ok(())
+}
