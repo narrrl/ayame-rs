@@ -10,6 +10,7 @@ use serenity::http::Http;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
 use tokio::task;
+use tracing::{debug, error, info};
 
 lazy_static! {
     pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
@@ -202,8 +203,11 @@ pub async fn guild_info(http: &Arc<Http>, guild: Guild, msg: &Message) -> Comman
 
     let mut admins = vec![];
     for (id, member) in members.iter() {
-        if let Some(perms) = member.permissions {
-            if perms.contains(Permissions::ADMINISTRATOR) {
+        if id.eq(&guild.owner_id) {
+            continue;
+        }
+        if let Ok(perms) = guild.member_permissions(http, id).await {
+            if !member.user.bot && perms.contains(Permissions::ADMINISTRATOR) {
                 admins.push(id);
             }
         }
