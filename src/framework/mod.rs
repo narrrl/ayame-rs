@@ -196,18 +196,42 @@ pub async fn guild_info(http: &Arc<Http>, guild: Guild, msg: &Message) -> Comman
         }
         None => String::new(),
     };
+    let creation_date = guild.id.created_at();
+
+    let members = &guild.members;
+
+    let mut admins = vec![];
+    for (id, member) in members.iter() {
+        if let Some(perms) = member.permissions {
+            if perms.contains(Permissions::ADMINISTRATOR) {
+                admins.push(id);
+            }
+        }
+    }
+
+    let admins = admins
+        .into_iter()
+        .map(|i| format!("<@!{}>", i.to_string()))
+        .collect::<String>();
 
     let mut message = format!(
         "
         Name: {}
-        Bot joined: {}
+        Created: {}
         Owner: <@!{}>
+        Admins: {}
         Members: {}
+        Bot joined: {}
         ",
         guild.name,
-        guild.joined_at.to_rfc2822(),
+        creation_date.format("%H:%M, %a %b %e %Y").to_string(),
         guild.owner_id.as_u64(),
-        guild.member_count
+        admins,
+        match guild.max_members {
+            Some(max) => format!("{}/{}", guild.member_count, max),
+            None => guild.member_count.to_string(),
+        },
+        guild.joined_at.format("%H:%M, %a %b %e %Y").to_string()
     );
 
     if let Some(ch) = guild.afk_channel_id {

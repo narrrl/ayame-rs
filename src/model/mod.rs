@@ -1,4 +1,4 @@
-pub mod discord_commands;
+pub mod discord_utils;
 pub mod ffmpeg;
 pub mod image_processing;
 pub mod youtubedl;
