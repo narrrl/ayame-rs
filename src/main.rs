@@ -10,6 +10,7 @@ mod configuration;
 mod framework;
 
 use chrono::{offset::Local, Timelike};
+use songbird::SerenityInit;
 use configuration::Config;
 use model::youtubedl::YTDL;
 use serenity::{
@@ -50,7 +51,7 @@ use std::{path::PathBuf, sync::atomic::AtomicBool};
 
 use tracing::{error, info};
 
-use commands::{admin::*, general::*, owner::*};
+use commands::{admin::*, general::*, owner::*, music::*};
 
 use lazy_static::*;
 
@@ -252,6 +253,10 @@ async fn set_status_to_current_time(ctx: Arc<Context>) {
 struct General;
 
 #[group]
+#[commands(deafen, join, leave, mute, play, undeafen, unmute)]
+struct Music;
+
+#[group]
 #[commands(shutdown)]
 #[description = "Bot-owner commands"]
 struct Owner;
@@ -332,6 +337,7 @@ async fn main() {
         .group(&GENERAL_GROUP)
         .group(&OWNER_GROUP)
         .group(&ADMIN_GROUP)
+        .group(&MUSIC_GROUP)
         .help(&HELP)
         .bucket("youtubedl", |b| b.time_span(180).limit(1))
         .await;
@@ -344,6 +350,7 @@ async fn main() {
             is_loop_running: AtomicBool::new(false),
         })
         .application_id(application_id)
+        .register_songbird()
         .await
         .expect("Err creating client");
 

@@ -10,7 +10,6 @@ use serenity::http::Http;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
 use tokio::task;
-use tracing::{debug, error, info};
 
 lazy_static! {
     pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
