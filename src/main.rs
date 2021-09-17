@@ -253,7 +253,9 @@ async fn set_status_to_current_time(ctx: Arc<Context>) {
 struct General;
 
 #[group]
-#[commands(deafen, join, leave, mute, play, undeafen, unmute)]
+#[commands(
+    deafen, join, leave, mute, play_fade, skip, stop, undeafen, unmute, play
+)]
 struct Music;
 
 #[group]
