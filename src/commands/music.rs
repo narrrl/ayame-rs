@@ -62,10 +62,17 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
-    _join(ctx, msg).await
+    let mut create_messag = CreateMessage::default();
+    let message = _join(&mut create_messag, ctx, msg).await;
+    msg.channel_id.send_message(&ctx.http, |_| message).await?;
+    Ok(())
 }
 
-async fn _join(ctx: &Context, msg: &Message) -> CommandResult {
+async fn _join<'a>(
+    m: &'a mut CreateMessage<'a>,
+    ctx: &Context,
+    msg: &Message,
+) -> &'a mut CreateMessage<'a> {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
@@ -77,9 +84,7 @@ async fn _join(ctx: &Context, msg: &Message) -> CommandResult {
     let connect_to = match channel_id {
         Some(channel) => channel,
         None => {
-            check_msg(msg.reply(ctx, "Not in a voice channel").await);
-
-            return Ok(());
+            return m.content("Not in a voice channel");
         }
     };
 
@@ -91,11 +96,6 @@ async fn _join(ctx: &Context, msg: &Message) -> CommandResult {
     let (handle_lock, success) = manager.join(guild_id, connect_to).await;
 
     if let Ok(_channel) = success {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, &format!("Joined {}", connect_to.mention()))
-                .await,
-        );
         let chan_id = msg.channel_id;
 
         let send_http = ctx.http.clone();
@@ -135,15 +135,10 @@ async fn _join(ctx: &Context, msg: &Message) -> CommandResult {
                 handler_lock: handle_lock,
             },
         );
+        return m.content(&format!("Joined {}", connect_to.mention()));
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Error joining the channel")
-                .await,
-        );
+        return m.content("Error joining the channel");
     }
-
-    Ok(())
 }
 struct TrackEndNotifier {
     chan_id: ChannelId,
