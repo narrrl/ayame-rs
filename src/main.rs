@@ -156,13 +156,25 @@ impl EventHandler for Handler {
                         .await;
                 }
                 "mock" => {
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.content("✅"))
-                        })
-                        .await;
+                    let options = command
+                        .data
+                        .options
+                        .get(0)
+                        .expect("Expected user option")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected String object");
+
+                    if let ApplicationCommandInteractionDataOptionValue::String(text) = options {
+                        let text = model::mock_text(&text);
+                        let _ = command
+                            .create_interaction_response(&ctx.http, |response| {
+                                response
+                                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                                    .interaction_response_data(|message| message.content(text))
+                            })
+                            .await;
+                    }
                 }
                 _ => return (),
             };

@@ -110,8 +110,11 @@ async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
 #[usage("[text...]")]
 #[description("Converts your message to random upper and lower cases")]
 async fn mock(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let text = args.message();
-    framework::mock(&ctx.http, msg, text).await
+    let text = crate::model::mock_text(args.message());
+    msg.channel_id
+        .send_message(&ctx.http, |m| m.content(text))
+        .await?;
+    Ok(())
 }
 
 #[command("guildicon")]

@@ -83,15 +83,6 @@ pub async fn ping(http: &Arc<Http>, msg: &Message, runner: &ShardRunnerInfo) -> 
     Ok(())
 }
 
-pub async fn mock(http: &Arc<Http>, msg: &Message, text: &str) -> CommandResult {
-    let channel_id = msg.channel_id;
-    msg.delete(http).await?;
-    let msg = crate::model::mock_text(text);
-
-    channel_id.send_message(http, |m| m.content(msg)).await?;
-    Ok(())
-}
-
 pub async fn guild_icon(http: &Arc<Http>, guild: Guild, msg: &Message) -> CommandResult {
     let icon = match guild.icon_url() {
         Some(url) => url,
