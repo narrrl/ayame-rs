@@ -118,9 +118,9 @@ impl EventHandler for Handler {
                                         })
                                 })
                                 .await;
-
+                            let cache = ctx.cache.clone();
                             task::spawn(async move {
-                                let mut ytdl = YTDL::new(channel_id, id, http);
+                                let mut ytdl = YTDL::new(channel_id, id, http, cache);
                                 ytdl.set_defaults();
                                 if audio_only {
                                     ytdl.set_audio_only();

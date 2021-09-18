@@ -1,4 +1,8 @@
-use serenity::{builder::CreateEmbed, utils::Color};
+use serenity::{
+    builder::CreateEmbed,
+    model::guild::{Guild, PremiumTier},
+    utils::Color,
+};
 
 pub fn default_embed() -> CreateEmbed {
     let mut e = CreateEmbed::default();
@@ -19,4 +23,13 @@ pub fn set_defaults_for_error(e: &mut CreateEmbed, message: &str) {
     // red color to indicate error
     e.color(Color::from_rgb(204, 0, 0));
     e.title(format!("Error: {}", message));
+}
+
+pub fn get_max_uploadsize(guild: &Guild) -> u64 {
+    let tier = guild.premium_tier;
+    match tier {
+        PremiumTier::Tier2 => 50_000_000,
+        PremiumTier::Tier3 => 100_000_000,
+        _ => 8_000_000,
+    }
 }

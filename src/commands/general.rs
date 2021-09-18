@@ -65,7 +65,17 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     }
 
     let id = msg.author.id.as_u64().clone();
-    framework::ytd_with_stamps(&ctx.http, url, id, msg.channel_id, audio_only, start, end).await
+    framework::ytd_with_stamps(
+        &ctx.http,
+        url,
+        id,
+        msg.channel_id,
+        audio_only,
+        start,
+        end,
+        &ctx.cache,
+    )
+    .await
 }
 
 #[command]

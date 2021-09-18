@@ -5,6 +5,7 @@ use std::{fs::read_dir, path::PathBuf, sync::Arc};
 use super::ffmpeg::FFmpeg;
 use super::Timestamp;
 use fs_extra::dir::get_size;
+use serenity::client::Cache;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
 use serenity::{
@@ -27,8 +28,8 @@ lazy_static! {
     };
 }
 
-pub const MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
 pub const MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
+pub const MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
 
 pub struct YTDL {
     channel: ChannelId,
@@ -38,10 +39,11 @@ pub struct YTDL {
     msg: Option<Message>,
     start: Option<crate::model::Timestamp>,
     end: Option<crate::model::Timestamp>,
+    cache: Arc<Cache>,
 }
 
 impl YTDL {
-    pub fn new(channel: ChannelId, author_id: u64, http: Arc<Http>) -> YTDL {
+    pub fn new(channel: ChannelId, author_id: u64, http: Arc<Http>, cache: Arc<Cache>) -> YTDL {
         YTDL {
             channel,
             author_id,
@@ -50,6 +52,7 @@ impl YTDL {
             msg: None,
             start: None,
             end: None,
+            cache,
         }
     }
 
@@ -154,8 +157,18 @@ impl YTDL {
         update_message
             .edit(&self.http, |m| m.content("Start converting ..."))
             .await?;
+        let max_upload = match self.cache.guild_channel(self.channel).await {
+            Some(channel) => match self.cache.guild(channel.guild_id).await {
+                Some(guild) => crate::model::discord_utils::get_max_uploadsize(&guild),
+                None => MAX_DISCORD_FILE_SIZE,
+            },
+            None => MAX_DISCORD_FILE_SIZE,
+        };
 
-        if let Err(why) = self.upload_file(&mut update_message, file).await {
+        if let Err(why) = self
+            .upload_file(&mut update_message, file, max_upload)
+            .await
+        {
             remove_dir_all(&dir)?;
             self.send_error(&format!("{}", why)).await?;
         }
@@ -254,7 +267,12 @@ impl YTDL {
     ///
     ///  Returns an error if the file is way to chonky
     ///
-    async fn upload_file(&self, update_message: &mut Message, file: PathBuf) -> CommandResult {
+    async fn upload_file(
+        &self,
+        update_message: &mut Message,
+        file: PathBuf,
+        max_upload: u64,
+    ) -> CommandResult {
         let file = match &self.start {
             Some(_) => match self.cut_file(&file).await {
                 Err(why) => {
@@ -267,7 +285,7 @@ impl YTDL {
         let size = get_size(file.as_path())?;
 
         // sizes smaller than 8mb can be uploaded to discord directly
-        if size < MAX_FILE_SIZE && size < MAX_DISCORD_FILE_SIZE {
+        if size < MAX_FILE_SIZE && size < max_upload {
             update_message
                 .edit(&self.http, |m| m.content("Uploading to Discord ..."))
                 .await?;

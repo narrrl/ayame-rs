@@ -3,7 +3,6 @@ use serenity::builder::CreateEmbed;
 use serenity::http::Http;
 use serenity::model::prelude::*;
 use std::sync::Arc;
-use tracing::error;
 
 pub async fn invite(http: &Arc<Http>) -> CreateEmbed {
     let mut e = discord_utils::default_embed();
