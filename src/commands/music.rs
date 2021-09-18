@@ -104,6 +104,29 @@ async fn _join(ctx: &Context, msg: &Message) -> CommandResult {
 
         let handle_lock = manager.get(guild_id).unwrap();
 
+        let bitrate = {
+            if let Some(ch) = handle.current_channel() {
+                match ctx.http.get_channel(ch.0).await {
+                    Ok(ch) => match ch
+                        .guild()
+                        .expect(
+                            "How did you manage to let the bot join anything but a voice channel?",
+                        )
+                        .bitrate
+                    {
+                        Some(bitrate) => bitrate as i32,
+                        None => DEFAULT_BITRATE,
+                    },
+                    Err(_) => DEFAULT_BITRATE,
+                }
+            } else {
+                DEFAULT_BITRATE
+            }
+        };
+
+        handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
+        info!("setting bitrate {} for guild {}", bitrate, guild_id);
+
         handle.add_global_event(
             Event::Track(TrackEvent::End),
             TrackEndNotifier {
@@ -447,26 +470,6 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
 
-        let bitrate = {
-            if let Some(ch) = handler.current_channel() {
-                match ctx.http.get_channel(ch.0).await {
-                    Ok(ch) => match ch
-                        .guild()
-                        .expect(
-                            "How did you manage to let the bot join anything but a voice channel?",
-                        )
-                        .bitrate
-                    {
-                        Some(bitrate) => bitrate as i32,
-                        None => DEFAULT_BITRATE,
-                    },
-                    Err(_) => DEFAULT_BITRATE,
-                }
-            } else {
-                DEFAULT_BITRATE
-            }
-        };
-
         // Here, we use lazy restartable sources to make sure that we don't pay
         // for decoding, playback on tracks which aren't actually live yet.
         let source = match Restartable::ytdl(url, true).await {
@@ -480,8 +483,6 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
             }
         };
 
-        handler.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
-        info!("setting bitrate {} for guild {}", bitrate, guild_id);
         handler.enqueue_source(source.into());
         check_msg(
             msg.channel_id
