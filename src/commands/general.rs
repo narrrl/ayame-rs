@@ -2,7 +2,6 @@ use crate::framework;
 use crate::ShardManagerContainer;
 use lazy_static::lazy_static;
 use regex::Regex;
-use serenity::builder::CreateMessage;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use serenity::{

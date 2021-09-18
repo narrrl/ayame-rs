@@ -1,18 +1,11 @@
-use crate::model::youtubedl::YTDL;
-use crate::model::Timestamp;
-use lazy_static::lazy_static;
-use regex::Regex;
-use serenity::builder::{CreateEmbed, CreateMessage};
-use serenity::client::bridge::gateway::ShardRunnerInfo;
-use serenity::framework::standard::CommandResult;
+use crate::model::discord_utils;
+use serenity::builder::CreateEmbed;
 use serenity::http::Http;
 use serenity::model::prelude::*;
-use serenity::utils::Color;
 use std::sync::Arc;
-use tokio::task;
 
 pub async fn invite(http: &Arc<Http>) -> CreateEmbed {
-    let mut e = CreateEmbed::default();
+    let mut e = discord_utils::default_embed();
     let current_user = http
         .get_current_user()
         .await
@@ -63,6 +56,5 @@ pub async fn invite(http: &Arc<Http>) -> CreateEmbed {
         - Bot (Well I guess)",
         true,
     );
-    e.color(Color::from_rgb(238, 14, 97));
     e
 }

@@ -146,7 +146,6 @@ impl EventHandler for Handler {
                     }
                 }
                 "invite" => {
-                    let channel_id = command.channel_id;
                     let embed = framework::general::invite(&ctx.http).await;
                     let _ = command
                         .create_interaction_response(&ctx.http, |response| {

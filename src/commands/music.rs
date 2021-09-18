@@ -1,28 +1,19 @@
-use humantime::format_duration;
 use serenity::{
     async_trait,
-    builder::CreateMessage,
     client::Context,
     framework::standard::{macros::command, Args, CommandResult},
     http::Http,
-    model::{channel::Message, misc::Mentionable, prelude::ChannelId},
-    prelude::Mutex,
+    model::{channel::Message, prelude::ChannelId},
     Result as SerenityResult,
 };
 use songbird::{
-    driver::Bitrate,
-    input::{self, restartable::Restartable, Metadata},
+    input::{self, restartable::Restartable},
     tracks::PlayMode,
-    Call, Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent,
+    Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent,
 };
 use std::{sync::Arc, time::Duration};
 
-use tracing::{error, info};
-
 use crate::framework;
-use crate::framework::music::TrackEndNotifier;
-
-pub const DEFAULT_BITRATE: i32 = 128_000;
 
 #[command]
 async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
@@ -65,9 +56,9 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
-    let mut message = framework::music::join(ctx, msg).await;
+    let embed = framework::music::join(ctx, msg).await;
     msg.channel_id
-        .send_message(&ctx.http, |_| &mut message)
+        .send_message(&ctx.http, |m| m.set_embed(embed))
         .await?;
     Ok(())
 }

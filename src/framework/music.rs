@@ -1,28 +1,26 @@
 use humantime::format_duration;
 use serenity::{
     async_trait,
-    builder::CreateMessage,
+    builder::{CreateEmbed, CreateMessage},
     client::Context,
-    framework::standard::{macros::command, Args, CommandResult},
     http::Http,
     model::{channel::Message, misc::Mentionable, prelude::ChannelId},
     prelude::Mutex,
-    Result as SerenityResult,
 };
 use songbird::{
-    driver::Bitrate,
-    input::{self, restartable::Restartable, Metadata},
-    tracks::PlayMode,
-    Call, Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent,
+    driver::Bitrate, input::Metadata, Call, Event, EventContext, EventHandler as VoiceEventHandler,
+    TrackEvent,
 };
 use std::{sync::Arc, time::Duration};
 
 use tracing::{error, info};
 
+use crate::model::discord_utils;
+
 pub const DEFAULT_BITRATE: i32 = 128_000;
 
-pub async fn join<'a>(ctx: &Context, msg: &Message) -> CreateMessage<'a> {
-    let mut m = CreateMessage::default();
+pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
+    let mut e = discord_utils::default_embed();
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
@@ -34,8 +32,8 @@ pub async fn join<'a>(ctx: &Context, msg: &Message) -> CreateMessage<'a> {
     let connect_to = match channel_id {
         Some(channel) => channel,
         None => {
-            m.content("Not in a voice channel");
-            return m;
+            discord_utils::set_defaults_for_error(&mut e, "not in a voice channel");
+            return e;
         }
     };
 
@@ -86,11 +84,11 @@ pub async fn join<'a>(ctx: &Context, msg: &Message) -> CreateMessage<'a> {
                 handler_lock: handle_lock,
             },
         );
-        m.content(&format!("Joined {}", connect_to.mention()));
+        e.description(&format!("Joined {}", connect_to.mention()));
     } else {
-        m.content("Error joining the channel");
+        discord_utils::set_defaults_for_error(&mut e, "couldn't joining the channel");
     }
-    m
+    e
 }
 
 pub struct TrackEndNotifier {
@@ -165,31 +163,30 @@ fn _hyperlink_song(data: &Metadata) -> String {
 }
 
 fn _create_skip_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Metadata) {
-    m.embed(|e| {
-        e.field("Skipped", _hyperlink_song(&sp), false);
-        if let Some(meta) = np {
-            e.field("Now Playing", _hyperlink_song(&meta), false);
-            let duration = match meta.duration {
-                Some(duration) => {
-                    if duration.as_secs() == 0 {
-                        "Live".to_string()
-                    } else {
-                        format_duration(duration).to_string()
-                    }
+    let mut e = discord_utils::default_embed();
+    e.field("Skipped", _hyperlink_song(&sp), false);
+    if let Some(meta) = np {
+        e.field("Now Playing", _hyperlink_song(&meta), false);
+        let duration = match meta.duration {
+            Some(duration) => {
+                if duration.as_secs() == 0 {
+                    "Live".to_string()
+                } else {
+                    format_duration(duration).to_string()
                 }
-                None => "Live".to_string(),
-            };
-            e.field("Duration", duration, true);
-            if let Some(t) = meta.thumbnail {
-                e.image(t);
             }
-        } else {
-            if let Some(t) = sp.thumbnail {
-                e.image(t);
-            }
+            None => "Live".to_string(),
+        };
+        e.field("Duration", duration, true);
+        if let Some(t) = meta.thumbnail {
+            e.image(t);
         }
-        e
-    });
+    } else {
+        if let Some(t) = sp.thumbnail {
+            e.image(t);
+        }
+    }
+    m.set_embed(e);
 }
 
 fn _duration_format(duration: Option<Duration>) -> String {
