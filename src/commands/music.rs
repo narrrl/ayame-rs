@@ -96,7 +96,6 @@ async fn _join(ctx: &Context, msg: &Message) -> CommandResult {
                 .say(&ctx.http, &format!("Joined {}", connect_to.mention()))
                 .await,
         );
-
         let chan_id = msg.channel_id;
 
         let send_http = ctx.http.clone();
@@ -445,10 +444,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
-    if let Some(handler_lock) = manager.get(guild_id).or({
-        let _ = _join(ctx, msg).await;
-        manager.get(guild_id)
-    }) {
+    if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
 
         let bitrate = {
@@ -673,9 +669,11 @@ fn _create_skip_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Metadata)
             };
             e.field("Duration", duration, true);
             if let Some(t) = meta.thumbnail {
-                e.thumbnail(t);
-            } else if let Some(t) = sp.thumbnail {
-                e.thumbnail(t);
+                e.image(t);
+            }
+        } else {
+            if let Some(t) = sp.thumbnail {
+                e.image(t);
             }
         }
         e
