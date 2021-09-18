@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     token: String,
     prefix: String,
+    application_id: u64,
 }
 
 impl Config {
@@ -16,6 +17,10 @@ impl Config {
 
     pub fn prefix(&self) -> String {
         self.prefix.clone()
+    }
+
+    pub fn get_application_id(&self) -> u64 {
+        self.application_id.clone()
     }
 }
 

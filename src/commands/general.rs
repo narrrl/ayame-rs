@@ -1,31 +1,34 @@
-use crate::model::youtubedl::YTDL;
+use crate::framework;
 use crate::ShardManagerContainer;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use serenity::utils::Color;
 use serenity::{
     client::bridge::gateway::ShardId,
     framework::standard::{macros::command, Args, CommandResult},
 };
-use tokio::task;
 
 lazy_static! {
     pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
     pub static ref AUDIO_ONLY_REGEX: Regex = Regex::new(r"-audio").expect("Couldn't build URL Regex");
+    pub static ref TIMESTAMP_REGEX: Regex = Regex::new(r"(\d{2}:)?(\d{2}:)?(\d+)(\.\d{2})?").expect("Couldn't build URL Regex");
 }
 
 #[command("youtube-dl")]
-#[bucket = "really_slow"]
 #[aliases("ytd", "dl")]
-#[usage("(-audio) [link]")]
+#[usage("(-audio) [link] (hh:mm:ss:ms) (hh:mm:ss:ms)")]
 #[description("Download videos/audio from different sources")]
+#[example("https://www.youtube.com/watch?v=dQw4w9WgXcQ 0 5")]
+#[example("-audio https://www.youtube.com/watch?v=4Bw2GwAbPuQ 0 1.2")]
 #[min_args(1)]
-#[max_args(2)]
+#[max_args(5)]
+#[bucket(youtubedl)]
 async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let mut url = String::new();
     let mut audio_only = false;
+    let mut start = None;
+    let mut end = None;
 
     while !args.is_empty() {
         if let Ok(arg) = args.single::<String>() {
@@ -33,7 +36,26 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 url = arg;
             } else if AUDIO_ONLY_REGEX.is_match(&arg) {
                 audio_only = true;
+            } else if TIMESTAMP_REGEX.is_match(&arg) {
+                let stamp = match crate::model::Timestamp::from_string(&arg) {
+                    Ok(stömp) => stömp,
+                    Err(_why) => {
+                        return Ok(());
+                    }
+                };
+
+                if let Some(_) = start {
+                    end = Some(stamp);
+                } else {
+                    start = Some(stamp);
+                }
+            } else {
+                msg.reply(&ctx.http, &format!("Invalid input {}", &arg))
+                    .await?;
+                return Ok(());
             }
+        } else {
+            return Ok(());
         }
     }
 
@@ -43,18 +65,7 @@ async fn ytd(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     }
 
     let id = msg.author.id.as_u64().clone();
-    let channel_id = msg.channel_id.clone();
-    let http = ctx.http.clone();
-
-    task::spawn(async move {
-        let mut ytdl = YTDL::new(channel_id, id, http);
-        ytdl.set_defaults();
-        if audio_only {
-            ytdl.set_audio_only();
-        }
-        ytdl.start_download(url).await
-    });
-    Ok(())
+    framework::ytd_with_stamps(&ctx.http, url, id, msg.channel_id, audio_only, start, end).await
 }
 
 #[command]
@@ -81,76 +92,13 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
             return Ok(());
         }
     };
-
-    match runner.latency {
-        Some(latency) => {
-            msg.reply(&ctx.http, &format!("Pong! {:?}", latency))
-                .await?
-        }
-        None => msg.reply(&ctx.http, "Pong!").await?,
-    };
-    Ok(())
+    framework::ping(&ctx.http, msg, &runner).await
 }
 
 #[command]
 #[num_args(0)]
 async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
-    let current_user = ctx.http.get_current_user().await?;
-    let invite_url = current_user
-        .invite_url_with_oauth2_scopes(
-            &ctx.http,
-            Permissions::ADMINISTRATOR,
-            &[OAuth2Scope::ApplicationsCommands, OAuth2Scope::Bot],
-        )
-        .await?;
-    let guild_amount = current_user.guilds(&ctx.http).await?.len();
-    msg.channel_id
-        .send_message(&ctx.http, |m| {
-            m.embed(|e| {
-                e.title("Invite the Bot!");
-                e.url(&invite_url);
-                if let Some(url) = current_user.avatar_url() {
-                    e.thumbnail(&url);
-                }
-                e.footer(|f| {
-                    if let Some(url) = current_user.avatar_url() {
-                        f.icon_url(&url);
-                    }
-                    f.text(&format!("Joined Guilds: {}", guild_amount));
-                    f
-                });
-                e.author(|a| {
-                    if let Some(url) = current_user.avatar_url() {
-                        a.icon_url(&url);
-                    }
-                    a.name(&current_user.name);
-                    a
-                });
-                e.description(
-                    "Those are the requirements for the bot to run without any restrictions.
-                    **Required [Permissions]\
-                    (https://discord.com/developers/docs/topics/permissions#permissions-bitwise-permission-flags)**:
-                    - ADMINISTRATOR 
-
-                    **Required [OAuth2Scopes]\
-                    (https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes)**:
-                    - ApplicationsCommands (Slash Commands)
-                    - Bot (Well I guess)
-
-                    The bot is open source and the source code can be found on \
-                    [Github](https://github.com/nirusu99/nirust). 
-
-                    [Click here](invite_url) to get the bot to join your server
-                "
-                    .replace("invite_url", &invite_url),
-                );
-                e.color(Color::from_rgb(238, 14, 97));
-                e
-            })
-        })
-        .await?;
-
-    Ok(())
+    framework::invite(&ctx.http, &msg.channel_id).await
 }
 
 #[command]
@@ -158,14 +106,8 @@ async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
 #[usage("[text...]")]
 #[description("Converts your message to random upper and lower cases")]
 async fn mock(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let channel_id = msg.channel_id;
-    msg.delete(&ctx.http).await?;
-    let msg = crate::model::mock_text(&args.message());
-
-    channel_id
-        .send_message(&ctx.http, |m| m.content(msg))
-        .await?;
-    Ok(())
+    let text = args.message();
+    framework::mock(&ctx.http, msg, text).await
 }
 
 #[command("guildicon")]
@@ -174,23 +116,7 @@ async fn mock(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 #[num_args(0)]
 async fn guild_icon(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.expect("Couldn't get guild");
-    let icon = match guild.icon_url() {
-        Some(url) => url,
-        None => {
-            msg.reply(&ctx.http, "Guild has no icon").await?;
-            return Ok(());
-        }
-    };
-    msg.channel_id
-        .send_message(&ctx.http, |m| {
-            m.embed(|e| {
-                e.image(icon);
-                e.color(Color::from_rgb(238, 14, 97));
-                e
-            })
-        })
-        .await?;
-    Ok(())
+    framework::guild_icon(&ctx.http, guild, msg).await
 }
 
 #[command("avatar")]
@@ -206,23 +132,14 @@ async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
             return Ok(());
         }
     };
+    framework::avatar(&ctx.http, msg, user).await
+}
 
-    let icon = match user.avatar_url() {
-        Some(user) => user,
-        None => {
-            msg.reply(&ctx.http, "User has no avatar").await?;
-            return Ok(());
-        }
-    };
-    msg.channel_id
-        .send_message(&ctx.http, |m| {
-            m.embed(|e| {
-                e.image(icon);
-                e.color(Color::from_rgb(238, 14, 97));
-                e
-            })
-        })
-        .await?;
-
-    Ok(())
+#[command("guild_info")]
+#[aliases("ginfo", "ginf")]
+#[only_in(guilds)]
+#[num_args(0)]
+async fn guild_info(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).await.expect("Couldn't get guild");
+    framework::guild_info(&ctx.http, guild, msg).await
 }

@@ -16,15 +16,11 @@ regex = "1"
 toml = "0.5"
 # sha2 = "0.9.4"
 fs_extra = "1.2.0"
+serenity = { version = "0.10", default-features = false, features = ["cache" ,"framework" , "standard_framework" ,"client", "gateway", "rustls_backend", "model", "unstable_discord_api", "voice"] }
+tokio = { version = "1.0", features = ["macros", "signal", "rt-multi-thread"] }
+songbird = { version = "0.2.0", features = ["builtin-queue"] }
 serde = "1.0"
 image = "0.23.14"
 rand = "0.8"
 chrono = "0.4"
-
-[dependencies.tokio]
-version = "1.0"
-features = ["macros", "signal", "rt-multi-thread"]
-
-[dependencies.serenity]
-version = "0.10"
-features = ["cache", "framework", "standard_framework", "rustls_backend"]
+humantime = "2.1"

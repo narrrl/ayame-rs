@@ -1,6 +1,9 @@
+use std::ffi::OsStr;
 use std::fs::remove_dir_all;
 use std::{fs::read_dir, path::PathBuf, sync::Arc};
 
+use super::ffmpeg::FFmpeg;
+use super::Timestamp;
 use fs_extra::dir::get_size;
 use serenity::model::prelude::*;
 use serenity::utils::Color;
@@ -11,6 +14,19 @@ use serenity::{
 use tracing::error;
 use ytd_rs::{Arg, ResultType, YoutubeDL};
 
+use lazy_static::*;
+
+lazy_static! {
+    static ref DEFAULT_ARGS: Vec<Arg> = {
+        let mut args = Vec::new();
+        // output format
+        args.push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
+        args.push(Arg::new_with_arg("--age-limit", "69"));
+        args.push(Arg::new("--add-metadata"));
+        args
+    };
+}
+
 pub const MAX_DISCORD_FILE_SIZE: u64 = 8_000_000; // 8mb
 pub const MAX_FILE_SIZE: u64 = 200_000_000; // 200mb
 
@@ -19,6 +35,9 @@ pub struct YTDL {
     author_id: u64,
     http: Arc<Http>,
     args: Vec<Arg>,
+    msg: Option<Message>,
+    start: Option<crate::model::Timestamp>,
+    end: Option<crate::model::Timestamp>,
 }
 
 impl YTDL {
@@ -28,6 +47,9 @@ impl YTDL {
             author_id,
             http,
             args: Vec::new(),
+            msg: None,
+            start: None,
+            end: None,
         }
     }
 
@@ -39,6 +61,15 @@ impl YTDL {
         self.args.push(Arg::new("--extract-audio"));
         self.args.push(Arg::new_with_arg("--audio-format", "mp3"));
         self.args.push(Arg::new("--embed-thumbnail"));
+        self
+    }
+
+    pub fn set_start<'a>(&'a mut self, stamp: Timestamp) -> &'a mut YTDL {
+        self.start = Some(stamp);
+        self
+    }
+    pub fn set_end<'a>(&'a mut self, stamp: Timestamp) -> &'a mut YTDL {
+        self.end = Some(stamp);
         self
     }
 
@@ -54,13 +85,27 @@ impl YTDL {
         self.args
             .push(Arg::new_with_arg("--output", "%(title).90s.%(ext)s"));
         self.args.push(Arg::new("--add-metadata"));
+        let mut dir = crate::BOT_DIR.clone();
+        dir.push("cookies.txt");
+        if dir.exists() {
+            let dir = dir.to_str().expect("Couldn't convert Path to cookie file");
+            self.args.push(Arg::new_with_arg("--cookies", dir));
+        }
         self
     }
+
+    #[allow(dead_code)]
+    pub fn set_update_message<'a>(&'a mut self, msg: &Message) -> &'a mut YTDL {
+        self.msg = Some(msg.clone());
+        self
+    }
+
     #[allow(dead_code)]
     pub fn arg<'a>(&'a mut self, arg: Arg) -> &'a mut YTDL {
         self.args.push(arg);
         self
     }
+
     #[allow(dead_code)]
     pub fn args<'a>(&'a mut self, args: &Vec<Arg>) -> &'a mut YTDL {
         for arg in args.iter() {
@@ -74,7 +119,7 @@ impl YTDL {
     ///
     /// It also checks if the user is already downloading and if the file is too chonky
     ///
-    pub async fn start_download(&self, url: String) -> CommandResult {
+    pub async fn start_download(&mut self, url: String) -> CommandResult {
         // create the download directory
         let dir = match self.get_download_directory().await {
             Ok(dir) => dir,
@@ -82,10 +127,19 @@ impl YTDL {
         };
 
         // create an update message to inform user about the current download state
-        let mut update_message = self
-            .channel
-            .send_message(&self.http, |m| m.content("Starting download ..."))
-            .await?;
+        let mut update_message = match self.msg {
+            Some(ref mut message) => {
+                message
+                    .edit(&self.http, |m| m.content("Starting download ..."))
+                    .await?;
+                message.clone()
+            }
+            None => {
+                self.channel
+                    .send_message(&self.http, |m| m.content("Starting download ..."))
+                    .await?
+            }
+        };
 
         // download the video
         let file = match self.download_file(&dir, &url).await {
@@ -95,6 +149,11 @@ impl YTDL {
             }
             Ok(path) => path,
         };
+
+        // create an update message to inform user about the current state
+        update_message
+            .edit(&self.http, |m| m.content("Start converting ..."))
+            .await?;
 
         if let Err(why) = self.upload_file(&mut update_message, file).await {
             remove_dir_all(&dir)?;
@@ -196,7 +255,15 @@ impl YTDL {
     ///  Returns an error if the file is way to chonky
     ///
     async fn upload_file(&self, update_message: &mut Message, file: PathBuf) -> CommandResult {
-        // get size of the file
+        let file = match &self.start {
+            Some(_) => match self.cut_file(&file).await {
+                Err(why) => {
+                    return self.send_error(&format!("Error: {:}", why)).await;
+                }
+                Ok(path) => path,
+            },
+            None => file,
+        }; // get size of the file
         let size = get_size(file.as_path())?;
 
         // sizes smaller than 8mb can be uploaded to discord directly
@@ -256,5 +323,30 @@ impl YTDL {
             })
             .await?;
         Ok(())
+    }
+
+    ///
+    /// Cuts the downloaded file to the given timestamps.
+    /// If no end stamp was given, the cut goes from the given start time to the end.
+    ///
+    /// uses ffmpeg in ['crate::model::ffmpeg::FFmpeg'] to cut the files
+    async fn cut_file(&self, file: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error + Send>> {
+        let mut new_path = file.clone();
+        let mut ext = file.extension().unwrap();
+        // nicer for discord, because discord doesn't embed mkvs
+        if ext.eq("mkv") {
+            ext = &OsStr::new("mp4");
+        }
+        new_path.pop();
+        new_path.push(format!("cut_file.{}", ext.to_str().unwrap()));
+        let mut ffmpeg = FFmpeg::new(file)?;
+
+        if let Some(start) = self.start {
+            ffmpeg.set_interval(start, self.end);
+        }
+
+        ffmpeg.cut_file(&mut new_path, false)?;
+
+        Ok(new_path)
     }
 }

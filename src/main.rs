@@ -7,8 +7,11 @@ mod model;
 // Config, etc ...
 mod configuration;
 
+mod framework;
+
 use chrono::{offset::Local, Timelike};
 use configuration::Config;
+use model::youtubedl::YTDL;
 use serenity::{
     async_trait,
     model::{gateway::Activity, id::GuildId},
@@ -24,16 +27,31 @@ use serenity::{
         StandardFramework,
     },
     http::Http,
-    model::{channel::Message, event::ResumedEvent, gateway::Ready, id::UserId},
+    model::{
+        channel::Message,
+        event::ResumedEvent,
+        gateway::Ready,
+        id::UserId,
+        interactions::{
+            application_command::{
+                ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
+                ApplicationCommandOptionType,
+            },
+            Interaction, InteractionResponseType,
+        },
+    },
     prelude::*,
 };
+use songbird::SerenityInit;
+use tokio::task;
+
 use std::sync::atomic::Ordering;
 use std::{collections::HashSet, fs::remove_dir_all, sync::Arc, time::Duration};
 use std::{path::PathBuf, sync::atomic::AtomicBool};
 
 use tracing::{error, info};
 
-use commands::{admin::*, general::*, owner::*};
+use commands::{admin::*, general::*, music::*, owner::*};
 
 use lazy_static::*;
 
@@ -60,7 +78,143 @@ struct Handler {
 // Ready and Resumed events to notify if the bot has started/resumed
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = interaction {
+            match command.data.name.as_str() {
+                "youtubedl" => {
+                    let options = command
+                        .data
+                        .options
+                        .get(0)
+                        .expect("Expected user option")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected String object");
+                    let audio_only = match command.data.options.get(1) {
+                        Some(value) => {
+                            let value = value.resolved.as_ref().expect("Expected bool object");
+                            match value {
+                                ApplicationCommandInteractionDataOptionValue::Boolean(b) => {
+                                    b.clone()
+                                }
+                                _ => false,
+                            }
+                        }
+                        None => false,
+                    };
+                    if let ApplicationCommandInteractionDataOptionValue::String(url) = options {
+                        if crate::commands::general::URL_REGEX.is_match(url) {
+                            let id = command.user.id.as_u64().clone();
+                            let channel_id = command.channel_id.clone();
+                            let http = ctx.http.clone();
+                            let audio_only = audio_only;
+                            let url = url.to_string();
+                            let _ = command
+                                .create_interaction_response(&ctx.http, |response| {
+                                    response
+                                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                                        .interaction_response_data(|message| {
+                                            message.content("Revieved Event")
+                                        })
+                                })
+                                .await;
+
+                            task::spawn(async move {
+                                let mut ytdl = YTDL::new(channel_id, id, http);
+                                ytdl.set_defaults();
+                                if audio_only {
+                                    ytdl.set_audio_only();
+                                }
+                                if let Ok(message) =
+                                    command.get_interaction_response(&ctx.http).await
+                                {
+                                    ytdl.set_update_message(&message);
+                                }
+                                ytdl.start_download(url.to_string()).await
+                            });
+                        } else {
+                            let _ = command
+                                .create_interaction_response(&ctx.http, |response| {
+                                    response
+                                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                                        .interaction_response_data(|message| {
+                                            message.content("Invalid URL")
+                                        })
+                                })
+                                .await;
+                        }
+                    }
+                }
+                "invite" => {
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.content("✅"))
+                        })
+                        .await;
+                    let channel_id = command.channel_id;
+                    let _ = framework::invite(&ctx.http, &channel_id).await;
+                }
+                "mock" => {
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.content("✅"))
+                        })
+                        .await;
+                }
+                _ => return (),
+            };
+        }
+    }
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        let commands = ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
+            commands
+                .create_application_command(|command| {
+                    command
+                        .name("youtubedl")
+                        .description("Download Videos from a lot of sites")
+                        .create_option(|option| {
+                            option
+                                .name("link")
+                                .description("A link to a video source")
+                                .kind(ApplicationCommandOptionType::String)
+                                .required(true)
+                        })
+                        .create_option(|option| {
+                            option
+                                .name("audio_only")
+                                .description("Download the video as mp3")
+                                .kind(ApplicationCommandOptionType::Boolean)
+                                .required(false)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("invite")
+                        .description("Invite the bot to your server")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("mock")
+                        .description("Converts your message to random upper and lower case")
+                        .create_option(|option| {
+                            option
+                                .name("message")
+                                .description("Your message that gets converted")
+                                .kind(ApplicationCommandOptionType::String)
+                                .required(true)
+                        })
+                })
+        })
+        .await;
+
+        println!(
+            "I now have the following global slash commands {:#?}",
+            commands
+        );
         info!("Connected as {}", ready.user.name);
     }
 
@@ -94,9 +248,15 @@ async fn set_status_to_current_time(ctx: Arc<Context>) {
 }
 
 #[group]
-#[commands(ping, ytd, invite, mock, guild_icon, avatar)]
+#[commands(ping, ytd, invite, mock, guild_icon, avatar, guild_info)]
 #[description = "A group with lots of different commands"]
 struct General;
+
+#[group]
+#[commands(
+    deafen, join, leave, mute, play_fade, skip, stop, undeafen, unmute, play, play_pause
+)]
+struct Music;
 
 #[group]
 #[commands(shutdown)]
@@ -179,11 +339,11 @@ async fn main() {
         .group(&GENERAL_GROUP)
         .group(&OWNER_GROUP)
         .group(&ADMIN_GROUP)
+        .group(&MUSIC_GROUP)
         .help(&HELP)
-        // annote command with #[bucket = "really_slow"]
-        // to limit command usage to 1 uses per 10 minutes
-        .bucket("really_slow", |b| b.time_span(600).limit(1))
+        .bucket("youtubedl", |b| b.time_span(180).limit(1))
         .await;
+    let application_id: u64 = CONFIG.get_application_id();
 
     let mut client = Client::builder(&token)
         .framework(framework)
@@ -191,6 +351,8 @@ async fn main() {
         .event_handler(Handler {
             is_loop_running: AtomicBool::new(false),
         })
+        .application_id(application_id)
+        .register_songbird()
         .await
         .expect("Err creating client");
 
