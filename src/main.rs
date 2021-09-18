@@ -146,15 +146,15 @@ impl EventHandler for Handler {
                     }
                 }
                 "invite" => {
+                    let channel_id = command.channel_id;
+                    let embed = framework::general::invite(&ctx.http).await;
                     let _ = command
                         .create_interaction_response(&ctx.http, |response| {
                             response
                                 .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.content("✅"))
+                                .interaction_response_data(|b| b.add_embed(embed))
                         })
                         .await;
-                    let channel_id = command.channel_id;
-                    let _ = framework::invite(&ctx.http, &channel_id).await;
                 }
                 "mock" => {
                     let _ = command

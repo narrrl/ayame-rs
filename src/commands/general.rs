@@ -2,6 +2,7 @@ use crate::framework;
 use crate::ShardManagerContainer;
 use lazy_static::lazy_static;
 use regex::Regex;
+use serenity::builder::CreateMessage;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use serenity::{
@@ -98,7 +99,11 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[num_args(0)]
 async fn invite(ctx: &Context, msg: &Message) -> CommandResult {
-    framework::invite(&ctx.http, &msg.channel_id).await
+    let embed = framework::general::invite(&ctx.http).await;
+    msg.channel_id
+        .send_message(&ctx.http, |m| m.set_embed(embed))
+        .await?;
+    Ok(())
 }
 
 #[command]
