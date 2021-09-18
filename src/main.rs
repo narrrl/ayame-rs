@@ -10,7 +10,6 @@ mod configuration;
 mod framework;
 
 use chrono::{offset::Local, Timelike};
-use songbird::SerenityInit;
 use configuration::Config;
 use model::youtubedl::YTDL;
 use serenity::{
@@ -43,6 +42,7 @@ use serenity::{
     },
     prelude::*,
 };
+use songbird::SerenityInit;
 use tokio::task;
 
 use std::sync::atomic::Ordering;
@@ -51,7 +51,7 @@ use std::{path::PathBuf, sync::atomic::AtomicBool};
 
 use tracing::{error, info};
 
-use commands::{admin::*, general::*, owner::*, music::*};
+use commands::{admin::*, general::*, music::*, owner::*};
 
 use lazy_static::*;
 
@@ -254,7 +254,7 @@ struct General;
 
 #[group]
 #[commands(
-    deafen, join, leave, mute, play_fade, skip, stop, undeafen, unmute, play
+    deafen, join, leave, mute, play_fade, skip, stop, undeafen, unmute, play, play_pause
 )]
 struct Music;
 
