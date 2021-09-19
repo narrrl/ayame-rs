@@ -1,8 +1,14 @@
 use serenity::{
     builder::CreateEmbed,
-    model::guild::{Guild, PremiumTier},
+    model::{
+        channel::Message,
+        guild::{Guild, PremiumTier},
+    },
     utils::Color,
+    Result as SerenityResult,
 };
+
+use tracing::error;
 
 pub fn default_embed() -> CreateEmbed {
     let mut e = CreateEmbed::default();
@@ -31,5 +37,11 @@ pub fn get_max_uploadsize(guild: &Guild) -> u64 {
         PremiumTier::Tier2 => 50_000_000,
         PremiumTier::Tier3 => 100_000_000,
         _ => 8_000_000,
+    }
+}
+
+pub fn check_msg(result: SerenityResult<Message>) {
+    if let Err(why) = result {
+        error!("Error sending message: {:?}", why);
     }
 }

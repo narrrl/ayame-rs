@@ -17,32 +17,33 @@ use std::{sync::Arc, time::Duration};
 
 use tracing::{error, info};
 
-use crate::model::discord_utils;
+use crate::model::discord_utils::*;
 
 pub const DEFAULT_BITRATE: i32 = 128_000;
 
 pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
-    let mut e = discord_utils::default_embed();
+    let mut e = default_embed();
+    // get guild the message was send in
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
+    // find the voice channel of the author
+    // None when author is in no channel
     let channel_id = guild
         .voice_states
         .get(&msg.author.id)
         .and_then(|voice_state| voice_state.channel_id);
 
+    // check if author is in any channel
     let connect_to = match channel_id {
         Some(channel) => channel,
         None => {
-            discord_utils::set_defaults_for_error(&mut e, "not in a voice channel");
+            set_defaults_for_error(&mut e, "not in a voice channel");
             return e;
         }
     };
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = _get_songbird(ctx).await;
     match manager.get(guild_id) {
         Some(_) => _switch_channel(&mut e, manager, GuildId::from(guild_id), connect_to, ctx).await,
         None => {
@@ -61,19 +62,15 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
 }
 
 pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
-    let mut e = discord_utils::default_embed();
+    let mut e = default_embed();
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
-
+    let manager = _get_songbird(ctx).await;
     let handler_lock = match manager.get(guild_id) {
         Some(handler) => handler,
         None => {
-            discord_utils::set_defaults_for_error(&mut e, "not in a voice channel");
+            set_defaults_for_error(&mut e, "not in a voice channel");
             return e;
         }
     };
@@ -81,10 +78,10 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
     let mut handler = handler_lock.lock().await;
 
     if handler.is_deaf() {
-        discord_utils::set_defaults_for_error(&mut e, "already deafened");
+        set_defaults_for_error(&mut e, "already deafened");
     } else {
         if let Err(why) = handler.deafen(true).await {
-            discord_utils::set_defaults_for_error(&mut e, &format!("failed to deafen {:?}", why));
+            set_defaults_for_error(&mut e, &format!("failed to deafen {:?}", why));
             return e;
         }
 
@@ -95,27 +92,24 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
 }
 
 pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed {
-    let mut e = discord_utils::default_embed();
+    let mut e = default_embed();
     let url = match args.single::<String>() {
         Ok(url) => url,
         Err(_) => {
-            discord_utils::set_defaults_for_error(&mut e, "must provide a URL to a video or audio");
+            set_defaults_for_error(&mut e, "must provide a URL to a video or audio");
             return e;
         }
     };
 
     if !url.starts_with("http") {
-        discord_utils::set_defaults_for_error(&mut e, "must provide a valid URL");
+        set_defaults_for_error(&mut e, "must provide a valid URL");
         return e;
     }
 
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = _get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
@@ -127,7 +121,7 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
             Err(why) => {
                 error!("Err starting source: {:?}", why);
 
-                discord_utils::set_defaults_for_error(&mut e, "Error sourcing ffmpeg");
+                set_defaults_for_error(&mut e, "Error sourcing ffmpeg");
                 return e;
             }
         };
@@ -144,21 +138,17 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
             return now_playing(ctx, msg).await;
         }
     } else {
-        discord_utils::set_defaults_for_error(&mut e, "not in a voice channel to play in");
+        set_defaults_for_error(&mut e, "not in a voice channel to play in");
     }
     return e;
 }
 
 pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
-    let mut e = discord_utils::default_embed();
+    let mut e = default_embed();
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
-
+    let manager = _get_songbird(ctx).await;
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
         if let Some(track) = handler.queue().current() {
@@ -172,10 +162,10 @@ pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
                 e.image(image);
             }
         } else {
-            discord_utils::set_defaults_for_error(&mut e, "nothing is playing");
+            set_defaults_for_error(&mut e, "nothing is playing");
         }
     } else {
-        discord_utils::set_defaults_for_error(&mut e, "not in a voice channel to play in");
+        set_defaults_for_error(&mut e, "not in a voice channel to play in");
     }
     return e;
 }
@@ -255,7 +245,7 @@ impl VoiceEventHandler for AutomaticDisconnect {
             if let None = handler.queue().current() {
                 let queue = handler.queue();
                 let _ = queue.stop();
-                let mut embed = discord_utils::default_embed();
+                let mut embed = default_embed();
                 embed.title("Bot disconnected because of inactivity");
                 if let Err(why) = self
                     .chan_id
@@ -301,7 +291,7 @@ fn _hyperlink_song(data: &Metadata) -> String {
 }
 
 fn _create_next_song_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Metadata) {
-    let mut e = discord_utils::default_embed();
+    let mut e = default_embed();
     e.field("Finished:", _hyperlink_song(&sp), false);
     e.field("Duration:", _duration_format(sp.duration), false);
     if let Some(meta) = np {
@@ -406,8 +396,14 @@ async fn _connect(
         handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
         info!("setting bitrate {} for guild {}", bitrate, guild_id);
     } else {
-        discord_utils::set_defaults_for_error(e, "couldn't joining the channel");
+        set_defaults_for_error(e, "couldn't joining the channel");
     }
 
     handle_lock
+}
+
+pub async fn _get_songbird(ctx: &Context) -> Arc<Songbird> {
+    songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
 }

@@ -2,11 +2,11 @@ use serenity::{
     client::Context,
     framework::standard::{macros::command, Args, CommandResult},
     model::channel::Message,
-    Result as SerenityResult,
 };
 use songbird::tracks::PlayMode;
 
 use crate::framework;
+use crate::model::discord_utils::*;
 
 #[command]
 async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
@@ -51,10 +51,7 @@ async fn now_playing(ctx: &Context, msg: &Message) -> CommandResult {
 async fn play_pause(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = framework::music::_get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
@@ -101,10 +98,7 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = framework::music::_get_songbird(ctx).await;
     let has_handler = manager.get(guild_id).is_some();
 
     if has_handler {
@@ -130,10 +124,7 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = framework::music::_get_songbird(ctx).await;
 
     let handler_lock = match manager.get(guild_id) {
         Some(handler) => handler,
@@ -181,10 +172,7 @@ async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = framework::music::_get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
@@ -207,10 +195,7 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = framework::music::_get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
@@ -235,10 +220,7 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = framework::music::_get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
@@ -267,10 +249,7 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
 async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
+    let manager = framework::music::_get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
@@ -292,11 +271,4 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     }
 
     Ok(())
-}
-
-/// Checks that a message successfully sent; if not, then logs why to stdout.
-fn check_msg(result: SerenityResult<Message>) {
-    if let Err(why) = result {
-        println!("Error sending message: {:?}", why);
-    }
 }
