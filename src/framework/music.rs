@@ -1,15 +1,16 @@
-use humantime::format_duration;
 use serenity::{
     async_trait,
     builder::{CreateEmbed, CreateMessage},
     client::Context,
+    framework::standard::Args,
     http::Http,
     model::{channel::Message, misc::Mentionable, prelude::ChannelId},
     prelude::Mutex,
 };
 use songbird::{
-    driver::Bitrate, input::Metadata, Call, Event, EventContext, EventHandler as VoiceEventHandler,
-    TrackEvent,
+    driver::Bitrate,
+    input::{Metadata, Restartable},
+    Call, Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -91,6 +92,126 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     e
 }
 
+pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
+    let mut e = discord_utils::default_embed();
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    let handler_lock = match manager.get(guild_id) {
+        Some(handler) => handler,
+        None => {
+            discord_utils::set_defaults_for_error(&mut e, "not in a voice channel");
+            return e;
+        }
+    };
+
+    let mut handler = handler_lock.lock().await;
+
+    if handler.is_deaf() {
+        discord_utils::set_defaults_for_error(&mut e, "already deafened");
+    } else {
+        if let Err(why) = handler.deafen(true).await {
+            discord_utils::set_defaults_for_error(&mut e, &format!("failed to deafen {:?}", why));
+            return e;
+        }
+
+        e.title("Deafened");
+    }
+
+    e
+}
+
+pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed {
+    let mut e = discord_utils::default_embed();
+    let url = match args.single::<String>() {
+        Ok(url) => url,
+        Err(_) => {
+            discord_utils::set_defaults_for_error(&mut e, "must provide a URL to a video or audio");
+            return e;
+        }
+    };
+
+    if !url.starts_with("http") {
+        discord_utils::set_defaults_for_error(&mut e, "must provide a valid URL");
+        return e;
+    }
+
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+
+        // Here, we use lazy restartable sources to make sure that we don't pay
+        // for decoding, playback on tracks which aren't actually live yet.
+        let source = match Restartable::ytdl(url, true).await {
+            Ok(source) => source,
+            Err(why) => {
+                error!("Err starting source: {:?}", why);
+
+                discord_utils::set_defaults_for_error(&mut e, "Error sourcing ffmpeg");
+                return e;
+            }
+        };
+
+        if let Some(_) = handler.queue().current() {
+            handler.enqueue_source(source.into());
+            e.title(format!(
+                "Added song to queue: position {}",
+                handler.queue().len()
+            ));
+        } else {
+            handler.enqueue_source(source.into());
+            drop(handler);
+            return now_playing(ctx, msg).await;
+        }
+    } else {
+        discord_utils::set_defaults_for_error(&mut e, "not in a voice channel to play in");
+    }
+    return e;
+}
+
+pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
+    let mut e = discord_utils::default_embed();
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let handler = handler_lock.lock().await;
+        if let Some(track) = handler.queue().current() {
+            e.field("Now Playing:", _hyperlink_song(track.metadata()), false);
+            e.field(
+                "Duration:",
+                _duration_format(track.metadata().duration),
+                false,
+            );
+            if let Some(image) = &track.metadata().thumbnail {
+                e.image(image);
+            }
+        } else {
+            discord_utils::set_defaults_for_error(&mut e, "nothing is playing");
+        }
+    } else {
+        discord_utils::set_defaults_for_error(&mut e, "not in a voice channel to play in");
+    }
+    return e;
+}
+
 pub struct TrackEndNotifier {
     chan_id: ChannelId,
     http: Arc<Http>,
@@ -114,7 +235,7 @@ impl VoiceEventHandler for TrackEndNotifier {
                 if let Err(why) = self
                     .chan_id
                     .send_message(&self.http, |m| {
-                        _create_skip_embed(m, Some(metadata.clone()), skipped_meta);
+                        _create_next_song_embed(m, Some(metadata.clone()), skipped_meta);
                         m
                     })
                     .await
@@ -125,7 +246,7 @@ impl VoiceEventHandler for TrackEndNotifier {
                 if let Err(why) = self
                     .chan_id
                     .send_message(&self.http, |m| {
-                        _create_skip_embed(m, None, skipped_meta);
+                        _create_next_song_embed(m, None, skipped_meta);
                         m
                     })
                     .await
@@ -162,22 +283,13 @@ fn _hyperlink_song(data: &Metadata) -> String {
     finished_song
 }
 
-fn _create_skip_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Metadata) {
+fn _create_next_song_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Metadata) {
     let mut e = discord_utils::default_embed();
-    e.field("Skipped", _hyperlink_song(&sp), false);
+    e.field("Finished:", _hyperlink_song(&sp), false);
+    e.field("Duration:", _duration_format(sp.duration), false);
     if let Some(meta) = np {
-        e.field("Now Playing", _hyperlink_song(&meta), false);
-        let duration = match meta.duration {
-            Some(duration) => {
-                if duration.as_secs() == 0 {
-                    "Live".to_string()
-                } else {
-                    format_duration(duration).to_string()
-                }
-            }
-            None => "Live".to_string(),
-        };
-        e.field("Duration", duration, true);
+        e.field("Now Playing:", _hyperlink_song(&meta), false);
+        e.field("Duration", _duration_format(meta.duration), false);
         if let Some(t) = meta.thumbnail {
             e.image(t);
         }
@@ -192,7 +304,7 @@ fn _create_skip_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Metadata)
 fn _duration_format(duration: Option<Duration>) -> String {
     if let Some(d) = duration {
         if d != Duration::default() {
-            return d.as_secs().to_string();
+            return humantime::format_duration(d).to_string();
         }
     }
     "Live".to_string()

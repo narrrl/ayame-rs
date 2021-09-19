@@ -265,7 +265,17 @@ struct General;
 
 #[group]
 #[commands(
-    deafen, join, leave, mute, play_fade, skip, stop, undeafen, unmute, play, play_pause
+    deafen,
+    join,
+    leave,
+    mute,
+    skip,
+    stop,
+    undeafen,
+    unmute,
+    play,
+    play_pause,
+    now_playing
 )]
 struct Music;
 
