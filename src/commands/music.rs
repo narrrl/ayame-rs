@@ -23,7 +23,11 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     let embed = framework::music::join(ctx, msg).await;
     // default deafen
-    let _ = framework::music::deafen(ctx, msg).await;
+    let ctx_copy = ctx.clone();
+    let msg_copy = msg.clone();
+    tokio::spawn(async move {
+        framework::music::deafen(&ctx_copy, &msg_copy).await;
+    });
     msg.channel_id
         .send_message(&ctx.http, |m| m.set_embed(embed))
         .await?;

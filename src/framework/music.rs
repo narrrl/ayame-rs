@@ -9,8 +9,9 @@ use serenity::{
 };
 use songbird::{
     driver::Bitrate,
+    id::GuildId,
     input::{Metadata, Restartable},
-    Call, Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent,
+    Call, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -42,53 +43,20 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
-
-    let (handle_lock, success) = manager.join(guild_id, connect_to).await;
-
-    if let Ok(_channel) = success {
-        let chan_id = msg.channel_id;
-
-        let send_http = ctx.http.clone();
-
-        let mut handle = handle_lock.lock().await;
-
-        let handle_lock = manager.get(guild_id).unwrap();
-
-        let bitrate = {
-            if let Some(ch) = handle.current_channel() {
-                match ctx.http.get_channel(ch.0).await {
-                    Ok(ch) => match ch
-                        .guild()
-                        .expect(
-                            "How did you manage to let the bot join anything but a voice channel?",
-                        )
-                        .bitrate
-                    {
-                        Some(bitrate) => bitrate as i32,
-                        None => DEFAULT_BITRATE,
-                    },
-                    Err(_) => DEFAULT_BITRATE,
-                }
-            } else {
-                DEFAULT_BITRATE
-            }
-        };
-
-        handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
-        info!("setting bitrate {} for guild {}", bitrate, guild_id);
-
-        handle.add_global_event(
-            Event::Track(TrackEvent::End),
-            TrackEndNotifier {
-                chan_id,
-                http: send_http,
-                handler_lock: handle_lock,
-            },
-        );
-        e.description(&format!("Joined {}", connect_to.mention()));
-    } else {
-        discord_utils::set_defaults_for_error(&mut e, "couldn't joining the channel");
-    }
+    match manager.get(guild_id) {
+        Some(_) => _switch_channel(&mut e, manager, GuildId::from(guild_id), connect_to, ctx).await,
+        None => {
+            _new_connection(
+                &mut e,
+                manager,
+                GuildId::from(guild_id),
+                connect_to,
+                msg.channel_id.clone(),
+                ctx,
+            )
+            .await
+        }
+    };
     e
 }
 
@@ -215,7 +183,8 @@ pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
 pub struct TrackEndNotifier {
     chan_id: ChannelId,
     http: Arc<Http>,
-    handler_lock: Arc<Mutex<Call>>,
+    guild_id: GuildId,
+    manager: Arc<Songbird>,
 }
 
 #[async_trait]
@@ -229,33 +198,81 @@ impl VoiceEventHandler for TrackEndNotifier {
                     return None;
                 }
             };
-            let handler = self.handler_lock.lock().await;
-            if let Some(np) = handler.queue().current() {
-                let metadata = np.metadata();
-                if let Err(why) = self
-                    .chan_id
-                    .send_message(&self.http, |m| {
-                        _create_next_song_embed(m, Some(metadata.clone()), skipped_meta);
-                        m
-                    })
-                    .await
-                {
-                    error!("Error sending message: {:?}", why);
-                }
-            } else {
-                if let Err(why) = self
-                    .chan_id
-                    .send_message(&self.http, |m| {
-                        _create_next_song_embed(m, None, skipped_meta);
-                        m
-                    })
-                    .await
-                {
-                    error!("Error sending message: {:?}", why);
+            if let Some(handler_lock) = self.manager.get(self.guild_id) {
+                let mut handler = handler_lock.lock().await;
+                if let Some(np) = handler.queue().current() {
+                    let metadata = np.metadata();
+                    if let Err(why) = self
+                        .chan_id
+                        .send_message(&self.http, |m| {
+                            _create_next_song_embed(m, Some(metadata.clone()), skipped_meta);
+                            m
+                        })
+                        .await
+                    {
+                        error!("Error sending message: {:?}", why);
+                    }
+                } else {
+                    handler.add_global_event(
+                        Event::Delayed(Duration::from_secs(300)),
+                        AutomaticDisconnect {
+                            chan_id: self.chan_id.clone(),
+                            http: self.http.clone(),
+                            guild_id: self.guild_id.clone(),
+                            manager: self.manager.clone(),
+                        },
+                    );
+                    if let Err(why) = self
+                        .chan_id
+                        .send_message(&self.http, |m| {
+                            _create_next_song_embed(m, None, skipped_meta);
+                            m
+                        })
+                        .await
+                    {
+                        error!("Error sending message: {:?}", why);
+                    }
                 }
             }
         }
 
+        None
+    }
+}
+
+struct AutomaticDisconnect {
+    chan_id: ChannelId,
+    http: Arc<Http>,
+    manager: Arc<Songbird>,
+    guild_id: GuildId,
+}
+
+#[async_trait]
+impl VoiceEventHandler for AutomaticDisconnect {
+    async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
+        if let Some(handler) = self.manager.get(self.guild_id) {
+            let handler = handler.lock().await;
+            if let None = handler.queue().current() {
+                let queue = handler.queue();
+                let _ = queue.stop();
+                let mut embed = discord_utils::default_embed();
+                embed.title("Bot disconnected because of inactivity");
+                if let Err(why) = self
+                    .chan_id
+                    .send_message(&self.http, |m| m.set_embed(embed))
+                    .await
+                {
+                    error!("Error sending message: {:?}", why);
+                }
+                let manager = self.manager.clone();
+                let guild_id = self.guild_id.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = manager.remove(guild_id).await {
+                        error!("Failed: {:?}", e);
+                    }
+                });
+            }
+        }
         None
     }
 }
@@ -308,4 +325,89 @@ fn _duration_format(duration: Option<Duration>) -> String {
         }
     }
     "Live".to_string()
+}
+
+async fn _new_connection(
+    e: &mut CreateEmbed,
+    manager: Arc<Songbird>,
+    guild_id: GuildId,
+    connect_to: ChannelId,
+    chan_id: ChannelId,
+    ctx: &Context,
+) {
+    let send_http = ctx.http.clone();
+    let handle_lock = _connect(e, &manager, guild_id, connect_to, ctx).await;
+    let mut handle = handle_lock.lock().await;
+    handle.add_global_event(
+        Event::Track(TrackEvent::End),
+        TrackEndNotifier {
+            chan_id,
+            http: send_http.clone(),
+            guild_id: GuildId::from(guild_id),
+            manager: manager.clone(),
+        },
+    );
+
+    handle.add_global_event(
+        Event::Periodic(Duration::from_secs(900), None),
+        AutomaticDisconnect {
+            chan_id,
+            http: send_http,
+            guild_id: GuildId::from(guild_id),
+            manager: manager.clone(),
+        },
+    );
+    e.description(&format!("Joined {}", connect_to.mention()));
+}
+
+async fn _switch_channel(
+    e: &mut CreateEmbed,
+    manager: Arc<Songbird>,
+    guild_id: GuildId,
+    connect_to: ChannelId,
+    ctx: &Context,
+) {
+    _connect(e, &manager, guild_id, connect_to, ctx).await;
+    e.description(&format!("Joined {}", connect_to.mention()));
+}
+
+async fn _connect(
+    e: &mut CreateEmbed,
+    manager: &Arc<Songbird>,
+    guild_id: GuildId,
+    connect_to: ChannelId,
+    ctx: &Context,
+) -> Arc<Mutex<Call>> {
+    let (handle_lock, success) = manager.join(guild_id, connect_to).await;
+
+    if let Ok(_channel) = success {
+        let mut handle = handle_lock.lock().await;
+
+        let bitrate = {
+            if let Some(ch) = handle.current_channel() {
+                match ctx.http.get_channel(ch.0).await {
+                    Ok(ch) => match ch
+                        .guild()
+                        .expect(
+                            "How did you manage to let the bot join anything but a voice channel?",
+                        )
+                        .bitrate
+                    {
+                        Some(bitrate) => bitrate as i32,
+                        None => DEFAULT_BITRATE,
+                    },
+                    Err(_) => DEFAULT_BITRATE,
+                }
+            } else {
+                DEFAULT_BITRATE
+            }
+        };
+
+        handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
+        info!("setting bitrate {} for guild {}", bitrate, guild_id);
+    } else {
+        discord_utils::set_defaults_for_error(e, "couldn't joining the channel");
+    }
+
+    handle_lock
 }
