@@ -284,7 +284,7 @@ impl YTDL {
         }; // get size of the file
         let size = get_size(file.as_path())?;
 
-        // sizes smaller than 8mb can be uploaded to discord directly
+        // sizes smaller then 8mb can be uploaded to discord directly
         if size < MAX_FILE_SIZE && size < max_upload {
             update_message
                 .edit(&self.http, |m| m.content("Uploading to Discord ..."))
@@ -300,7 +300,7 @@ impl YTDL {
         } else {
             let max_mb = MAX_FILE_SIZE / 1_000_000;
             return Err(CommandError::from(format!(
-                "Your download was larger than {}mb",
+                "Your download was larger then {}mb",
                 max_mb
             )));
         }
