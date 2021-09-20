@@ -192,16 +192,14 @@ impl VoiceEventHandler for TrackEndNotifier {
                 let mut handler = handler_lock.lock().await;
                 if let Some(np) = handler.queue().current() {
                     let metadata = np.metadata();
-                    if let Err(why) = self
-                        .chan_id
-                        .send_message(&self.http, |m| {
-                            _create_next_song_embed(m, Some(metadata.clone()), skipped_meta);
-                            m
-                        })
-                        .await
-                    {
-                        error!("Error sending message: {:?}", why);
-                    }
+                    check_msg(
+                        self.chan_id
+                            .send_message(&self.http, |m| {
+                                _create_next_song_embed(m, Some(metadata.clone()), skipped_meta);
+                                m
+                            })
+                            .await,
+                    );
                 } else {
                     handler.add_global_event(
                         Event::Delayed(Duration::from_secs(300)),
@@ -212,16 +210,14 @@ impl VoiceEventHandler for TrackEndNotifier {
                             manager: self.manager.clone(),
                         },
                     );
-                    if let Err(why) = self
-                        .chan_id
-                        .send_message(&self.http, |m| {
-                            _create_next_song_embed(m, None, skipped_meta);
-                            m
-                        })
-                        .await
-                    {
-                        error!("Error sending message: {:?}", why);
-                    }
+                    check_msg(
+                        self.chan_id
+                            .send_message(&self.http, |m| {
+                                _create_next_song_embed(m, None, skipped_meta);
+                                m
+                            })
+                            .await,
+                    );
                 }
             }
         }
@@ -240,22 +236,32 @@ struct AutomaticDisconnect {
 #[async_trait]
 impl VoiceEventHandler for AutomaticDisconnect {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
-        if let Some(handler) = self.manager.get(self.guild_id) {
-            let handler = handler.lock().await;
-            if let None = handler.queue().current() {
-                let queue = handler.queue();
+        if let Some(handle) = self.manager.get(self.guild_id) {
+            // lock handle
+            let handle = handle.lock().await;
+            // check if bot is idling by locking at the current song
+            // if none trigger disconnect
+            if let None = handle.queue().current() {
+                // get queue to stop it
+                let queue = handle.queue();
                 let _ = queue.stop();
+                // create the info message
                 let mut embed = default_embed();
                 embed.title("Bot disconnected because of inactivity");
-                if let Err(why) = self
-                    .chan_id
-                    .send_message(&self.http, |m| m.set_embed(embed))
-                    .await
-                {
-                    error!("Error sending message: {:?}", why);
-                }
+                // send message
+                check_msg(
+                    self.chan_id
+                        .send_message(&self.http, |m| m.set_embed(embed))
+                        .await,
+                );
+                // now we have to destroy the guild handle which is behind
+                // a Mutex
                 let manager = self.manager.clone();
                 let guild_id = self.guild_id.clone();
+                // we drop our mutexguard to let the handle free
+                drop(handle);
+                // now we move the remove to a seperate function to delete
+                // it in the near future
                 tokio::spawn(async move {
                     if let Err(e) = manager.remove(guild_id).await {
                         error!("Failed: {:?}", e);
