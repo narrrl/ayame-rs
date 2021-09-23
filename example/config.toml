@@ -1,0 +1,7 @@
+# usually the bot's user id
+# \@bot_user in any chat, or in discord developer mode right click the bot -> copy id
+application_id = 000000000000000000
+# you have to create a discord application for that
+token = "super_duper_secret_token_that_you_should_never_share"
+# trigger for the bot
+prefix = "~"
