@@ -49,9 +49,10 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
 
     let manager = _get_songbird(ctx).await;
     // there are to different connect events
-    // rejoin another channel and join with a new connection
+    // switching to another channel and join with a new connection
     // both do essentially the same, but we need to set the idle
-    // disconnect event [`AutomaticDisconnect`] for every new connection
+    // disconnect event [`AutomaticDisconnect`] for every new connection, but not for switching
+    // channels
     match manager.get(guild_id) {
         Some(_) => _switch_channel(&mut e, manager, GuildId::from(guild_id), connect_to, ctx).await,
         None => {
