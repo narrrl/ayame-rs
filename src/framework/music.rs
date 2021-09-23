@@ -22,6 +22,9 @@ use crate::model::discord_utils::*;
 
 pub const DEFAULT_BITRATE: i32 = 128_000;
 
+///
+/// joins the the current channel of the message author
+///
 pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     let mut e = default_embed();
     // get guild the message was send in
@@ -45,6 +48,10 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     };
 
     let manager = _get_songbird(ctx).await;
+    // there are to different connect events
+    // rejoin another channel and join with a new connection
+    // both do essentially the same, but we need to set the idle
+    // disconnect event [`AutomaticDisconnect`] for every new connection
     match manager.get(guild_id) {
         Some(_) => _switch_channel(&mut e, manager, GuildId::from(guild_id), connect_to, ctx).await,
         None => {
@@ -62,12 +69,20 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     e
 }
 
+///
+/// deafens bot
+///
 pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
+    // we take our default embed
     let mut e = default_embed();
+    // get the current guild
     let guild = msg.guild(&ctx.cache).await.unwrap();
+    // the unique guild id
     let guild_id = guild.id;
 
+    // the songbird manager for the current call
     let manager = _get_songbird(ctx).await;
+    // get the lock to the call
     let handler_lock = match manager.get(guild_id) {
         Some(handler) => handler,
         None => {
@@ -76,11 +91,14 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
         }
     };
 
+    // lock the call
     let mut handler = handler_lock.lock().await;
 
+    // check if the bot is already deafened
     if handler.is_deaf() {
         set_defaults_for_error(&mut e, "already deafened");
     } else {
+        // deafen and let the user know if anything goes horribly wrong
         if let Err(why) = handler.deafen(true).await {
             set_defaults_for_error(&mut e, &format!("failed to deafen {:?}", why));
             return e;
@@ -92,8 +110,15 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
     e
 }
 
+///
+/// queues the given link to the song queue of the current call
+///
+/// also does directly play if its the first song in queue and
+/// basically sends the [`now_playing`] command to inform the user
+/// that the song started playing
 pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed {
     let mut e = default_embed();
+    // take the url from the message
     let url = match args.single::<String>() {
         Ok(url) => url,
         Err(_) => {
@@ -102,6 +127,8 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
         }
     };
 
+    // check if its actually a url
+    // TODO: implement yt-search with search terms
     if !url.starts_with("http") {
         set_defaults_for_error(&mut e, "must provide a valid URL");
         return e;
@@ -112,7 +139,9 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
 
     let manager = _get_songbird(ctx).await;
 
+    // get the current call lock
     if let Some(handler_lock) = manager.get(guild_id) {
+        // await the lock
         let mut handler = handler_lock.lock().await;
 
         // Here, we use lazy restartable sources to make sure that we don't pay
@@ -127,6 +156,7 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
             }
         };
 
+        // check if something is playing
         if let Some(_) = handler.queue().current() {
             handler.enqueue_source(source.into());
             e.title(format!(
@@ -134,8 +164,11 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
                 handler.queue().len()
             ));
         } else {
+            // else we queue the song
             handler.enqueue_source(source.into());
+            // drop the lock on the call
             drop(handler);
+            // to simply invoke the now playing command
             return now_playing(ctx, msg).await;
         }
     } else {
@@ -144,6 +177,9 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
     return e;
 }
 
+///
+/// basically sends a nice embed of the current playing song
+///
 pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
     let mut e = default_embed();
     let guild = msg.guild(&ctx.cache).await.unwrap();
@@ -152,13 +188,17 @@ pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
     let manager = _get_songbird(ctx).await;
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
+        // get track
         if let Some(track) = handler.queue().current() {
+            // field with the name as a hyperlink to the source
             e.field("Now Playing:", _hyperlink_song(track.metadata()), false);
+            // field with a nice formatted duration
             e.field(
                 "Duration:",
                 _duration_format(track.metadata().duration),
                 false,
             );
+            // thumbnail url if it exists
             if let Some(image) = &track.metadata().thumbnail {
                 e.image(image);
             }
@@ -168,6 +208,8 @@ pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
     } else {
         set_defaults_for_error(&mut e, "not in a voice channel to play in");
     }
+
+    // return either error or now playing embed
     return e;
 }
 
