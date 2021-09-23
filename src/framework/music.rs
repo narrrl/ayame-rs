@@ -11,6 +11,7 @@ use songbird::{
     driver::Bitrate,
     id::GuildId,
     input::{Metadata, Restartable},
+    tracks::TrackHandle,
     Call, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
 };
 use std::{sync::Arc, time::Duration};
@@ -177,6 +178,7 @@ pub struct TrackEndNotifier {
     manager: Arc<Songbird>,
 }
 
+// TODO: that definetly needs some structure
 #[async_trait]
 impl VoiceEventHandler for TrackEndNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
@@ -378,31 +380,15 @@ async fn _connect(
 
     if let Ok(_channel) = success {
         let mut handle = handle_lock.lock().await;
-
-        let bitrate = {
-            if let Some(ch) = handle.current_channel() {
-                match ctx.http.get_channel(ch.0).await {
-                    Ok(ch) => match ch
-                        .guild()
-                        .expect(
-                            "How did you manage to let the bot join anything but a voice channel?",
-                        )
-                        .bitrate
-                    {
-                        Some(bitrate) => bitrate as i32,
-                        None => DEFAULT_BITRATE,
-                    },
-                    Err(_) => DEFAULT_BITRATE,
-                }
-            } else {
-                DEFAULT_BITRATE
-            }
+        let bitrate = match handle.current_channel() {
+            Some(channel) => _get_bitrate_for_channel(channel, &ctx.http).await,
+            None => DEFAULT_BITRATE,
         };
 
         handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
         info!("setting bitrate {} for guild {}", bitrate, guild_id);
     } else {
-        set_defaults_for_error(e, "couldn't joining the channel");
+        set_defaults_for_error(e, "couldn't join the channel");
     }
 
     handle_lock
@@ -412,4 +398,21 @@ pub async fn _get_songbird(ctx: &Context) -> Arc<Songbird> {
     songbird::get(ctx)
         .await
         .expect("Songbird Voice client placed in at initialisation.")
+}
+
+async fn _get_current_song(handle_lock: Arc<Mutex<Call>>) -> Option<TrackHandle> {
+    let handle = handle_lock.lock().await;
+    handle.queue().current()
+}
+
+async fn _get_bitrate_for_channel(channel: songbird::id::ChannelId, http: &Arc<Http>) -> i32 {
+    match http.get_channel(channel.0).await {
+        Ok(ch) => match ch.guild().expect("Only Guilds are supported").bitrate {
+            Some(bitrate) => bitrate as i32,
+            // returns default bitrate when it was a textchannel
+            None => DEFAULT_BITRATE,
+        },
+        // what ever
+        Err(_) => DEFAULT_BITRATE,
+    }
 }
