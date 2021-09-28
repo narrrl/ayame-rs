@@ -247,7 +247,7 @@ impl VoiceEventHandler for TrackEndNotifier {
                     );
                 } else {
                     handler.add_global_event(
-                        Event::Delayed(Duration::from_secs(300)),
+                        Event::Delayed(Duration::from_secs(900)),
                         AutomaticDisconnect {
                             chan_id: self.chan_id.clone(),
                             http: self.http.clone(),
@@ -390,7 +390,7 @@ async fn _new_connection(
     );
 
     handle.add_global_event(
-        Event::Periodic(Duration::from_secs(900), None),
+        Event::Delayed(Duration::from_secs(900)),
         AutomaticDisconnect {
             chan_id,
             http: send_http,
