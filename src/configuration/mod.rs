@@ -8,6 +8,7 @@ pub struct Config {
     token: String,
     prefix: String,
     application_id: u64,
+    copy_codec: Option<bool>,
 }
 
 impl Config {
@@ -21,6 +22,14 @@ impl Config {
 
     pub fn get_application_id(&self) -> u64 {
         self.application_id.clone()
+    }
+
+    pub fn copy_codec(&self) -> bool {
+        if let Some(b) = self.copy_codec {
+            b
+        } else {
+            false
+        }
     }
 }
 

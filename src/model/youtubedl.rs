@@ -363,7 +363,7 @@ impl YTDL {
             ffmpeg.set_interval(start, self.end);
         }
 
-        ffmpeg.cut_file(&mut new_path, false)?;
+        ffmpeg.cut_file(&mut new_path, crate::CONFIG.copy_codec())?;
 
         Ok(new_path)
     }
