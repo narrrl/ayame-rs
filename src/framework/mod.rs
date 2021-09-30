@@ -119,36 +119,36 @@ pub async fn guild_info(http: &Arc<Http>, guild: Guild, msg: &Message) -> Comman
 
     let members = &guild.members;
 
-    let mut admins = vec![];
-    for (id, member) in members.iter() {
-        if id.eq(&guild.owner_id) {
-            continue;
-        }
-        if let Ok(perms) = guild.member_permissions(http, id).await {
-            if !member.user.bot && perms.contains(Permissions::ADMINISTRATOR) {
-                admins.push(id);
-            }
-        }
-    }
+    // TODO: was a really dumb way to get the admins
+    // let mut admins = vec![];
+    // for (id, member) in members.iter() {
+    //     if id.eq(&guild.owner_id) {
+    //         continue;
+    //     }
+    //     if let Ok(perms) = guild.member_permissions(http, id).await {
+    //         if !member.user.bot && perms.contains(Permissions::ADMINISTRATOR) {
+    //             admins.push(id);
+    //         }
+    //     }
+    // }
 
-    let admins = admins
-        .into_iter()
-        .map(|i| format!("<@!{}>", i.to_string()))
-        .collect::<String>();
+    // let admins = admins
+    //     .into_iter()
+    //     .map(|i| format!("<@!{}>", i.to_string()))
+    //     .collect::<String>();
 
     let mut message = format!(
         "
         Name: {}
         Created: {}
         Owner: <@!{}>
-        Admins: {}
         Members: {}
         Bot joined: {}
         ",
         guild.name,
         creation_date.format("%H:%M, %a %b %e %Y").to_string(),
         guild.owner_id.as_u64(),
-        admins,
+        // admins,
         match guild.max_members {
             Some(max) => format!("{}/{}", guild.member_count, max),
             None => guild.member_count.to_string(),

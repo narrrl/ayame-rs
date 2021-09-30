@@ -1,7 +1,7 @@
 use serenity::{
     async_trait,
     builder::{CreateEmbed, CreateMessage},
-    client::Context,
+    client::{Cache, Context},
     framework::standard::Args,
     http::Http,
     model::{channel::Message, misc::Mentionable, prelude::ChannelId},
@@ -12,7 +12,7 @@ use songbird::{
     id::GuildId,
     input::{Metadata, Restartable},
     tracks::TrackHandle,
-    Call, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
+    Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -48,25 +48,15 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     };
 
     let manager = _get_songbird(ctx).await;
-    // there are to different connect events
-    // switching to another channel and join with a new connection
-    // both do essentially the same, but we need to set the idle
-    // disconnect event [`AutomaticDisconnect`] for every new connection, but not for switching
-    // channels
-    match manager.get(guild_id) {
-        Some(_) => _switch_channel(&mut e, manager, GuildId::from(guild_id), connect_to, ctx).await,
-        None => {
-            _new_connection(
-                &mut e,
-                manager,
-                GuildId::from(guild_id),
-                connect_to,
-                msg.channel_id.clone(),
-                ctx,
-            )
-            .await
-        }
-    };
+    _new_connection(
+        &mut e,
+        manager,
+        GuildId::from(guild_id),
+        connect_to,
+        msg.channel_id.clone(),
+        ctx,
+    )
+    .await;
     e
 }
 
@@ -234,7 +224,7 @@ impl VoiceEventHandler for TrackEndNotifier {
                 }
             };
             if let Some(handler_lock) = self.manager.get(self.guild_id) {
-                let mut handler = handler_lock.lock().await;
+                let handler = handler_lock.lock().await;
                 if let Some(np) = handler.queue().current() {
                     let metadata = np.metadata();
                     check_msg(
@@ -246,15 +236,6 @@ impl VoiceEventHandler for TrackEndNotifier {
                             .await,
                     );
                 } else {
-                    handler.add_global_event(
-                        Event::Delayed(Duration::from_secs(900)),
-                        AutomaticDisconnect {
-                            chan_id: self.chan_id.clone(),
-                            http: self.http.clone(),
-                            guild_id: self.guild_id.clone(),
-                            manager: self.manager.clone(),
-                        },
-                    );
                     check_msg(
                         self.chan_id
                             .send_message(&self.http, |m| {
@@ -271,48 +252,67 @@ impl VoiceEventHandler for TrackEndNotifier {
     }
 }
 
-struct AutomaticDisconnect {
+struct LeaveWhenAlone {
     chan_id: ChannelId,
+    cache: Arc<Cache>,
     http: Arc<Http>,
     manager: Arc<Songbird>,
     guild_id: GuildId,
 }
 
 #[async_trait]
-impl VoiceEventHandler for AutomaticDisconnect {
+impl VoiceEventHandler for LeaveWhenAlone {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
-        if let Some(handle) = self.manager.get(self.guild_id) {
-            // lock handle
-            let handle = handle.lock().await;
-            // check if bot is idling by locking at the current song
-            // if none trigger disconnect
-            if let None = handle.queue().current() {
-                // get queue to stop it
-                let queue = handle.queue();
-                let _ = queue.stop();
-                // create the info message
-                let mut embed = default_embed();
-                embed.title("Bot disconnected because of inactivity");
-                // send message
-                check_msg(
-                    self.chan_id
-                        .send_message(&self.http, |m| m.set_embed(embed))
-                        .await,
-                );
-                // now we have to destroy the guild handle which is behind
-                // a Mutex
-                let manager = self.manager.clone();
-                let guild_id = self.guild_id.clone();
-                // we drop our mutexguard to let the handle free
-                drop(handle);
-                // now we move the remove to a seperate function to delete
-                // it in the near future
-                tokio::spawn(async move {
-                    if let Err(e) = manager.remove(guild_id).await {
-                        error!("Failed: {:?}", e);
-                    }
-                });
+        let handle = self
+            .manager
+            .get(self.guild_id)
+            .expect("Couldn't get handle of call");
+        // lock handle
+        let mut handle = handle.lock().await;
+        let channel = self
+            .cache
+            .guild_channel(handle.current_channel().unwrap().0)
+            .await
+            .expect("Couldn't get channel");
+        let users = channel
+            .members(&self.cache)
+            .await
+            .expect("Couldn't get connected members");
+        let mut no_user_connected = true;
+        for user in users.iter() {
+            if !user.user.bot {
+                no_user_connected = false;
+                break;
             }
+        }
+        if no_user_connected {
+            if let Some(track) = handle.queue().current() {
+                let _ = track.stop();
+            }
+            handle.queue().stop();
+            handle.stop();
+            // now we have to destroy the guild handle which is behind
+            // a Mutex
+            let manager = self.manager.clone();
+            let guild_id = self.guild_id.clone();
+            // we drop our mutexguard to let the handle free
+            drop(handle);
+            // now we move the remove to a seperate function to delete
+            // it in the near future
+            tokio::spawn(async move {
+                if let Err(e) = manager.remove(guild_id).await {
+                    error!("Failed to remove songbird manager: {:?}", e);
+                }
+            });
+            // create the info message
+            let mut embed = default_embed();
+            embed.title("Bot disconnected because of inactivity");
+            // send message
+            check_msg(
+                self.chan_id
+                    .send_message(&self.http, |m| m.set_embed(embed))
+                    .await,
+            );
         }
         None
     }
@@ -390,25 +390,16 @@ async fn _new_connection(
     );
 
     handle.add_global_event(
-        Event::Delayed(Duration::from_secs(900)),
-        AutomaticDisconnect {
+        Event::Core(CoreEvent::ClientDisconnect),
+        LeaveWhenAlone {
             chan_id,
-            http: send_http,
+            cache: ctx.cache.clone(),
+            http: send_http.clone(),
             guild_id: GuildId::from(guild_id),
             manager: manager.clone(),
         },
     );
-    e.description(&format!("Joined {}", connect_to.mention()));
-}
-
-async fn _switch_channel(
-    e: &mut CreateEmbed,
-    manager: Arc<Songbird>,
-    guild_id: GuildId,
-    connect_to: ChannelId,
-    ctx: &Context,
-) {
-    _connect(e, &manager, guild_id, connect_to, ctx).await;
+    drop(handle);
     e.description(&format!("Joined {}", connect_to.mention()));
 }
 
