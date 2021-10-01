@@ -55,6 +55,9 @@ use commands::{admin::*, general::*, music::*, owner::*};
 
 use lazy_static::*;
 
+pub const COLOR: &str = "#EE0E61";
+pub const COLOR_ERROR: &str = "#CC0000";
+
 lazy_static! {
     pub static ref CONFIG: Config = configuration::config();
     pub static ref BOT_DIR: PathBuf = {
@@ -293,6 +296,9 @@ struct Admin;
 #[individual_command_tip = "Hewwo! こんにちは！안녕하세요~\n\n\
 If you want more information about a specific command, just pass the command as argument."]
 #[command_not_found_text = "Could not find: `{}`."]
+#[suggestion_text("Did you mean `{}`?")]
+#[embed_success_colour = "#EE0E61"]
+#[embed_error_colour = "#CC0000"]
 #[max_levenshtein_distance(3)]
 #[lacking_permissions = "Hide"]
 #[lacking_role = "Nothing"]
