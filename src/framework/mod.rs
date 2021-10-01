@@ -117,7 +117,7 @@ pub async fn guild_info(http: &Arc<Http>, guild: Guild, msg: &Message) -> Comman
     };
     let creation_date = guild.id.created_at();
 
-    let members = &guild.members;
+    // let members = &guild.members;
 
     // TODO: was a really dumb way to get the admins
     // let mut admins = vec![];

@@ -48,15 +48,44 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     };
 
     let manager = _get_songbird(ctx).await;
-    _new_connection(
-        &mut e,
-        manager,
-        GuildId::from(guild_id),
-        connect_to,
-        msg.channel_id.clone(),
-        ctx,
-    )
-    .await;
+    let send_http = ctx.http.clone();
+    let (handle_lock, success) = manager.join(guild_id, connect_to).await;
+
+    if let Ok(_channel) = success {
+        let mut handle = handle_lock.lock().await;
+        let bitrate = match handle.current_channel() {
+            Some(channel) => _get_bitrate_for_channel(channel, &ctx.http).await,
+            None => DEFAULT_BITRATE,
+        };
+
+        handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
+        info!("setting bitrate {} for guild {}", bitrate, guild_id);
+    } else {
+        set_defaults_for_error(&mut e, "couldn't join the channel");
+    }
+    let mut handle = handle_lock.lock().await;
+    handle.add_global_event(
+        Event::Track(TrackEvent::End),
+        TrackEndNotifier {
+            chan_id: msg.channel_id,
+            http: send_http.clone(),
+            guild_id: GuildId::from(guild_id),
+            manager: manager.clone(),
+        },
+    );
+
+    handle.add_global_event(
+        Event::Core(CoreEvent::ClientDisconnect),
+        LeaveWhenAlone {
+            chan_id: msg.channel_id,
+            cache: ctx.cache.clone(),
+            http: send_http,
+            guild_id: GuildId::from(guild_id),
+            manager,
+        },
+    );
+    drop(handle);
+    e.description(&format!("Joined {}", connect_to.mention()));
     e
 }
 
@@ -212,6 +241,7 @@ pub struct TrackEndNotifier {
 }
 
 // TODO: that definetly needs some structure
+// somewhat better, but not the most beautiful code i've ever written
 #[async_trait]
 impl VoiceEventHandler for TrackEndNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
@@ -225,26 +255,18 @@ impl VoiceEventHandler for TrackEndNotifier {
             };
             if let Some(handler_lock) = self.manager.get(self.guild_id) {
                 let handler = handler_lock.lock().await;
-                if let Some(np) = handler.queue().current() {
-                    let metadata = np.metadata();
-                    check_msg(
-                        self.chan_id
-                            .send_message(&self.http, |m| {
-                                _create_next_song_embed(m, Some(metadata.clone()), skipped_meta);
-                                m
-                            })
-                            .await,
-                    );
-                } else {
-                    check_msg(
-                        self.chan_id
-                            .send_message(&self.http, |m| {
-                                _create_next_song_embed(m, None, skipped_meta);
-                                m
-                            })
-                            .await,
-                    );
-                }
+                let next_playing = handler
+                    .queue()
+                    .current()
+                    .and_then(|track| Some(track.metadata().clone()));
+                check_msg(
+                    self.chan_id
+                        .send_message(&self.http, |m| {
+                            _create_next_song_embed(m, next_playing, skipped_meta);
+                            m
+                        })
+                        .await,
+                );
             }
         }
 
@@ -286,9 +308,10 @@ impl VoiceEventHandler for LeaveWhenAlone {
             }
         }
         if no_user_connected {
-            if let Some(track) = handle.queue().current() {
-                let _ = track.stop();
-            }
+            handle
+                .queue()
+                .current()
+                .and_then(|track| Some(track.stop()));
             handle.queue().stop();
             handle.stop();
             // now we have to destroy the guild handle which is behind
@@ -306,7 +329,7 @@ impl VoiceEventHandler for LeaveWhenAlone {
             });
             // create the info message
             let mut embed = default_embed();
-            embed.title("Bot disconnected because of inactivity");
+            embed.title("Bot disconnected because no one was left in channel");
             // send message
             check_msg(
                 self.chan_id
@@ -366,66 +389,6 @@ fn _duration_format(duration: Option<Duration>) -> String {
         }
     }
     "Live".to_string()
-}
-
-async fn _new_connection(
-    e: &mut CreateEmbed,
-    manager: Arc<Songbird>,
-    guild_id: GuildId,
-    connect_to: ChannelId,
-    chan_id: ChannelId,
-    ctx: &Context,
-) {
-    let send_http = ctx.http.clone();
-    let handle_lock = _connect(e, &manager, guild_id, connect_to, ctx).await;
-    let mut handle = handle_lock.lock().await;
-    handle.add_global_event(
-        Event::Track(TrackEvent::End),
-        TrackEndNotifier {
-            chan_id,
-            http: send_http.clone(),
-            guild_id: GuildId::from(guild_id),
-            manager: manager.clone(),
-        },
-    );
-
-    handle.add_global_event(
-        Event::Core(CoreEvent::ClientDisconnect),
-        LeaveWhenAlone {
-            chan_id,
-            cache: ctx.cache.clone(),
-            http: send_http.clone(),
-            guild_id: GuildId::from(guild_id),
-            manager: manager.clone(),
-        },
-    );
-    drop(handle);
-    e.description(&format!("Joined {}", connect_to.mention()));
-}
-
-async fn _connect(
-    e: &mut CreateEmbed,
-    manager: &Arc<Songbird>,
-    guild_id: GuildId,
-    connect_to: ChannelId,
-    ctx: &Context,
-) -> Arc<Mutex<Call>> {
-    let (handle_lock, success) = manager.join(guild_id, connect_to).await;
-
-    if let Ok(_channel) = success {
-        let mut handle = handle_lock.lock().await;
-        let bitrate = match handle.current_channel() {
-            Some(channel) => _get_bitrate_for_channel(channel, &ctx.http).await,
-            None => DEFAULT_BITRATE,
-        };
-
-        handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
-        info!("setting bitrate {} for guild {}", bitrate, guild_id);
-    } else {
-        set_defaults_for_error(e, "couldn't join the channel");
-    }
-
-    handle_lock
 }
 
 pub async fn _get_songbird(ctx: &Context) -> Arc<Songbird> {
