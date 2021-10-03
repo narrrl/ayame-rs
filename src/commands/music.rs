@@ -1,14 +1,20 @@
+use std::sync::Arc;
+
 use serenity::{
+    builder::CreateEmbed,
     client::Context,
     framework::standard::{macros::command, Args, CommandResult},
-    model::channel::Message,
+    http::Http,
+    model::{channel::Message, id::ChannelId},
 };
-use songbird::tracks::PlayMode;
 
 use crate::framework;
 use crate::model::discord_utils::*;
 
 #[command]
+#[only_in(guilds)]
+#[description("Deafens the bot")]
+#[num_args(0)]
 async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
     let embed = framework::music::deafen(ctx, msg).await;
     msg.channel_id
@@ -20,173 +26,104 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[aliases("j")]
 #[only_in(guilds)]
+#[description("Makes the bot join your channel")]
+#[num_args(0)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
-    let embed = framework::music::join(ctx, msg).await;
-    // default deafen
-    let ctx_copy = ctx.clone();
-    let msg_copy = msg.clone();
-    tokio::spawn(async move {
-        framework::music::deafen(&ctx_copy, &msg_copy).await;
-    });
-    msg.channel_id
-        .send_message(&ctx.http, |m| m.set_embed(embed))
-        .await?;
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::join(ctx, msg).await,
+    )
+    .await
 }
 
 #[command]
 #[aliases("np")]
 #[only_in(guilds)]
+#[description("Shows the currently playing song")]
+#[num_args(0)]
 async fn now_playing(ctx: &Context, msg: &Message) -> CommandResult {
-    let embed = framework::music::now_playing(ctx, msg).await;
-    msg.channel_id
-        .send_message(&ctx.http, |m| m.set_embed(embed))
-        .await?;
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::now_playing(ctx, msg).await,
+    )
+    .await
 }
 
-#[command("toggleplay")]
+#[command("play_pause")]
 #[only_in(guilds)]
 #[aliases("pause", "resume")]
+#[description("Toggles pause/resume for the current playback")]
+#[num_args(0)]
 async fn play_pause(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
-    let manager = framework::music::_get_songbird(ctx).await;
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let handler = handler_lock.lock().await;
-        let track = match &handler.queue().current() {
-            Some(info) => info.clone(),
-            None => {
-                msg.reply(&ctx.http, "Nothing is playing".to_string())
-                    .await?;
-                return Ok(());
-            }
-        };
-
-        let is_playing = match track.get_info().await {
-            Ok(info) => info.playing == PlayMode::Play,
-            Err(_) => false,
-        };
-
-        if is_playing {
-            if let Err(why) = track.pause() {
-                msg.reply(&ctx.http, format!("couldn't pause track {:#?}", why))
-                    .await?;
-            }
-        } else {
-            if let Err(why) = track.play() {
-                msg.reply(&ctx.http, format!("couldn't resume track {:#?}", why))
-                    .await?;
-            }
-        }
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
-    }
-
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::play_pause(ctx, guild).await,
+    )
+    .await
 }
 
 #[command]
 #[aliases("l", "verpiss_dich")]
 #[only_in(guilds)]
+#[description("Cleares the whole queue and disconnects the bot")]
+#[num_args(0)]
 async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
-
-    let manager = framework::music::_get_songbird(ctx).await;
-    let has_handler = manager.get(guild_id).is_some();
-
-    if has_handler {
-        if let Err(e) = manager.remove(guild_id).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", e))
-                    .await,
-            );
-        }
-
-        check_msg(msg.channel_id.say(&ctx.http, "Left voice channel").await);
-    } else {
-        check_msg(msg.reply(ctx, "Not in a voice channel").await);
-    }
-
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::leave(ctx, guild).await,
+    )
+    .await
 }
 
 #[command]
 #[only_in(guilds)]
+#[description("Mutes the bot for everyone")]
+#[num_args(0)]
 async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
-
-    let manager = framework::music::_get_songbird(ctx).await;
-
-    let handler_lock = match manager.get(guild_id) {
-        Some(handler) => handler,
-        None => {
-            check_msg(msg.reply(ctx, "Not in a voice channel").await);
-
-            return Ok(());
-        }
-    };
-
-    let mut handler = handler_lock.lock().await;
-
-    if handler.is_mute() {
-        check_msg(msg.channel_id.say(&ctx.http, "Already muted").await);
-    } else {
-        if let Err(e) = handler.mute(true).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", e))
-                    .await,
-            );
-        }
-
-        check_msg(msg.channel_id.say(&ctx.http, "Now muted").await);
-    }
-
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::mute(ctx, guild).await,
+    )
+    .await
 }
 
 #[command]
 #[only_in(guilds)]
 #[aliases("p")]
+#[description("Queues music/video sources from links")]
+#[usage("[link]")]
+#[example("play https://www.youtube.com/watch?v=vRpbtf8_7XM")]
+#[num_args(1)]
 async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let embed = framework::music::play(ctx, msg, &mut args).await;
-    msg.channel_id
-        .send_message(&ctx.http, |m| m.set_embed(embed))
-        .await?;
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::play(ctx, msg, &mut args).await,
+    )
+    .await
 }
 
 #[command]
 #[only_in(guilds)]
+#[description("Skip the current song")]
+#[num_args(0)]
 #[aliases("s", "next", "fs")]
 async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
-
-    let manager = framework::music::_get_songbird(ctx).await;
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let handler = handler_lock.lock().await;
-        let queue = handler.queue();
-        let _ = queue.skip();
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
-    }
-
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::skip(ctx, guild).await,
+    )
+    .await
 }
 
 #[command]
@@ -270,5 +207,16 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
         );
     }
 
+    Ok(())
+}
+
+async fn _execute_command(
+    channel_id: &ChannelId,
+    http: &Arc<Http>,
+    embed: CreateEmbed,
+) -> CommandResult {
+    channel_id
+        .send_message(http, |m| m.set_embed(embed))
+        .await?;
     Ok(())
 }

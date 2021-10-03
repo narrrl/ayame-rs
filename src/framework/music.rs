@@ -4,14 +4,14 @@ use serenity::{
     client::{Cache, Context},
     framework::standard::Args,
     http::Http,
-    model::{channel::Message, misc::Mentionable, prelude::ChannelId},
+    model::{channel::Message, guild::Guild, misc::Mentionable, prelude::ChannelId},
     prelude::Mutex,
 };
 use songbird::{
     driver::Bitrate,
     id::GuildId,
     input::{Metadata, Restartable},
-    tracks::TrackHandle,
+    tracks::{PlayMode, TrackHandle},
     Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
 };
 use std::{sync::Arc, time::Duration};
@@ -22,6 +22,49 @@ use crate::model::discord_utils::*;
 
 pub const DEFAULT_BITRATE: i32 = 128_000;
 
+pub async fn skip(ctx: &Context, guild: Guild) -> CreateEmbed {
+    let mut e = default_embed();
+    let guild_id = guild.id;
+
+    let manager = _get_songbird(ctx).await;
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let handler = handler_lock.lock().await;
+        let queue = handler.queue();
+        let _ = queue.skip();
+    } else {
+        set_defaults_for_error(&mut e, "Not in a voice channel to play in");
+    }
+    e
+}
+
+pub async fn mute(ctx: &Context, guild: Guild) -> CreateEmbed {
+    let mut e = default_embed();
+    let guild_id = guild.id;
+
+    let manager = _get_songbird(ctx).await;
+
+    let handler_lock = match manager.get(guild_id) {
+        Some(handler) => handler,
+        None => {
+            set_defaults_for_error(&mut e, "not in a voice channel");
+            return e;
+        }
+    };
+
+    let mut handler = handler_lock.lock().await;
+
+    if handler.is_mute() {
+        set_defaults_for_error(&mut e, "already muted");
+    } else {
+        if let Err(why) = handler.mute(true).await {
+            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
+        } else {
+            e.title("Now muted");
+        }
+    }
+    e
+}
 ///
 /// joins the the current channel of the message author
 ///
@@ -89,6 +132,59 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     e
 }
 
+pub async fn play_pause(ctx: &Context, guild: Guild) -> CreateEmbed {
+    let mut e = default_embed();
+    let guild_id = guild.id;
+    let manager = _get_songbird(ctx).await;
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let handler = handler_lock.lock().await;
+        let track = match &handler.queue().current() {
+            Some(info) => info.clone(),
+            None => {
+                set_defaults_for_error(&mut e, "nothing is playing");
+                return e;
+            }
+        };
+
+        let is_playing = match track.get_info().await {
+            Ok(info) => info.playing == PlayMode::Play,
+            Err(_) => false,
+        };
+
+        if is_playing {
+            if let Err(why) = track.pause() {
+                set_defaults_for_error(&mut e, &format!("couldn't pause track {:#?}", why));
+            }
+        } else {
+            if let Err(why) = track.play() {
+                set_defaults_for_error(&mut e, &format!("couldn't resume track {:#?}", why));
+            }
+        }
+    } else {
+        set_defaults_for_error(&mut e, "Not in a voice channel to play in");
+    }
+    e
+}
+
+pub async fn leave(ctx: &Context, guild: Guild) -> CreateEmbed {
+    let mut e = default_embed();
+    let guild_id = guild.id;
+
+    let manager = _get_songbird(ctx).await;
+    let has_handler = manager.get(guild_id).is_some();
+
+    if has_handler {
+        if let Err(why) = manager.remove(guild_id).await {
+            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
+        }
+
+        e.title("Left voice channel");
+    } else {
+        set_defaults_for_error(&mut e, "Not in a voice channel");
+    }
+    e
+}
 ///
 /// deafens bot
 ///
@@ -126,7 +222,7 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
 
         e.title("Deafened");
     }
-
+    drop(handler);
     e
 }
 
