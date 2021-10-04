@@ -365,11 +365,12 @@ pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
             // field with the name as a hyperlink to the source
             e.field("Now Playing:", _hyperlink_song(track.metadata()), false);
             // field with a nice formatted duration
-            e.field(
-                "Duration:",
-                _duration_format(track.metadata().duration),
-                false,
-            );
+            let track_time = _duration_format(track.metadata().duration);
+            let duration_string = match track.get_info().await {
+                Ok(info) => format!("{}/{}", _duration_format(Some(info.position)), track_time),
+                Err(_) => track_time,
+            };
+            e.field("Duration:", duration_string, false);
             // thumbnail url if it exists
             if let Some(image) = &track.metadata().thumbnail {
                 e.image(image);
