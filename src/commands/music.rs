@@ -9,18 +9,18 @@ use serenity::{
 };
 
 use crate::framework;
-use crate::model::discord_utils::*;
 
 #[command]
 #[only_in(guilds)]
 #[description("Deafens the bot")]
 #[num_args(0)]
 async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
-    let embed = framework::music::deafen(ctx, msg).await;
-    msg.channel_id
-        .send_message(&ctx.http, |m| m.set_embed(embed))
-        .await?;
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::deafen(ctx, msg).await,
+    )
+    .await
 }
 
 #[command]
@@ -128,86 +128,44 @@ async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[description("Stops and cleares the current queue")]
+#[num_args(0)]
 async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
-
-    let manager = framework::music::_get_songbird(ctx).await;
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let handler = handler_lock.lock().await;
-        let queue = handler.queue();
-        let _ = queue.stop();
-
-        check_msg(msg.channel_id.say(&ctx.http, "Queue cleared.").await);
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
-    }
-
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::stop(ctx, guild).await,
+    )
+    .await
 }
 
 #[command]
 #[only_in(guilds)]
+#[description("Undeafens the bot")]
+#[num_args(0)]
 async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
-
-    let manager = framework::music::_get_songbird(ctx).await;
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-        if let Err(e) = handler.deafen(false).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", e))
-                    .await,
-            );
-        }
-
-        check_msg(msg.channel_id.say(&ctx.http, "Undeafened").await);
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to undeafen in")
-                .await,
-        );
-    }
-
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::undeafen(ctx, guild).await,
+    )
+    .await
 }
 
 #[command]
 #[only_in(guilds)]
+#[description("Unmutes the bot")]
+#[num_args(0)]
 async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
-    let manager = framework::music::_get_songbird(ctx).await;
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-        if let Err(e) = handler.mute(false).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", e))
-                    .await,
-            );
-        }
-
-        check_msg(msg.channel_id.say(&ctx.http, "Unmuted").await);
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to unmute in")
-                .await,
-        );
-    }
-
-    Ok(())
+    _execute_command(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::unmute(ctx, guild).await,
+    )
+    .await
 }
 
 async fn _execute_command(

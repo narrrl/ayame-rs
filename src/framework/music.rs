@@ -21,6 +21,62 @@ use tracing::{error, info};
 use crate::model::discord_utils::*;
 
 pub const DEFAULT_BITRATE: i32 = 128_000;
+pub async fn unmute(ctx: &Context, guild: Guild) -> CreateEmbed {
+    let mut e = default_embed();
+    let guild_id = guild.id;
+    let manager = _get_songbird(ctx).await;
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+        if let Err(why) = handler.mute(false).await {
+            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
+            return e;
+        }
+
+        e.title("Unmuted");
+    } else {
+        set_defaults_for_error(&mut e, "Not in a voice channel to unmute in");
+    }
+    e
+}
+
+pub async fn undeafen(ctx: &Context, guild: Guild) -> CreateEmbed {
+    let mut e = default_embed();
+    let guild_id = guild.id;
+
+    let manager = _get_songbird(ctx).await;
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut handler = handler_lock.lock().await;
+        if let Err(why) = handler.deafen(false).await {
+            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
+            return e;
+        }
+
+        e.title("Undeafened");
+    } else {
+        set_defaults_for_error(&mut e, "Not in a voice channel to undeafen in");
+    }
+    e
+}
+
+pub async fn stop(ctx: &Context, guild: Guild) -> CreateEmbed {
+    let mut e = default_embed();
+    let guild_id = guild.id;
+
+    let manager = _get_songbird(ctx).await;
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let handler = handler_lock.lock().await;
+        let queue = handler.queue();
+        let _ = queue.stop();
+
+        e.title("Queue cleared.");
+    } else {
+        set_defaults_for_error(&mut e, "Not in a voice channel to play in");
+    }
+    e
+}
 
 pub async fn skip(ctx: &Context, guild: Guild) -> CreateEmbed {
     let mut e = default_embed();
