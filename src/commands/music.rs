@@ -15,7 +15,7 @@ use crate::framework;
 #[description("Deafens the bot")]
 #[num_args(0)]
 async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::deafen(ctx, msg).await,
@@ -29,7 +29,7 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Makes the bot join your channel")]
 #[num_args(0)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::join(ctx, msg).await,
@@ -43,7 +43,7 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Shows the currently playing song")]
 #[num_args(0)]
 async fn now_playing(ctx: &Context, msg: &Message) -> CommandResult {
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::now_playing(ctx, msg).await,
@@ -58,7 +58,7 @@ async fn now_playing(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 async fn play_pause(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::play_pause(ctx, guild).await,
@@ -73,7 +73,7 @@ async fn play_pause(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::leave(ctx, guild).await,
@@ -87,7 +87,7 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::mute(ctx, guild).await,
@@ -103,7 +103,7 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
 #[example("play https://www.youtube.com/watch?v=vRpbtf8_7XM")]
 #[num_args(1)]
 async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::play(ctx, msg, &mut args).await,
@@ -118,7 +118,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 #[aliases("s", "next", "fs")]
 async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::skip(ctx, guild).await,
@@ -132,7 +132,7 @@ async fn skip(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 #[num_args(0)]
 async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::stop(ctx, guild).await,
@@ -146,7 +146,7 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 #[num_args(0)]
 async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::undeafen(ctx, guild).await,
@@ -160,7 +160,7 @@ async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    _execute_command(
+    _send_response(
         &msg.channel_id,
         &ctx.http,
         framework::music::unmute(ctx, guild).await,
@@ -168,7 +168,7 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     .await
 }
 
-async fn _execute_command(
+async fn _send_response(
     channel_id: &ChannelId,
     http: &Arc<Http>,
     embed: CreateEmbed,
