@@ -7,6 +7,10 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 - copy the [example config](./example/config.toml*) to your bot directory and paste your token \([Where do I get a discord bot token?](https://discord.com/developers/docs/intro)\), the application_id (usually the bots user id) and the prefix (which will trigger the bot in guilds).
 - execute the executable with `./nirust`
 
+## building and running in GNU/Linux
+- run `./run.sh start`, the script will ask for the credentials
+- run `./run.sh stop` to stop the bot
+
 ## Contact
 - **Discord**: ニルス#0420
 - **Email**: nils@nirusu.codes
