@@ -450,6 +450,7 @@ impl VoiceEventHandler for LeaveWhenAlone {
             .guild_channel(handle.current_channel().unwrap().0)
             .await
             .expect("Couldn't get channel");
+        std::thread::sleep(Duration::from_secs(3));
         let users = channel
             .members(&self.cache)
             .await
