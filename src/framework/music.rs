@@ -438,7 +438,8 @@ struct LeaveWhenAlone {
 #[async_trait]
 impl VoiceEventHandler for LeaveWhenAlone {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
-        info!("Detected UserDisconnect-Event for {}", &self.guild_id);
+        // wait some seconds to be sure that the cache is up to date
+        std::thread::sleep(Duration::from_secs(3));
         let handle = self
             .manager
             .get(self.guild_id)
@@ -450,12 +451,10 @@ impl VoiceEventHandler for LeaveWhenAlone {
             .guild_channel(handle.current_channel().unwrap().0)
             .await
             .expect("Couldn't get channel");
-        std::thread::sleep(Duration::from_secs(3));
         let users = channel
             .members(&self.cache)
             .await
             .expect("Couldn't get connected members");
-        info!("User in channel: {:?}", &users);
         let mut no_user_connected = true;
         for user in users.iter() {
             if !user.user.bot {
@@ -464,7 +463,6 @@ impl VoiceEventHandler for LeaveWhenAlone {
             }
         }
         if no_user_connected {
-            info!("No user left in {:?}", &self.guild_id);
             handle
                 .queue()
                 .current()
