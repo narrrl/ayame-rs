@@ -30,10 +30,13 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Makes the bot join your channel")]
 #[num_args(0)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    let author_id = msg.author.id;
+    let chan_id = msg.channel_id;
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::join(ctx, msg).await,
+        framework::music::join(&ctx, guild, author_id, chan_id).await,
     )
     .await
 }

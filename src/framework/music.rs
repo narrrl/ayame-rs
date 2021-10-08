@@ -4,7 +4,7 @@ use serenity::{
     client::{Cache, Context},
     http::Http,
     model::{
-        channel::Message, guild::Guild, misc::Mentionable, prelude::ChannelId,
+        channel::Message, guild::Guild, id::UserId, misc::Mentionable, prelude::ChannelId,
         prelude::GuildId as SerenityGuildId,
     },
     prelude::Mutex,
@@ -126,17 +126,21 @@ pub async fn mute(ctx: &Context, guild: Guild) -> CreateEmbed {
 ///
 /// joins the the current channel of the message author
 ///
-pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
+pub async fn join(
+    ctx: &Context,
+    guild: Guild,
+    author_id: UserId,
+    chan_id: ChannelId,
+) -> CreateEmbed {
     let mut e = default_embed();
     // get guild the message was send in
-    let guild = msg.guild(&ctx.cache).await.unwrap();
     let guild_id = guild.id;
 
     // find the voice channel of the author
     // None when author is in no channel
     let channel_id = guild
         .voice_states
-        .get(&msg.author.id)
+        .get(&author_id)
         .and_then(|voice_state| voice_state.channel_id);
 
     // check if author is in any channel
@@ -168,7 +172,7 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     handle.add_global_event(
         Event::Track(TrackEvent::End),
         TrackEndNotifier {
-            chan_id: msg.channel_id,
+            chan_id,
             http: send_http.clone(),
             guild_id: GuildId::from(guild_id),
             manager: manager.clone(),
@@ -178,7 +182,7 @@ pub async fn join(ctx: &Context, msg: &Message) -> CreateEmbed {
     handle.add_global_event(
         Event::Core(CoreEvent::ClientDisconnect),
         LeaveWhenAlone {
-            chan_id: msg.channel_id,
+            chan_id,
             cache: ctx.cache.clone(),
             http: send_http,
             guild_id: GuildId::from(guild_id),
