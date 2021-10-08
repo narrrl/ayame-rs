@@ -378,6 +378,40 @@ pub async fn now_playing(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbe
     return e;
 }
 
+pub async fn loop_song(ctx: &Context, guild_id: SerenityGuildId, times: usize) -> CreateEmbed {
+    let mut e = default_embed();
+
+    if times > 10 {
+        set_defaults_for_error(&mut e, "a song can only be looped 10 times");
+        return e;
+    }
+
+    let manager = _get_songbird(ctx).await;
+
+    if let Some(handle_lock) = manager.get(guild_id) {
+        let handle = handle_lock.lock().await;
+
+        if let Some(track) = handle.queue().current() {
+            if let Err(_) = track.loop_for(times) {
+                set_defaults_for_error(&mut e, "looping is not supported for that track");
+                return e;
+            }
+            e.title(format!(
+                "Now looping {} {} times",
+                _hyperlink_song(track.metadata()),
+                times
+            ));
+        } else {
+            set_defaults_for_error(&mut e, "nothing is playing");
+            return e;
+        }
+    } else {
+        set_defaults_for_error(&mut e, "not in a voice channel to play in");
+        return e;
+    }
+    e
+}
+
 pub struct TrackEndNotifier {
     chan_id: ChannelId,
     http: Arc<Http>,

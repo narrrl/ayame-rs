@@ -312,7 +312,8 @@ struct General;
     unmute,
     play,
     play_pause,
-    now_playing
+    now_playing,
+    loop_song
 )]
 struct Music;
 

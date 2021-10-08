@@ -185,6 +185,29 @@ async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     .await
 }
 
+#[command("loop")]
+#[only_in(guilds)]
+#[description("Loops the current song x times")]
+#[num_args(1)]
+async fn loop_song(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let times = match args.single::<usize>() {
+        Ok(url) => url,
+        Err(_) => {
+            let mut e = default_embed();
+            set_defaults_for_error(&mut e, "invalid loop counter");
+            return _send_response(&msg.channel_id, &ctx.http, e).await;
+        }
+    };
+
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    _send_response(
+        &msg.channel_id,
+        &ctx.http,
+        framework::music::loop_song(&ctx, guild.id, times).await,
+    )
+    .await
+}
+
 async fn _send_response(
     channel_id: &ChannelId,
     http: &Arc<Http>,
