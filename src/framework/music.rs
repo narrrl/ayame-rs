@@ -396,11 +396,8 @@ pub async fn loop_song(ctx: &Context, guild_id: SerenityGuildId, times: usize) -
                 set_defaults_for_error(&mut e, "looping is not supported for that track");
                 return e;
             }
-            e.title(format!(
-                "Now looping {} {} times",
-                _hyperlink_song(track.metadata()),
-                times
-            ));
+            e.field("Now looping", _hyperlink_song(track.metadata()), true);
+            e.field("Times", times.to_string(), true);
         } else {
             set_defaults_for_error(&mut e, "nothing is playing");
             return e;
