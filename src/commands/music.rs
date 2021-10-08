@@ -9,6 +9,7 @@ use serenity::{
 };
 
 use crate::framework;
+use crate::model::discord_utils::*;
 
 #[command]
 #[only_in(guilds)]
@@ -43,10 +44,12 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Shows the currently playing song")]
 #[num_args(0)]
 async fn now_playing(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    let guild_id = guild.id;
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::now_playing(ctx, msg).await,
+        framework::music::now_playing(ctx, guild_id).await,
     )
     .await
 }
@@ -103,10 +106,21 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
 #[example("play https://www.youtube.com/watch?v=vRpbtf8_7XM")]
 #[num_args(1)]
 async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    // take the url from the message
+    let url = match args.single::<String>() {
+        Ok(url) => url,
+        Err(_) => {
+            let mut e = default_embed();
+            set_defaults_for_error(&mut e, "must provide a URL to a video or audio");
+            return _send_response(&msg.channel_id, &ctx.http, e).await;
+        }
+    };
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    let guild_id = guild.id;
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::play(ctx, msg, &mut args).await,
+        framework::music::play(ctx, guild_id, url).await,
     )
     .await
 }

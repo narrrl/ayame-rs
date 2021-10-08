@@ -79,6 +79,7 @@ struct Handler {
 }
 
 // Ready and Resumed events to notify if the bot has started/resumed
+// TODO: this is the ugliest code i've ever written
 #[async_trait]
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -179,6 +180,27 @@ impl EventHandler for Handler {
                             .await;
                     }
                 }
+                "play" => {
+                    let options = command
+                        .data
+                        .options
+                        .get(0)
+                        .expect("Expected user option")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected String object");
+                    if let ApplicationCommandInteractionDataOptionValue::String(text) = options {
+                        let guild_id = command.guild_id.unwrap();
+                        let embed = framework::music::play(&ctx, guild_id, text.to_string()).await;
+                        let _ = command
+                            .create_interaction_response(&ctx.http, |response| {
+                                response
+                                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                                    .interaction_response_data(|message| message.add_embed(embed))
+                            })
+                            .await;
+                    }
+                }
                 _ => return (),
             };
         }
@@ -218,6 +240,18 @@ impl EventHandler for Handler {
                             option
                                 .name("message")
                                 .description("Your message that gets converted")
+                                .kind(ApplicationCommandOptionType::String)
+                                .required(true)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("play")
+                        .description("Play some music")
+                        .create_option(|option| {
+                            option
+                                .name("link")
+                                .description("The link that should be played")
                                 .kind(ApplicationCommandOptionType::String)
                                 .required(true)
                         })

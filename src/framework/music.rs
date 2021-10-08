@@ -2,9 +2,11 @@ use serenity::{
     async_trait,
     builder::{CreateEmbed, CreateMessage},
     client::{Cache, Context},
-    framework::standard::Args,
     http::Http,
-    model::{channel::Message, guild::Guild, misc::Mentionable, prelude::ChannelId},
+    model::{
+        channel::Message, guild::Guild, misc::Mentionable, prelude::ChannelId,
+        prelude::GuildId as SerenityGuildId,
+    },
     prelude::Mutex,
 };
 use songbird::{
@@ -288,26 +290,14 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
 /// also does directly play if its the first song in queue and
 /// basically sends the [`now_playing`] command to inform the user
 /// that the song started playing
-pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed {
+pub async fn play(ctx: &Context, guild_id: SerenityGuildId, url: String) -> CreateEmbed {
     let mut e = default_embed();
-    // take the url from the message
-    let url = match args.single::<String>() {
-        Ok(url) => url,
-        Err(_) => {
-            set_defaults_for_error(&mut e, "must provide a URL to a video or audio");
-            return e;
-        }
-    };
-
     // check if its actually a url
     // TODO: implement yt-search with search terms
     if !url.starts_with("http") {
         set_defaults_for_error(&mut e, "must provide a valid URL");
         return e;
     }
-
-    let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
 
     let manager = _get_songbird(ctx).await;
 
@@ -341,7 +331,7 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
             // drop the lock on the call
             drop(handler);
             // to simply invoke the now playing command
-            return now_playing(ctx, msg).await;
+            return now_playing(ctx, guild_id).await;
         }
     } else {
         set_defaults_for_error(&mut e, "not in a voice channel to play in");
@@ -352,10 +342,8 @@ pub async fn play(ctx: &Context, msg: &Message, args: &mut Args) -> CreateEmbed 
 ///
 /// basically sends a nice embed of the current playing song
 ///
-pub async fn now_playing(ctx: &Context, msg: &Message) -> CreateEmbed {
+pub async fn now_playing(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
     let mut e = default_embed();
-    let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
 
     let manager = _get_songbird(ctx).await;
     if let Some(handler_lock) = manager.get(guild_id) {
