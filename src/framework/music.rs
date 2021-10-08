@@ -16,7 +16,7 @@ use songbird::{
     tracks::{PlayMode, TrackHandle},
     Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
 };
-use std::{sync::Arc, time::Duration};
+use std::{ops::Sub, sync::Arc, time::Duration};
 
 use tracing::{error, info};
 
@@ -528,7 +528,11 @@ fn _create_next_song_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Meta
 fn _duration_format(duration: Option<Duration>) -> String {
     if let Some(d) = duration {
         if d != Duration::default() {
-            return humantime::format_duration(d).to_string();
+            return humantime::format_duration(
+                // we don't want milliseconds
+                d.sub(Duration::from_millis(d.subsec_millis().into())),
+            )
+            .to_string();
         }
     }
     "Live".to_string()
