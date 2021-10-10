@@ -4,7 +4,7 @@ use serenity::{
     client::{Cache, Context},
     http::Http,
     model::{
-        channel::Message, guild::Guild, id::UserId, misc::Mentionable, prelude::ChannelId,
+        guild::Guild, id::UserId, misc::Mentionable, prelude::ChannelId,
         prelude::GuildId as SerenityGuildId,
     },
     prelude::Mutex,
@@ -23,48 +23,9 @@ use tracing::{error, info};
 use crate::model::discord_utils::*;
 
 pub const DEFAULT_BITRATE: i32 = 128_000;
-pub async fn unmute(ctx: &Context, guild: Guild) -> CreateEmbed {
+
+pub async fn stop(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
     let mut e = default_embed();
-    let guild_id = guild.id;
-    let manager = _get_songbird(ctx).await;
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-        if let Err(why) = handler.mute(false).await {
-            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
-            return e;
-        }
-
-        e.title("Unmuted");
-    } else {
-        set_defaults_for_error(&mut e, "Not in a voice channel to unmute in");
-    }
-    e
-}
-
-pub async fn undeafen(ctx: &Context, guild: Guild) -> CreateEmbed {
-    let mut e = default_embed();
-    let guild_id = guild.id;
-
-    let manager = _get_songbird(ctx).await;
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-        if let Err(why) = handler.deafen(false).await {
-            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
-            return e;
-        }
-
-        e.title("Undeafened");
-    } else {
-        set_defaults_for_error(&mut e, "Not in a voice channel to undeafen in");
-    }
-    e
-}
-
-pub async fn stop(ctx: &Context, guild: Guild) -> CreateEmbed {
-    let mut e = default_embed();
-    let guild_id = guild.id;
 
     let manager = _get_songbird(ctx).await;
 
@@ -80,9 +41,8 @@ pub async fn stop(ctx: &Context, guild: Guild) -> CreateEmbed {
     e
 }
 
-pub async fn skip(ctx: &Context, guild: Guild) -> CreateEmbed {
+pub async fn skip(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
     let mut e = default_embed();
-    let guild_id = guild.id;
 
     let manager = _get_songbird(ctx).await;
 
@@ -96,9 +56,8 @@ pub async fn skip(ctx: &Context, guild: Guild) -> CreateEmbed {
     e
 }
 
-pub async fn mute(ctx: &Context, guild: Guild) -> CreateEmbed {
+pub async fn mute(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
     let mut e = default_embed();
-    let guild_id = guild.id;
 
     let manager = _get_songbird(ctx).await;
 
@@ -113,7 +72,12 @@ pub async fn mute(ctx: &Context, guild: Guild) -> CreateEmbed {
     let mut handler = handler_lock.lock().await;
 
     if handler.is_mute() {
-        set_defaults_for_error(&mut e, "already muted");
+        if let Err(why) = handler.mute(false).await {
+            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
+            return e;
+        }
+
+        e.title("Unmuted");
     } else {
         if let Err(why) = handler.mute(true).await {
             set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
@@ -133,7 +97,7 @@ pub async fn join(
     chan_id: ChannelId,
 ) -> CreateEmbed {
     let mut e = default_embed();
-    // get guild the message was send in
+    // get guild id the message was send in
     let guild_id = guild.id;
 
     // find the voice channel of the author
@@ -194,9 +158,8 @@ pub async fn join(
     e
 }
 
-pub async fn play_pause(ctx: &Context, guild: Guild) -> CreateEmbed {
+pub async fn play_pause(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
     let mut e = default_embed();
-    let guild_id = guild.id;
     let manager = _get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
@@ -229,10 +192,8 @@ pub async fn play_pause(ctx: &Context, guild: Guild) -> CreateEmbed {
     e
 }
 
-pub async fn leave(ctx: &Context, guild: Guild) -> CreateEmbed {
+pub async fn leave(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
     let mut e = default_embed();
-    let guild_id = guild.id;
-
     let manager = _get_songbird(ctx).await;
     let has_handler = manager.get(guild_id).is_some();
 
@@ -250,13 +211,9 @@ pub async fn leave(ctx: &Context, guild: Guild) -> CreateEmbed {
 ///
 /// deafens bot
 ///
-pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
+pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
     // we take our default embed
     let mut e = default_embed();
-    // get the current guild
-    let guild = msg.guild(&ctx.cache).await.unwrap();
-    // the unique guild id
-    let guild_id = guild.id;
 
     // the songbird manager for the current call
     let manager = _get_songbird(ctx).await;
@@ -274,7 +231,12 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CreateEmbed {
 
     // check if the bot is already deafened
     if handler.is_deaf() {
-        set_defaults_for_error(&mut e, "already deafened");
+        if let Err(why) = handler.deafen(false).await {
+            set_defaults_for_error(&mut e, &format!("Failed: {:?}", why));
+            return e;
+        }
+
+        e.title("Undeafened");
     } else {
         // deafen and let the user know if anything goes horribly wrong
         if let Err(why) = handler.deafen(true).await {
@@ -393,7 +355,7 @@ pub async fn loop_song(ctx: &Context, guild_id: SerenityGuildId, times: usize) -
 
         if let Some(track) = handle.queue().current() {
             if let Err(_) = track.loop_for(times) {
-                set_defaults_for_error(&mut e, "looping is not supported for that track");
+                set_defaults_for_error(&mut e, "looping is not supported for this track");
                 return e;
             }
             e.field("Now looping", _hyperlink_song(track.metadata()), true);

@@ -2,6 +2,7 @@ pub mod admin;
 pub mod general;
 pub mod music;
 pub mod owner;
+pub mod slash_commands;
 
 use std::sync::Arc;
 

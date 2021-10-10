@@ -201,6 +201,86 @@ impl EventHandler for Handler {
                             .await;
                     }
                 }
+                "join" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
+                    let author_id = command.user.id;
+                    let channel_id = command.channel_id;
+                    let embed = framework::music::join(&ctx, guild, author_id, channel_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
+                "skip" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let embed = framework::music::skip(&ctx, guild_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
+                "mute" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let embed = framework::music::mute(&ctx, guild_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
+                "deafen" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let embed = framework::music::deafen(&ctx, guild_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
+                "playing" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let embed = framework::music::now_playing(&ctx, guild_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
+                "pause" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let embed = framework::music::play_pause(&ctx, guild_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
+                "resume" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let embed = framework::music::play_pause(&ctx, guild_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
                 _ => return (),
             };
         }
@@ -256,6 +336,35 @@ impl EventHandler for Handler {
                                 .required(true)
                         })
                 })
+                .create_application_command(|command| {
+                    command
+                        .name("join")
+                        .description("Joins the current channel")
+                })
+                .create_application_command(|command| {
+                    command.name("skip").description("skips the current song")
+                })
+                .create_application_command(|command| {
+                    command.name("mute").description("mutes the bot")
+                })
+                .create_application_command(|command| {
+                    command.name("deafen").description("deafens the bot")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("playing")
+                        .description("Shows the current playing track")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("pause")
+                        .description("pauses/resumes current playing track")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("resume")
+                        .description("pauses/resumes current playing track")
+                })
         })
         .await;
 
@@ -308,8 +417,6 @@ struct General;
     mute,
     skip,
     stop,
-    undeafen,
-    unmute,
     play,
     play_pause,
     now_playing,
