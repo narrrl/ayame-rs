@@ -215,6 +215,17 @@ impl EventHandler for Handler {
                         })
                         .await;
                 }
+                "leave" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let embed = framework::music::leave(&ctx, guild_id).await;
+                    let _ = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| message.add_embed(embed))
+                        })
+                        .await;
+                }
                 "skip" => {
                     let guild_id = command.guild_id.unwrap();
                     let embed = framework::music::skip(&ctx, guild_id).await;
@@ -340,6 +351,11 @@ impl EventHandler for Handler {
                     command
                         .name("join")
                         .description("Joins the current channel")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("leave")
+                        .description("Leaves the current channel")
                 })
                 .create_application_command(|command| {
                     command.name("skip").description("skips the current song")
