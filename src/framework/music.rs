@@ -92,7 +92,7 @@ pub async fn mute(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
 ///
 pub async fn join(
     ctx: &Context,
-    guild: Guild,
+    guild: &Guild,
     author_id: UserId,
     chan_id: ChannelId,
 ) -> CreateEmbed {
@@ -117,6 +117,7 @@ pub async fn join(
     };
 
     let manager = _get_songbird(ctx).await;
+    let is_new_connection = !manager.get(guild_id).is_some();
     let send_http = ctx.http.clone();
     let (handle_lock, success) = manager.join(guild_id, connect_to).await;
 
@@ -133,26 +134,28 @@ pub async fn join(
         set_defaults_for_error(&mut e, "couldn't join the channel");
     }
     let mut handle = handle_lock.lock().await;
-    handle.add_global_event(
-        Event::Track(TrackEvent::End),
-        TrackEndNotifier {
-            chan_id,
-            http: send_http.clone(),
-            guild_id: GuildId::from(guild_id),
-            manager: manager.clone(),
-        },
-    );
+    if is_new_connection {
+        handle.add_global_event(
+            Event::Track(TrackEvent::End),
+            TrackEndNotifier {
+                chan_id,
+                http: send_http.clone(),
+                guild_id: GuildId::from(guild_id),
+                manager: manager.clone(),
+            },
+        );
 
-    handle.add_global_event(
-        Event::Core(CoreEvent::ClientDisconnect),
-        LeaveWhenAlone {
-            chan_id,
-            cache: ctx.cache.clone(),
-            http: send_http,
-            guild_id: GuildId::from(guild_id),
-            manager,
-        },
-    );
+        handle.add_global_event(
+            Event::Core(CoreEvent::ClientDisconnect),
+            LeaveWhenAlone {
+                chan_id,
+                cache: ctx.cache.clone(),
+                http: send_http,
+                guild_id: GuildId::from(guild_id),
+                manager,
+            },
+        );
+    }
     drop(handle);
     e.description(&format!("Joined {}", connect_to.mention()));
     e
@@ -180,11 +183,15 @@ pub async fn play_pause(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed
         if is_playing {
             if let Err(why) = track.pause() {
                 set_defaults_for_error(&mut e, &format!("couldn't pause track {:#?}", why));
+                return e;
             }
+            e.title("Paused track");
         } else {
             if let Err(why) = track.play() {
                 set_defaults_for_error(&mut e, &format!("couldn't resume track {:#?}", why));
+                return e;
             }
+            e.title("Resumed track");
         }
     } else {
         set_defaults_for_error(&mut e, "Not in a voice channel to play in");
@@ -256,8 +263,15 @@ pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> CreateEmbed {
 /// also does directly play if its the first song in queue and
 /// basically sends the [`now_playing`] command to inform the user
 /// that the song started playing
-pub async fn play(ctx: &Context, guild_id: SerenityGuildId, url: String) -> CreateEmbed {
+pub async fn play(
+    ctx: &Context,
+    guild: &Guild,
+    chan_id: ChannelId,
+    author_id: UserId,
+    url: String,
+) -> CreateEmbed {
     let mut e = default_embed();
+    let guild_id = guild.id;
     // check if its actually a url
     // TODO: implement yt-search with search terms
     if !url.starts_with("http") {
@@ -266,6 +280,10 @@ pub async fn play(ctx: &Context, guild_id: SerenityGuildId, url: String) -> Crea
     }
 
     let manager = _get_songbird(ctx).await;
+
+    if manager.get(guild_id).is_none() {
+        join(&ctx, guild, author_id, chan_id).await;
+    }
 
     // get the current call lock
     if let Some(handler_lock) = manager.get(guild_id) {
@@ -300,9 +318,9 @@ pub async fn play(ctx: &Context, guild_id: SerenityGuildId, url: String) -> Crea
             return now_playing(ctx, guild_id).await;
         }
     } else {
-        set_defaults_for_error(&mut e, "not in a voice channel to play in");
+        set_defaults_for_error(&mut e, "not in a voice channel");
     }
-    return e;
+    e
 }
 
 ///

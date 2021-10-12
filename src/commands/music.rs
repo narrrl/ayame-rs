@@ -37,7 +37,7 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::join(&ctx, guild, author_id, chan_id).await,
+        framework::music::join(&ctx, &guild, author_id, chan_id).await,
     )
     .await
 }
@@ -120,11 +120,10 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         }
     };
     let guild = msg.guild(&ctx.cache).await.unwrap();
-    let guild_id = guild.id;
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::play(ctx, guild_id, url).await,
+        framework::music::play(ctx, &guild, msg.channel_id, msg.author.id, url).await,
     )
     .await
 }

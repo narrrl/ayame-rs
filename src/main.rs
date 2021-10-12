@@ -191,7 +191,17 @@ impl EventHandler for Handler {
                         .expect("Expected String object");
                     if let ApplicationCommandInteractionDataOptionValue::String(text) = options {
                         let guild_id = command.guild_id.unwrap();
-                        let embed = framework::music::play(&ctx, guild_id, text.to_string()).await;
+                        let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
+                        let author_id = command.user.id;
+                        let channel_id = command.channel_id;
+                        let embed = framework::music::play(
+                            &ctx,
+                            &guild,
+                            channel_id,
+                            author_id,
+                            text.to_string(),
+                        )
+                        .await;
                         let _ = command
                             .create_interaction_response(&ctx.http, |response| {
                                 response
@@ -206,7 +216,7 @@ impl EventHandler for Handler {
                     let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
                     let author_id = command.user.id;
                     let channel_id = command.channel_id;
-                    let embed = framework::music::join(&ctx, guild, author_id, channel_id).await;
+                    let embed = framework::music::join(&ctx, &guild, author_id, channel_id).await;
                     let _ = command
                         .create_interaction_response(&ctx.http, |response| {
                             response
