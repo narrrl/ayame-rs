@@ -3,6 +3,7 @@ use serenity::builder::{CreateApplicationCommand, CreateApplicationCommands, Cre
 use serenity::client::Context;
 use serenity::framework::standard::CommandResult;
 use serenity::http::Http;
+use serenity::model::id::ChannelId;
 use serenity::model::interactions::application_command::{
     ApplicationCommandInteraction, ApplicationCommandInteractionDataOptionValue,
     ApplicationCommandOptionType,
@@ -105,17 +106,24 @@ impl SlashCommand for Play {
             let author_id = command.user.id;
             let channel_id = command.channel_id;
             let manager = _get_songbird(&ctx).await;
+            // TODO: better auto join
+            let mut already_responded = false;
             if manager.get(guild_id).is_none() {
                 let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
                 let is_error = result.is_err();
                 _send_response(&ctx.http, result, &command).await;
+                already_responded = true;
                 if is_error {
                     return Ok(());
                 }
             }
             let result =
                 framework::music::play(&ctx, &guild, channel_id, author_id, text.to_string()).await;
-            _send_response(&ctx.http, result, &command).await;
+            if already_responded {
+                _send_message(&ctx.http, result, channel_id).await;
+            } else {
+                _send_response(&ctx.http, result, &command).await;
+            }
         }
         Ok(())
     }
@@ -423,6 +431,27 @@ async fn _send_response(
                             .interaction_response_data(|message| message.add_embed(embed))
                     })
                     .await,
+            );
+        }
+    };
+}
+
+async fn _send_message(
+    http: &Arc<Http>,
+    result: Result<CreateEmbed, String>,
+    channel_id: ChannelId,
+) {
+    match result {
+        Ok(embed) => {
+            model::discord_utils::check_msg(
+                channel_id.send_message(http, |m| m.set_embed(embed)).await,
+            );
+        }
+        Err(why) => {
+            let mut embed = default_embed();
+            set_defaults_for_error(&mut embed, &why);
+            model::discord_utils::check_msg(
+                channel_id.send_message(http, |m| m.set_embed(embed)).await,
             );
         }
     };
