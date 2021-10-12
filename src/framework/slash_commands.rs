@@ -103,12 +103,12 @@ impl SlashCommand for Play {
         if let ApplicationCommandInteractionDataOptionValue::String(text) = options {
             let guild_id = command.guild_id.unwrap();
             let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
-            let author_id = command.user.id;
-            let channel_id = command.channel_id;
             let manager = _get_songbird(&ctx).await;
+            let channel_id = command.channel_id;
             // TODO: better auto join
             let mut already_responded = false;
             if manager.get(guild_id).is_none() {
+                let author_id = command.user.id;
                 let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
                 let is_error = result.is_err();
                 _send_response(&ctx.http, result, &command).await;
@@ -117,8 +117,7 @@ impl SlashCommand for Play {
                     return Ok(());
                 }
             }
-            let result =
-                framework::music::play(&ctx, &guild, channel_id, author_id, text.to_string()).await;
+            let result = framework::music::play(&ctx, &guild, text.to_string()).await;
             if already_responded {
                 _send_message(&ctx.http, result, channel_id).await;
             } else {

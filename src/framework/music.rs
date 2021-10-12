@@ -259,13 +259,7 @@ pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEm
 /// also does directly play if its the first song in queue and
 /// basically sends the [`now_playing`] command to inform the user
 /// that the song started playing
-pub async fn play(
-    ctx: &Context,
-    guild: &Guild,
-    chan_id: ChannelId,
-    author_id: UserId,
-    url: String,
-) -> Result<CreateEmbed> {
+pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmbed> {
     let mut e = default_embed();
     let guild_id = guild.id;
     // check if its actually a url

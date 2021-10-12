@@ -130,17 +130,17 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     if manager.get(guild.id).is_none() {
         let author_id = msg.author.id;
         let chan_id = msg.channel_id;
-        let _ = _send_response(
-            &msg.channel_id,
-            &ctx.http,
-            framework::music::join(ctx, &guild, author_id, chan_id).await,
-        )
-        .await;
+        let result = framework::music::join(ctx, &guild, author_id, chan_id).await;
+        let is_err = result.is_err().clone();
+        let _ = _send_response(&msg.channel_id, &ctx.http, result).await;
+        if is_err {
+            return Ok(());
+        }
     }
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::play(ctx, &guild, msg.channel_id, msg.author.id, url).await,
+        framework::music::play(ctx, &guild, url).await,
     )
     .await
 }
