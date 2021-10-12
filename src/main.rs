@@ -11,7 +11,6 @@ mod framework;
 
 use chrono::{offset::Local, Timelike};
 use configuration::Config;
-use model::youtubedl::YTDL;
 use serenity::{
     async_trait,
     model::{gateway::Activity, id::GuildId},
@@ -32,18 +31,11 @@ use serenity::{
         event::ResumedEvent,
         gateway::Ready,
         id::UserId,
-        interactions::{
-            application_command::{
-                ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
-                ApplicationCommandOptionType,
-            },
-            Interaction, InteractionResponseType,
-        },
+        interactions::{application_command::ApplicationCommand, Interaction},
     },
     prelude::*,
 };
 use songbird::SerenityInit;
-use tokio::task;
 
 use std::sync::atomic::Ordering;
 use std::{collections::HashSet, fs::remove_dir_all, sync::Arc, time::Duration};
@@ -52,6 +44,8 @@ use std::{path::PathBuf, sync::atomic::AtomicBool};
 use tracing::{error, info};
 
 use commands::{admin::*, general::*, music::*, owner::*};
+
+use framework::slash_commands::*;
 
 use lazy_static::*;
 
@@ -84,313 +78,18 @@ struct Handler {
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            match command.data.name.as_str() {
-                "youtubedl" => {
-                    let options = command
-                        .data
-                        .options
-                        .get(0)
-                        .expect("Expected user option")
-                        .resolved
-                        .as_ref()
-                        .expect("Expected String object");
-                    let audio_only = match command.data.options.get(1) {
-                        Some(value) => {
-                            let value = value.resolved.as_ref().expect("Expected bool object");
-                            match value {
-                                ApplicationCommandInteractionDataOptionValue::Boolean(b) => {
-                                    b.clone()
-                                }
-                                _ => false,
-                            }
-                        }
-                        None => false,
-                    };
-                    if let ApplicationCommandInteractionDataOptionValue::String(url) = options {
-                        if crate::commands::general::URL_REGEX.is_match(url) {
-                            let id = command.user.id.as_u64().clone();
-                            let channel_id = command.channel_id.clone();
-                            let http = ctx.http.clone();
-                            let audio_only = audio_only;
-                            let url = url.to_string();
-                            let _ = command
-                                .create_interaction_response(&ctx.http, |response| {
-                                    response
-                                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                                        .interaction_response_data(|message| {
-                                            message.content("Revieved Event")
-                                        })
-                                })
-                                .await;
-                            let cache = ctx.cache.clone();
-                            task::spawn(async move {
-                                let mut ytdl = YTDL::new(channel_id, id, http, cache);
-                                ytdl.set_defaults();
-                                if audio_only {
-                                    ytdl.set_audio_only();
-                                }
-                                if let Ok(message) =
-                                    command.get_interaction_response(&ctx.http).await
-                                {
-                                    ytdl.set_update_message(&message);
-                                }
-                                ytdl.start_download(url.to_string()).await
-                            });
-                        } else {
-                            let _ = command
-                                .create_interaction_response(&ctx.http, |response| {
-                                    response
-                                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                                        .interaction_response_data(|message| {
-                                            message.content("Invalid URL")
-                                        })
-                                })
-                                .await;
-                        }
-                    }
+            let key = command.data.name.as_str().to_string();
+            let handler = get_slash_handler();
+            if let Some(slash) = handler.find(&key) {
+                if let Err(why) = slash.run(ctx, command).await {
+                    error!("failed: {:?}", why);
                 }
-                "invite" => {
-                    let embed = framework::general::invite(&ctx.http).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|b| b.add_embed(embed))
-                        })
-                        .await;
-                }
-                "mock" => {
-                    let options = command
-                        .data
-                        .options
-                        .get(0)
-                        .expect("Expected user option")
-                        .resolved
-                        .as_ref()
-                        .expect("Expected String object");
-
-                    if let ApplicationCommandInteractionDataOptionValue::String(text) = options {
-                        let text = model::mock_text(&text);
-                        let _ = command
-                            .create_interaction_response(&ctx.http, |response| {
-                                response
-                                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                                    .interaction_response_data(|message| message.content(text))
-                            })
-                            .await;
-                    }
-                }
-                "play" => {
-                    let options = command
-                        .data
-                        .options
-                        .get(0)
-                        .expect("Expected user option")
-                        .resolved
-                        .as_ref()
-                        .expect("Expected String object");
-                    if let ApplicationCommandInteractionDataOptionValue::String(text) = options {
-                        let guild_id = command.guild_id.unwrap();
-                        let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
-                        let author_id = command.user.id;
-                        let channel_id = command.channel_id;
-                        let embed = framework::music::play(
-                            &ctx,
-                            &guild,
-                            channel_id,
-                            author_id,
-                            text.to_string(),
-                        )
-                        .await;
-                        let _ = command
-                            .create_interaction_response(&ctx.http, |response| {
-                                response
-                                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                                    .interaction_response_data(|message| message.add_embed(embed))
-                            })
-                            .await;
-                    }
-                }
-                "join" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
-                    let author_id = command.user.id;
-                    let channel_id = command.channel_id;
-                    let embed = framework::music::join(&ctx, &guild, author_id, channel_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                "leave" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let embed = framework::music::leave(&ctx, guild_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                "skip" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let embed = framework::music::skip(&ctx, guild_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                "mute" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let embed = framework::music::mute(&ctx, guild_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                "deafen" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let embed = framework::music::deafen(&ctx, guild_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                "playing" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let embed = framework::music::now_playing(&ctx, guild_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                "pause" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let embed = framework::music::play_pause(&ctx, guild_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                "resume" => {
-                    let guild_id = command.guild_id.unwrap();
-                    let embed = framework::music::play_pause(&ctx, guild_id).await;
-                    let _ = command
-                        .create_interaction_response(&ctx.http, |response| {
-                            response
-                                .kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|message| message.add_embed(embed))
-                        })
-                        .await;
-                }
-                _ => return (),
-            };
+            }
         }
     }
     async fn ready(&self, ctx: Context, ready: Ready) {
         let commands = ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
-            commands
-                .create_application_command(|command| {
-                    command
-                        .name("youtubedl")
-                        .description("Download Videos from a lot of sites")
-                        .create_option(|option| {
-                            option
-                                .name("link")
-                                .description("A link to a video source")
-                                .kind(ApplicationCommandOptionType::String)
-                                .required(true)
-                        })
-                        .create_option(|option| {
-                            option
-                                .name("audio_only")
-                                .description("Download the video as mp3")
-                                .kind(ApplicationCommandOptionType::Boolean)
-                                .required(false)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("invite")
-                        .description("Invite the bot to your server")
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("mock")
-                        .description("Converts your message to random upper and lower case")
-                        .create_option(|option| {
-                            option
-                                .name("message")
-                                .description("Your message that gets converted")
-                                .kind(ApplicationCommandOptionType::String)
-                                .required(true)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("play")
-                        .description("Play some music")
-                        .create_option(|option| {
-                            option
-                                .name("link")
-                                .description("The link that should be played")
-                                .kind(ApplicationCommandOptionType::String)
-                                .required(true)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("join")
-                        .description("Joins the current channel")
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("leave")
-                        .description("Leaves the current channel")
-                })
-                .create_application_command(|command| {
-                    command.name("skip").description("skips the current song")
-                })
-                .create_application_command(|command| {
-                    command.name("mute").description("mutes the bot")
-                })
-                .create_application_command(|command| {
-                    command.name("deafen").description("deafens the bot")
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("playing")
-                        .description("Shows the current playing track")
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("pause")
-                        .description("pauses/resumes current playing track")
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("resume")
-                        .description("pauses/resumes current playing track")
-                })
+            create_commands(commands)
         })
         .await;
 

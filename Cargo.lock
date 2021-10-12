@@ -916,6 +916,7 @@ dependencies = [
 name = "nirust"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "dotenv",
  "fs_extra",

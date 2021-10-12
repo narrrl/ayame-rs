@@ -11,6 +11,8 @@ use serenity::{
 use crate::framework;
 use crate::model::discord_utils::*;
 
+type Result<T> = std::result::Result<T, String>;
+
 #[command]
 #[only_in(guilds)]
 #[description("Deafens the bot")]
@@ -114,9 +116,12 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let url = match args.single::<String>() {
         Ok(url) => url,
         Err(_) => {
-            let mut e = default_embed();
-            set_defaults_for_error(&mut e, "must provide a URL to a video or audio");
-            return _send_response(&msg.channel_id, &ctx.http, e).await;
+            return _send_response(
+                &msg.channel_id,
+                &ctx.http,
+                Err("must provide a URL to a video or audio".to_string()),
+            )
+            .await;
         }
     };
     let guild = msg.guild(&ctx.cache).await.unwrap();
@@ -165,9 +170,12 @@ async fn loop_song(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     let times = match args.single::<usize>() {
         Ok(url) => url,
         Err(_) => {
-            let mut e = default_embed();
-            set_defaults_for_error(&mut e, "invalid loop counter");
-            return _send_response(&msg.channel_id, &ctx.http, e).await;
+            return _send_response(
+                &msg.channel_id,
+                &ctx.http,
+                Err("invalid loop counter".to_string()),
+            )
+            .await;
         }
     };
 
@@ -183,8 +191,16 @@ async fn loop_song(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
 async fn _send_response(
     channel_id: &ChannelId,
     http: &Arc<Http>,
-    embed: CreateEmbed,
+    result: Result<CreateEmbed>,
 ) -> CommandResult {
+    let embed = match result {
+        Ok(embed) => embed,
+        Err(why) => {
+            let mut embed = default_embed();
+            set_defaults_for_error(&mut embed, &why);
+            embed
+        }
+    };
     channel_id
         .send_message(http, |m| m.set_embed(embed))
         .await?;
