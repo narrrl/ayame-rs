@@ -276,12 +276,6 @@ pub async fn play(
 
     let manager = _get_songbird(ctx).await;
 
-    if manager.get(guild_id).is_none() {
-        if let Err(why) = join(&ctx, guild, author_id, chan_id).await {
-            return Err(why);
-        }
-    }
-
     // get the current call lock
     if let Some(handler_lock) = manager.get(guild_id) {
         // await the lock

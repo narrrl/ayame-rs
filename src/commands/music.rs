@@ -125,6 +125,18 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         }
     };
     let guild = msg.guild(&ctx.cache).await.unwrap();
+
+    let manager = framework::music::_get_songbird(&ctx).await;
+    if manager.get(guild.id).is_none() {
+        let author_id = msg.author.id;
+        let chan_id = msg.channel_id;
+        let _ = _send_response(
+            &msg.channel_id,
+            &ctx.http,
+            framework::music::join(ctx, &guild, author_id, chan_id).await,
+        )
+        .await;
+    }
     _send_response(
         &msg.channel_id,
         &ctx.http,
