@@ -13,7 +13,7 @@ use chrono::{offset::Local, Timelike};
 use configuration::Config;
 use serenity::{
     async_trait,
-    model::{gateway::Activity, id::GuildId},
+    model::{gateway::Activity, id::GuildId, Permissions},
 };
 use serenity::{
     client::bridge::gateway::{GatewayIntents, ShardManager},
@@ -58,6 +58,27 @@ lazy_static! {
         let mut dir = std::env::current_exe().expect("Couldn't get bot directory");
         dir.pop();
         dir
+    };
+    pub static ref NEEDED_PERMISSIONS: Permissions = {
+        let mut perms = Permissions::default();
+        perms.toggle(Permissions::MANAGE_EMOJIS);
+        perms.toggle(Permissions::READ_MESSAGES);
+        perms.toggle(Permissions::SEND_MESSAGES);
+        perms.toggle(Permissions::MANAGE_MESSAGES);
+        perms.toggle(Permissions::EMBED_LINKS);
+        perms.toggle(Permissions::ATTACH_FILES);
+        perms.toggle(Permissions::READ_MESSAGE_HISTORY);
+        perms.toggle(Permissions::USE_EXTERNAL_EMOJIS);
+        perms.toggle(Permissions::CONNECT);
+        perms.toggle(Permissions::SPEAK);
+        perms.toggle(Permissions::MUTE_MEMBERS);
+        perms.toggle(Permissions::DEAFEN_MEMBERS);
+        perms.toggle(Permissions::MOVE_MEMBERS);
+        perms.toggle(Permissions::USE_VAD);
+        perms.toggle(Permissions::USE_PUBLIC_THREADS);
+        perms.toggle(Permissions::USE_PRIVATE_THREADS);
+        perms.toggle(Permissions::CREATE_INVITE);
+        perms
     };
 }
 

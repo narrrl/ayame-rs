@@ -18,7 +18,7 @@ pub const MAX_EMOTE_SIZE: u64 = 256_000; // kb
 
 #[command]
 #[only_in(guilds)]
-#[required_permissions("ADMINISTRATOR")]
+#[required_permissions("MANAGE_EMOJIS")]
 #[num_args(1)]
 #[usage("[emote_name]")]
 #[description(
