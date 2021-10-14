@@ -51,13 +51,12 @@ pub async fn skip(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbe
         let mut e = default_embed();
         let handler = handler_lock.lock().await;
         let queue = handler.queue();
-        let track = queue.current();
         if let Err(_) = queue.skip() {
             return Err(NOTHING_PLAYING_ERROR.to_string());
         }
         // we can unwrap safely the the current track, because it must be `Some`
         // else the skip should have returned an error
-        _embed_song(&mut e, track.unwrap().metadata());
+        e.title("Skipped Song");
         return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
@@ -289,13 +288,7 @@ pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmb
         handler.enqueue_source(source.into());
         let queue = handler.queue().current_queue();
         let track = queue.last().expect("couldn't get handle of queued track");
-        e.field("Added Song:", _hyperlink_song(track.metadata()), false);
-        let track_time = _duration_format(track.metadata().duration);
-        e.field("Duration:", track_time, false);
-        // thumbnail url if it exists
-        if let Some(image) = &track.metadata().thumbnail {
-            e.image(image);
-        }
+        _embed_song(&mut e, track.metadata(), "Added song:");
         return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
@@ -539,8 +532,8 @@ async fn _get_current_song(handle_lock: Arc<Mutex<Call>>) -> Option<TrackHandle>
     handle.queue().current()
 }
 
-fn _embed_song(e: &mut CreateEmbed, track: &Metadata) {
-    e.field("Added Song:", _hyperlink_song(track), false);
+fn _embed_song(e: &mut CreateEmbed, track: &Metadata, field_title: &str) {
+    e.field(field_title, _hyperlink_song(track), false);
     let track_time = _duration_format(track.duration);
     e.field("Duration:", track_time, false);
     // thumbnail url if it exists
