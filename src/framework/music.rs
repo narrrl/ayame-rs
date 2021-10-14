@@ -29,41 +29,42 @@ pub const NOT_IN_VOICE_ERROR: &str = "not in a voice channel";
 pub const NOTHING_PLAYING_ERROR: &str = "nothing is playing";
 
 pub async fn stop(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbed> {
-    let mut e = default_embed();
-
     let manager = _get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
+        let mut e = default_embed();
         let handler = handler_lock.lock().await;
         let queue = handler.queue();
-        let _ = queue.stop();
+        queue.stop();
 
         e.title("Queue cleared.");
+        return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
     }
-    Ok(e)
 }
 
 pub async fn skip(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbed> {
-    let mut e = default_embed();
-
     let manager = _get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
+        let mut e = default_embed();
         let handler = handler_lock.lock().await;
         let queue = handler.queue();
-        let _ = queue.skip();
-        e.title("Skipped song");
+        let track = queue.current();
+        if let Err(_) = queue.skip() {
+            return Err(NOTHING_PLAYING_ERROR.to_string());
+        }
+        // we can unwrap safely the the current track, because it must be `Some`
+        // else the skip should have returned an error
+        _embed_song(&mut e, track.unwrap().metadata());
+        return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
     }
-    Ok(e)
 }
 
 pub async fn mute(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbed> {
-    let mut e = default_embed();
-
     let manager = _get_songbird(ctx).await;
 
     let handler_lock = match manager.get(guild_id) {
@@ -75,6 +76,7 @@ pub async fn mute(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbe
 
     let mut handler = handler_lock.lock().await;
 
+    let mut e = default_embed();
     if handler.is_mute() {
         if let Err(why) = handler.mute(false).await {
             return Err(format!("failed: {:?}", why));
@@ -99,7 +101,6 @@ pub async fn join(
     author_id: UserId,
     chan_id: ChannelId,
 ) -> Result<CreateEmbed> {
-    let mut e = default_embed();
     // get guild id the message was send in
     let guild_id = guild.id;
 
@@ -159,12 +160,12 @@ pub async fn join(
         );
     }
     drop(handle);
+    let mut e = default_embed();
     e.description(&format!("Joined {}", connect_to.mention()));
     Ok(e)
 }
 
 pub async fn play_pause(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbed> {
-    let mut e = default_embed();
     let manager = _get_songbird(ctx).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
@@ -181,6 +182,7 @@ pub async fn play_pause(ctx: &Context, guild_id: SerenityGuildId) -> Result<Crea
             Err(_) => false,
         };
 
+        let mut e = default_embed();
         if is_playing {
             if let Err(why) = track.pause() {
                 return Err(format!("couldn't pause track {:#?}", why));
@@ -192,35 +194,32 @@ pub async fn play_pause(ctx: &Context, guild_id: SerenityGuildId) -> Result<Crea
             }
             e.title("Resumed track");
         }
+        return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
     }
-    Ok(e)
 }
 
 pub async fn leave(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbed> {
-    let mut e = default_embed();
     let manager = _get_songbird(ctx).await;
     let has_handler = manager.get(guild_id).is_some();
 
     if has_handler {
+        let mut e = default_embed();
         if let Err(why) = manager.remove(guild_id).await {
             return Err(format!("failed: {:?}", why));
         }
 
         e.title("Left voice channel");
+        return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
     }
-    Ok(e)
 }
 ///
 /// deafens bot
 ///
 pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbed> {
-    // we take our default embed
-    let mut e = default_embed();
-
     // the songbird manager for the current call
     let manager = _get_songbird(ctx).await;
     // get the lock to the call
@@ -234,6 +233,7 @@ pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEm
     // lock the call
     let mut handler = handler_lock.lock().await;
 
+    let mut e = default_embed();
     // check if the bot is already deafened
     if handler.is_deaf() {
         if let Err(why) = handler.deafen(false).await {
@@ -260,7 +260,6 @@ pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEm
 /// basically sends the [`now_playing`] command to inform the user
 /// that the song started playing
 pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmbed> {
-    let mut e = default_embed();
     let guild_id = guild.id;
     // check if its actually a url
     // TODO: implement yt-search with search terms
@@ -286,38 +285,33 @@ pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmb
             }
         };
 
-        // check if something is playing
-        if let Some(_) = handler.queue().current() {
-            handler.enqueue_source(source.into());
-            e.title(format!(
-                "Added song to queue: position {}",
-                handler.queue().len()
-            ));
-        } else {
-            // else we queue the song
-            handler.enqueue_source(source.into());
-            // drop the lock on the call
-            drop(handler);
-            // to simply invoke the now playing command
-            return now_playing(ctx, guild_id).await;
+        let mut e = default_embed();
+        handler.enqueue_source(source.into());
+        let queue = handler.queue().current_queue();
+        let track = queue.last().expect("couldn't get handle of queued track");
+        e.field("Added Song:", _hyperlink_song(track.metadata()), false);
+        let track_time = _duration_format(track.metadata().duration);
+        e.field("Duration:", track_time, false);
+        // thumbnail url if it exists
+        if let Some(image) = &track.metadata().thumbnail {
+            e.image(image);
         }
+        return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
     }
-    Ok(e)
 }
 
 ///
 /// basically sends a nice embed of the current playing song
 ///
 pub async fn now_playing(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbed> {
-    let mut e = default_embed();
-
     let manager = _get_songbird(ctx).await;
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
         // get track
         if let Some(track) = handler.queue().current() {
+            let mut e = default_embed();
             // field with the name as a hyperlink to the source
             e.field("Now Playing:", _hyperlink_song(track.metadata()), false);
             // field with a nice formatted duration
@@ -331,14 +325,13 @@ pub async fn now_playing(ctx: &Context, guild_id: SerenityGuildId) -> Result<Cre
             if let Some(image) = &track.metadata().thumbnail {
                 e.image(image);
             }
+            return Ok(e);
         } else {
-            set_defaults_for_error(&mut e, "nothing is playing");
+            return Err(NOTHING_PLAYING_ERROR.to_string());
         }
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
     }
-
-    Ok(e)
 }
 
 pub async fn loop_song(
@@ -346,8 +339,6 @@ pub async fn loop_song(
     guild_id: SerenityGuildId,
     times: usize,
 ) -> Result<CreateEmbed> {
-    let mut e = default_embed();
-
     if times > 10 {
         return Err("a song can only be looped 10 times".to_string());
     }
@@ -361,15 +352,16 @@ pub async fn loop_song(
             if let Err(_) = track.loop_for(times) {
                 return Err("looping is not supported for this track".to_string());
             }
+            let mut e = default_embed();
             e.field("Now looping", _hyperlink_song(track.metadata()), true);
             e.field("Times", times.to_string(), true);
+            return Ok(e);
         } else {
             return Err(NOTHING_PLAYING_ERROR.to_string());
         }
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
     }
-    Ok(e)
 }
 
 pub struct TrackEndNotifier {
@@ -545,6 +537,16 @@ pub async fn _get_songbird(ctx: &Context) -> Arc<Songbird> {
 async fn _get_current_song(handle_lock: Arc<Mutex<Call>>) -> Option<TrackHandle> {
     let handle = handle_lock.lock().await;
     handle.queue().current()
+}
+
+fn _embed_song(e: &mut CreateEmbed, track: &Metadata) {
+    e.field("Added Song:", _hyperlink_song(track), false);
+    let track_time = _duration_format(track.duration);
+    e.field("Duration:", track_time, false);
+    // thumbnail url if it exists
+    if let Some(image) = &track.thumbnail {
+        e.image(image);
+    }
 }
 
 async fn _get_bitrate_for_channel(channel: songbird::id::ChannelId, http: &Arc<Http>) -> i32 {
