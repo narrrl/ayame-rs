@@ -9,6 +9,7 @@ pub struct Config {
     prefix: String,
     application_id: u64,
     copy_codec: Option<bool>,
+    youtube_api_key: String,
 }
 
 impl Config {
@@ -30,6 +31,10 @@ impl Config {
         } else {
             false
         }
+    }
+
+    pub fn youtube_api_key(&self) -> String {
+        self.youtube_api_key.clone()
     }
 }
 

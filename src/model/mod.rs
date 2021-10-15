@@ -1,6 +1,7 @@
 pub mod discord_utils;
 pub mod ffmpeg;
 pub mod image_processing;
+pub mod youtube;
 pub mod youtubedl;
 
 use rand::Rng;
