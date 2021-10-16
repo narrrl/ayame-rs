@@ -5,6 +5,8 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 //
 // heavily *inspired* by
 // [serenity_utils](https://github.com/AriusX7/serenity-utils/blob/current/src/error.rs)
