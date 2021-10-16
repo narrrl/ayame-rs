@@ -489,8 +489,6 @@ impl SlashCommand for Search {
             let mut first_page = default_embed();
             for (index, result) in res.results().iter().enumerate() {
                 let mut e = default_embed();
-                e.title(&result.title());
-                e.url(&result.url());
                 e.thumbnail(result.thumbnail().url());
                 e.field(
                     "Title:",
