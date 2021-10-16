@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-// use reqwest::StatusCode;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::string::ToString;
 use strum_macros::Display;
@@ -192,7 +192,7 @@ impl YoutubeSearch {
             }
         };
 
-        // let status = res.status();
+        let status = res.status();
 
         let body = match res.text().await {
             Ok(body) => body,
@@ -201,10 +201,10 @@ impl YoutubeSearch {
                 return Err(SearchError::new(ErrorType::Unkown));
             }
         };
-        // if !status.eq(&StatusCode::FOUND) {
-        //     error!("youtube search failed with wrong status code: {:?}", body);
-        //     return Err(SearchError::new(ErrorType::Invalid));
-        // }
+        if !status.eq(&StatusCode::OK) {
+            error!("youtube search failed with wrong status code: {:?}", body);
+            return Err(SearchError::new(ErrorType::Invalid));
+        }
 
         let res: YoutubeResponse = match serde_json::from_str(&body) {
             Ok(res) => res,
