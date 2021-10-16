@@ -50,7 +50,7 @@ pub fn get_max_uploadsize(guild: &Guild) -> u64 {
     }
 }
 
-pub fn check_msg(result: SerenityResult<Message>) {
+pub fn check_msg<T>(result: SerenityResult<T>) {
     if let Err(why) = result {
         error!("Error sending message: {:?}", why);
     }

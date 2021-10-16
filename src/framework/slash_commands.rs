@@ -11,15 +11,13 @@ use serenity::model::interactions::application_command::{
     ApplicationCommandOptionType,
 };
 use serenity::model::interactions::InteractionResponseType;
-use serenity::Result as SerenityResult;
 use std::result::Result;
 use std::sync::Arc;
-use tracing::error;
 
 use crate::framework;
 use crate::model;
 use crate::model::discord_utils::{
-    default_embed, set_defaults_for_error, MusicSelectOptions, SelectMenu,
+    check_msg, default_embed, set_defaults_for_error, MusicSelectOptions, SelectMenu,
 };
 use crate::model::youtube::*;
 
@@ -112,7 +110,6 @@ impl SlashCommand for Play {
             let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
             let manager = _get_songbird(&ctx).await;
             let channel_id = command.channel_id;
-            // TODO: better auto join
             let mut already_responded = false;
             if manager.get(guild_id).is_none() {
                 let author_id = command.user.id;
@@ -207,13 +204,7 @@ impl SlashCommand for Invite {
 
     async fn run(&self, ctx: Context, command: ApplicationCommandInteraction) -> CommandResult {
         let embed = framework::general::invite(&ctx.http).await;
-        check_msg(command
-            .create_interaction_response(&ctx.http, |response| {
-                response
-                    .kind(serenity::model::interactions::InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|b| b.add_embed(embed))
-            })
-            .await);
+        _send_response(&ctx.http, Ok(embed), &command).await;
         Ok(())
     }
 
@@ -403,45 +394,6 @@ impl SlashCommand for Resume {
     }
 }
 
-fn check_msg(result: SerenityResult<()>) {
-    if let Err(why) = result {
-        error!("failed: {:?}", why);
-    }
-}
-
-async fn _send_response(
-    http: &Arc<Http>,
-    result: Result<CreateEmbed, String>,
-    command: &ApplicationCommandInteraction,
-) {
-    match result {
-        Ok(embed) => {
-            check_msg(
-                command
-                    .create_interaction_response(http, |response| {
-                        response
-                            .kind(InteractionResponseType::ChannelMessageWithSource)
-                            .interaction_response_data(|message| message.add_embed(embed))
-                    })
-                    .await,
-            );
-        }
-        Err(why) => {
-            let mut embed = default_embed();
-            set_defaults_for_error(&mut embed, &why);
-            check_msg(
-                command
-                    .create_interaction_response(http, |response| {
-                        response
-                            .kind(InteractionResponseType::ChannelMessageWithSource)
-                            .interaction_response_data(|message| message.add_embed(embed))
-                    })
-                    .await,
-            );
-        }
-    };
-}
-
 #[async_trait]
 impl SlashCommand for Search {
     fn alias(&self) -> String {
@@ -468,15 +420,7 @@ impl SlashCommand for Search {
             let mut req = YoutubeSearch::new(&conf.youtube_api_key());
             req.set_amount(5).set_filter(Type::VIDEO);
 
-            let res = match req.search(search_term).await {
-                Ok(res) => res,
-                Err(_) => {
-                    let mut e = default_embed();
-                    set_defaults_for_error(&mut e, "fatal error creating search");
-                    _send_response(&ctx.http, Ok(e), &command).await;
-                    return Ok(());
-                }
-            };
+            let res = req.search(search_term).await?;
 
             if res.results().is_empty() {
                 let mut e = default_embed();
@@ -571,6 +515,39 @@ async fn _send_message(
             model::discord_utils::check_msg(
                 channel_id.send_message(http, |m| m.set_embed(embed)).await,
             );
+        }
+    };
+}
+
+async fn _make_response(
+    http: &Arc<Http>,
+    embed: CreateEmbed,
+    command: &ApplicationCommandInteraction,
+) {
+    check_msg(
+        command
+            .create_interaction_response(http, |response| {
+                response
+                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                    .interaction_response_data(|message| message.add_embed(embed))
+            })
+            .await,
+    );
+}
+
+async fn _send_response(
+    http: &Arc<Http>,
+    result: Result<CreateEmbed, String>,
+    command: &ApplicationCommandInteraction,
+) {
+    match result {
+        Ok(embed) => {
+            _make_response(http, embed, command).await;
+        }
+        Err(why) => {
+            let mut embed = default_embed();
+            set_defaults_for_error(&mut embed, &why);
+            _make_response(http, embed, command).await;
         }
     };
 }

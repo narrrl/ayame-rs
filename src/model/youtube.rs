@@ -3,7 +3,8 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::string::ToString;
 use strum_macros::Display;
-use tracing::error;
+
+use crate::error::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct YoutubeResult {
@@ -172,7 +173,7 @@ impl YoutubeSearch {
     }
 
     #[allow(dead_code)]
-    pub async fn search(&self, querry: &str) -> std::result::Result<YoutubeResponse, SearchError> {
+    pub async fn search(&self, querry: &str) -> std::result::Result<YoutubeResponse, Error> {
         let mut url = String::from("https://www.googleapis.com/youtube/v3/search?part=snippet");
         url.push_str(&format!("&q={}", querry));
         if let Some(amount) = self.amount {
@@ -187,8 +188,10 @@ impl YoutubeSearch {
         let res = match reqwest::get(&url).await {
             Ok(res) => res,
             Err(why) => {
-                error!("youtube search failed to send request: {:?}", why);
-                return Err(SearchError::new(ErrorType::Unkown));
+                return Err(Error::from(format!(
+                    "youtube search  failed to send request: {:?}",
+                    why
+                )));
             }
         };
 
@@ -197,60 +200,33 @@ impl YoutubeSearch {
         let body = match res.text().await {
             Ok(body) => body,
             Err(why) => {
-                error!("youtube search failed to parse body: {:?}", why);
-                return Err(SearchError::new(ErrorType::Unkown));
+                return Err(Error::from(format!(
+                    "youtube search failed to parse body: {:?}",
+                    why
+                )));
             }
         };
         if !status.eq(&StatusCode::OK) {
-            error!("youtube search failed with wrong status code: {:?}", body);
-            return Err(SearchError::new(ErrorType::Invalid));
+            return Err(Error::from(format!(
+                "youtube search failed with wrong status code: {:?}",
+                status
+            )));
         }
 
         let res: YoutubeResponse = match serde_json::from_str(&body) {
             Ok(res) => res,
             Err(why) => {
-                error!("youtube search failed to parse from json: {:?}", why);
-                return Err(SearchError::new(ErrorType::Parse));
+                return Err(Error::from(format!(
+                    "youtube search failed to parse from json: {:?}",
+                    why
+                )));
             }
         };
         Ok(res)
     }
 }
 
-#[derive(Debug)]
-pub struct SearchError {
-    error_type: ErrorType,
-    descr: String,
-}
-
-impl SearchError {
-    pub fn new(error_type: ErrorType) -> SearchError {
-        let descr = error_type.to_string();
-        SearchError { error_type, descr }
-    }
-}
-
-#[derive(Display, Debug)]
-#[strum(serialize_all = "lowercase")]
-pub enum ErrorType {
-    Unkown,
-    Invalid,
-    Parse,
-}
-impl std::fmt::Display for SearchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.descr)
-    }
-}
-
-impl std::error::Error for SearchError {
-    fn description(&self) -> &str {
-        self.descr.as_ref()
-    }
-}
-
-unsafe impl Send for SearchError {}
-
+#[allow(dead_code)]
 pub fn hyperlink_result(result: &YoutubeResult) -> String {
     format!(
         "[{} - {}]({})",
