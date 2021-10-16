@@ -17,6 +17,7 @@ use tracing::error;
 use crate::framework;
 use crate::model;
 use crate::model::discord_utils::{default_embed, set_defaults_for_error};
+use crate::model::youtube::*;
 
 use super::music::_get_songbird;
 
@@ -60,6 +61,7 @@ pub fn get_slash_handler() -> SlashCommandHandler {
     handler.add_migration(Box::new(Playing));
     handler.add_migration(Box::new(Pause));
     handler.add_migration(Box::new(Resume));
+    handler.add_migration(Box::new(Search));
     handler
 }
 
@@ -84,6 +86,7 @@ struct Deafen;
 struct Playing;
 struct Pause;
 struct Resume;
+struct Search;
 
 #[async_trait]
 impl SlashCommand for Play {
@@ -435,6 +438,115 @@ async fn _send_response(
     };
 }
 
+#[async_trait]
+impl SlashCommand for Search {
+    fn alias(&self) -> String {
+        String::from("search")
+    }
+
+    async fn run(&self, ctx: Context, command: ApplicationCommandInteraction) -> CommandResult {
+        let options = command
+            .data
+            .options
+            .get(0)
+            .expect("Expected user option")
+            .resolved
+            .as_ref()
+            .expect("Expected String object");
+        if let ApplicationCommandInteractionDataOptionValue::String(search_term) = options {
+            let guild_id = command.guild_id.unwrap();
+            let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
+            let manager = _get_songbird(&ctx).await;
+            let channel_id = command.channel_id;
+
+            let conf = &crate::CONFIG;
+            let mut req = YoutubeSearch::new(&conf.youtube_api_key());
+            req.set_amount(5).set_filter(Type::VIDEO);
+
+            let res = match req.search(search_term).await {
+                Ok(res) => res,
+                Err(_) => {
+                    let mut e = default_embed();
+                    set_defaults_for_error(&mut e, "fatal error creating search");
+                    _send_response(&ctx.http, Ok(e), &command).await;
+                    return Ok(());
+                }
+            };
+
+            if res.results().is_empty() {
+                let mut e = default_embed();
+                set_defaults_for_error(&mut e, "noting found");
+                _send_response(&ctx.http, Ok(e), &command).await;
+                return Ok(());
+            }
+
+            let mut e = default_embed();
+            e.title("Select a result:");
+            e.description("Type the according number to select the song.");
+            for (i, result) in res.results().iter().enumerate() {
+                if i == 0 {
+                    e.image(&result.thumbnail().url());
+                }
+                e.field(&format!("Index: {}", i), hyperlink_result(result), false);
+            }
+            _send_response(&ctx.http, Ok(e), &command).await;
+
+            let choice: &YoutubeResult = match &command
+                .user
+                .await_reply(&ctx)
+                .timeout(std::time::Duration::from_secs(15))
+                .await
+            {
+                Some(answer) => {
+                    let content = answer.content_safe(&ctx.cache).await;
+                    if let Ok(index) = content.parse::<usize>() {
+                        if index < res.results().len() {
+                            // unwrap because index < len
+                            res.results().get(index).unwrap()
+                        } else {
+                            return Ok(());
+                        }
+                    } else {
+                        return Ok(());
+                    }
+                }
+                None => {
+                    return Ok(());
+                }
+            };
+
+            // TODO: fix duplicated code
+            if manager.get(guild_id).is_none() {
+                let author_id = command.user.id;
+                let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
+                let is_error = result.is_err();
+                _send_message(&ctx.http, result, channel_id).await;
+                if is_error {
+                    return Ok(());
+                }
+            }
+            let result = framework::music::play(&ctx, &guild, choice.url()).await;
+            _send_message(&ctx.http, result, channel_id).await;
+        }
+        Ok(())
+    }
+
+    fn create_application<'a>(
+        &self,
+        command: &'a mut CreateApplicationCommand,
+    ) -> &'a mut CreateApplicationCommand {
+        command
+            .description("Searches for music on Youtube")
+            .create_option(|option| {
+                option
+                    .name("querry")
+                    .description("The search term")
+                    .kind(ApplicationCommandOptionType::String)
+                    .required(true)
+            });
+        command
+    }
+}
 async fn _send_message(
     http: &Arc<Http>,
     result: Result<CreateEmbed, String>,

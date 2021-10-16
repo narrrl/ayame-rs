@@ -10,6 +10,7 @@ use serenity::{
 
 use crate::framework;
 use crate::model::discord_utils::*;
+// use crate::model::youtube::*;
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -199,6 +200,89 @@ async fn loop_song(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     )
     .await
 }
+
+// #[command("search")]
+// #[only_in(guilds)]
+// #[description("Searches for songs on youtube")]
+// #[min_args(1)]
+// async fn search(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+//     let guild_id = msg.guild_id.unwrap();
+//     let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
+//     let manager = framework::music::_get_songbird(&ctx).await;
+//     let channel_id = msg.channel_id;
+//
+//     let conf = &crate::CONFIG;
+//     let mut req = YoutubeSearch::new(&conf.youtube_api_key());
+//     req.set_amount(5).set_filter(Type::VIDEO);
+//
+//     let search_term = args.message();
+//
+//     let res = match req.search(search_term).await {
+//         Ok(res) => res,
+//         Err(_) => {
+//             let mut e = default_embed();
+//             set_defaults_for_error(&mut e, "fatal error creating search");
+//             _send_response(&channel_id, &ctx.http, Ok(e)).await;
+//             return Ok(());
+//         }
+//     };
+//
+//     if res.results().is_empty() {
+//         let mut e = default_embed();
+//         set_defaults_for_error(&mut e, "noting found");
+//         _send_response(&channel_id, &ctx.http, Ok(e)).await;
+//         return Ok(());
+//     }
+//
+//     let mut e = default_embed();
+//     e.title("Select a result:");
+//     e.description("Type the according number to select the song.");
+//     for (i, result) in res.results().iter().enumerate() {
+//         if i == 0 {
+//             e.image(&result.thumbnail().url());
+//         }
+//         e.field(&format!("Index: {}", i), hyperlink_result(result), false);
+//     }
+//
+//     _send_response(&channel_id, &ctx.http, Ok(e)).await;
+//     let choice: &YoutubeResult = match &msg
+//         .author
+//         .await_reply(&ctx)
+//         .timeout(std::time::Duration::from_secs(15))
+//         .await
+//     {
+//         Some(answer) => {
+//             let content = answer.content_safe(&ctx.cache).await;
+//             if let Ok(index) = content.parse::<usize>() {
+//                 if index < res.results().len() {
+//                     // unwrap because index < len
+//                     res.results().get(index).unwrap()
+//                 } else {
+//                     return Ok(());
+//                 }
+//             } else {
+//                 return Ok(());
+//             }
+//         }
+//         None => {
+//             return Ok(());
+//         }
+//     };
+//
+//     // TODO: fix duplicated code
+//     if manager.get(guild_id).is_none() {
+//         let author_id = msg.author.id;
+//         let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
+//         let is_error = result.is_err();
+//         _send_response(&channel_id, &ctx.http, result).await;
+//         if is_error {
+//             return Ok(());
+//         }
+//     }
+//     let result = framework::music::play(&ctx, &guild, choice.url()).await;
+//     _send_response(&channel_id, &ctx.http, result).await;
+//     Ok(())
+// }
 
 async fn _send_response(
     channel_id: &ChannelId,

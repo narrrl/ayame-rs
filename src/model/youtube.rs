@@ -1,9 +1,11 @@
 use chrono::{DateTime, Utc};
+// use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::string::ToString;
 use strum_macros::Display;
+use tracing::error;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct YoutubeResult {
     kind: String,
     etag: String,
@@ -11,14 +13,14 @@ pub struct YoutubeResult {
     snippet: Snippet,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Id {
     kind: String,
     #[serde(rename = "videoId", alias = "channelId", alias = "playlistId")]
     id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Snippet {
     #[serde(rename = "publishedAt")]
     published_at: String,
@@ -31,14 +33,14 @@ pub struct Snippet {
     channel_title: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Thumbnails {
     default: Thumbnail,
     medium: Thumbnail,
     high: Thumbnail,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Thumbnail {
     url: String,
     width: Option<i32>,
@@ -119,7 +121,7 @@ impl YoutubeResult {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct YoutubeResponse {
     items: Vec<YoutubeResult>,
 }
@@ -170,10 +172,7 @@ impl YoutubeSearch {
     }
 
     #[allow(dead_code)]
-    pub async fn search(
-        &self,
-        querry: &str,
-    ) -> std::result::Result<YoutubeResponse, Box<dyn std::error::Error>> {
+    pub async fn search(&self, querry: &str) -> std::result::Result<YoutubeResponse, SearchError> {
         let mut url = String::from("https://www.googleapis.com/youtube/v3/search?part=snippet");
         url.push_str(&format!("&q={}", querry));
         if let Some(amount) = self.amount {
@@ -185,12 +184,80 @@ impl YoutubeSearch {
             _ => url.push_str(&format!("&type={}", self.result_type)),
         };
 
-        let res = reqwest::get(&url).await?;
-        let body = res.text().await?;
+        let res = match reqwest::get(&url).await {
+            Ok(res) => res,
+            Err(why) => {
+                error!("youtube search failed to send request: {:?}", why);
+                return Err(SearchError::new(ErrorType::Unkown));
+            }
+        };
 
-        let res: YoutubeResponse = serde_json::from_str(&body)?;
+        // let status = res.status();
+
+        let body = match res.text().await {
+            Ok(body) => body,
+            Err(why) => {
+                error!("youtube search failed to parse body: {:?}", why);
+                return Err(SearchError::new(ErrorType::Unkown));
+            }
+        };
+        // if !status.eq(&StatusCode::FOUND) {
+        //     error!("youtube search failed with wrong status code: {:?}", body);
+        //     return Err(SearchError::new(ErrorType::Invalid));
+        // }
+
+        let res: YoutubeResponse = match serde_json::from_str(&body) {
+            Ok(res) => res,
+            Err(why) => {
+                error!("youtube search failed to parse from json: {:?}", why);
+                return Err(SearchError::new(ErrorType::Parse));
+            }
+        };
         Ok(res)
     }
+}
+
+#[derive(Debug)]
+pub struct SearchError {
+    error_type: ErrorType,
+    descr: String,
+}
+
+impl SearchError {
+    pub fn new(error_type: ErrorType) -> SearchError {
+        let descr = error_type.to_string();
+        SearchError { error_type, descr }
+    }
+}
+
+#[derive(Display, Debug)]
+#[strum(serialize_all = "lowercase")]
+pub enum ErrorType {
+    Unkown,
+    Invalid,
+    Parse,
+}
+impl std::fmt::Display for SearchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.descr)
+    }
+}
+
+impl std::error::Error for SearchError {
+    fn description(&self) -> &str {
+        self.descr.as_ref()
+    }
+}
+
+unsafe impl Send for SearchError {}
+
+pub fn hyperlink_result(result: &YoutubeResult) -> String {
+    format!(
+        "[{} - {}]({})",
+        result.title(),
+        result.channel_name(),
+        result.url()
+    )
 }
 
 #[cfg(test)]
