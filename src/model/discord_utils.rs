@@ -67,6 +67,7 @@ pub struct SelectMenu<'a> {
     pages: &'a Vec<CreateMessage<'a>>,
     options: MusicSelectOptions,
     has_selected: bool,
+    was_canceled: bool,
 }
 
 impl<'a> SelectMenu<'a> {
@@ -84,6 +85,7 @@ impl<'a> SelectMenu<'a> {
             pages,
             options,
             has_selected: false,
+            was_canceled: false,
         }
     }
 
@@ -95,6 +97,8 @@ impl<'a> SelectMenu<'a> {
         loop {
             if self.has_selected {
                 break;
+            } else if self.was_canceled {
+                return Err(Error::from("selection was canceled by user"));
             }
             match self.work().await {
                 Ok((index, reaction)) => match self.options.controls.get(index) {
@@ -247,6 +251,7 @@ impl Default for MusicSelectOptions {
         let controls = vec![
             Control::new('◀'.into(), Arc::new(|m, r| Box::pin(prev_page(m, r)))),
             Control::new('✅'.into(), Arc::new(|m, r| Box::pin(select_page(m, r)))),
+            Control::new('🚫'.into(), Arc::new(|m, r| Box::pin(cancel(m, r)))),
             Control::new('▶'.into(), Arc::new(|m, r| Box::pin(next_page(m, r)))),
         ];
         MusicSelectOptions::new(30, controls)
@@ -295,6 +300,10 @@ pub async fn prev_page(menu: &mut SelectMenu<'_>, reaction: Reaction) {
 
 pub async fn select_page(menu: &mut SelectMenu<'_>, _reaction: Reaction) {
     menu.has_selected = true;
+}
+
+pub async fn cancel(menu: &mut SelectMenu<'_>, _reaction: Reaction) {
+    menu.was_canceled = true;
 }
 
 pub async fn add_reactions(ctx: &Context, msg: &Message, emojis: Vec<ReactionType>) -> Result<()> {
