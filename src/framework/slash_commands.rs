@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use serenity::builder::{CreateApplicationCommand, CreateApplicationCommands, CreateEmbed};
+use serenity::builder::{
+    CreateApplicationCommand, CreateApplicationCommands, CreateEmbed, CreateMessage,
+};
 use serenity::client::Context;
 use serenity::framework::standard::CommandResult;
 use serenity::http::Http;
@@ -16,7 +18,9 @@ use tracing::error;
 
 use crate::framework;
 use crate::model;
-use crate::model::discord_utils::{default_embed, set_defaults_for_error};
+use crate::model::discord_utils::{
+    default_embed, set_defaults_for_error, MusicSelectOptions, SelectMenu,
+};
 use crate::model::youtube::*;
 
 use super::music::_get_songbird;
@@ -458,6 +462,7 @@ impl SlashCommand for Search {
             let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
             let manager = _get_songbird(&ctx).await;
             let channel_id = command.channel_id;
+            let author_id = command.user.id;
 
             let conf = &crate::CONFIG;
             let mut req = YoutubeSearch::new(&conf.youtube_api_key());
@@ -480,40 +485,44 @@ impl SlashCommand for Search {
                 return Ok(());
             }
 
-            let mut e = default_embed();
-            e.title("Select a result:");
-            e.description("Type the according number to select the song.");
-            for (i, result) in res.results().iter().enumerate() {
-                if i == 0 {
-                    e.image(&result.thumbnail().url());
-                }
-                e.field(&format!("Index: {}", i), hyperlink_result(result), false);
-            }
-            _send_response(&ctx.http, Ok(e), &command).await;
+            let mut pages = vec![];
+            let mut first_page = default_embed();
+            for (index, result) in res.results().iter().enumerate() {
+                let mut e = default_embed();
+                e.title(&result.title());
+                e.url(&result.url());
+                e.thumbnail(result.thumbnail().url());
+                e.field(
+                    "Title:",
+                    &format!("[{}]({})", result.title(), result.url()),
+                    false,
+                );
+                e.field(
+                    "Channel:",
+                    &format!("[{}]({})", result.channel_name(), result.channel_url()),
+                    false,
+                );
 
-            let choice: &YoutubeResult = match &command
-                .user
-                .await_reply(&ctx)
-                .timeout(std::time::Duration::from_secs(15))
-                .await
-            {
-                Some(answer) => {
-                    let content = answer.content_safe(&ctx.cache).await;
-                    if let Ok(index) = content.parse::<usize>() {
-                        if index < res.results().len() {
-                            // unwrap because index < len
-                            res.results().get(index).unwrap()
-                        } else {
-                            return Ok(());
-                        }
-                    } else {
-                        return Ok(());
-                    }
+                e.field("Published:", result.time_published().to_rfc2822(), false);
+                let mut mes = CreateMessage::default();
+                if index == 0 {
+                    first_page = e.clone();
                 }
-                None => {
-                    return Ok(());
-                }
-            };
+                mes.set_embed(e);
+                pages.push(mes);
+            }
+            _send_response(&ctx.http, Ok(first_page), &command).await;
+
+            let msg = command.get_interaction_response(&ctx.http).await.unwrap();
+
+            let mut options = MusicSelectOptions::default();
+            options.set_message(msg);
+
+            let menu = SelectMenu::new(&ctx, &author_id, &channel_id, &pages, options);
+
+            let (index, _) = menu.run().await?;
+
+            let choice = res.results().get(index).unwrap();
 
             // TODO: fix duplicated code
             if manager.get(guild_id).is_none() {

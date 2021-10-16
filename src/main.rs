@@ -1,5 +1,6 @@
 // commands
 mod commands;
+mod error;
 
 // models like the youtube downloader
 mod model;
