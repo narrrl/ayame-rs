@@ -14,7 +14,7 @@ use chrono::{offset::Local, Timelike};
 use configuration::Config;
 use serenity::{
     async_trait,
-    model::{gateway::Activity, id::GuildId, Permissions},
+    model::{gateway::Activity, guild::Guild, id::GuildId, Permissions},
 };
 use serenity::{
     client::bridge::gateway::{GatewayIntents, ShardManager},
@@ -49,6 +49,8 @@ use commands::{admin::*, general::*, music::*, owner::*};
 use framework::slash_commands::*;
 
 use lazy_static::*;
+
+use crate::model::discord_utils::check_msg;
 
 pub const COLOR: &str = "#EE0E61";
 pub const COLOR_ERROR: &str = "#CC0000";
@@ -98,6 +100,23 @@ struct Handler {
 // TODO: this is the ugliest code i've ever written
 #[async_trait]
 impl EventHandler for Handler {
+    async fn guild_create(&self, ctx: Context, guild: Guild, is_new: bool) {
+        if !is_new {
+            return;
+        }
+        info!("bot joined guild: {:?}, creating slash commands", guild.id);
+        for cmd in get_all_create_commands(Scope::GUILD).iter() {
+            check_msg(
+                guild
+                    .id
+                    .create_application_command(&ctx.http, |command| {
+                        command.clone_from(&cmd);
+                        command
+                    })
+                    .await,
+            );
+        }
+    }
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             let key = command.data.name.as_str().to_string();
@@ -110,14 +129,12 @@ impl EventHandler for Handler {
         }
     }
     async fn ready(&self, ctx: Context, ready: Ready) {
-        if let Err(why) =
+        check_msg(
             ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
                 create_commands(commands)
             })
-            .await
-        {
-            error!("couldn't create global application commands: {:?}", why);
-        }
+            .await,
+        );
         let guilds = ctx.cache.guilds().await;
         let commands = get_all_create_commands(Scope::GLOBAL);
         for id in guilds.iter() {
@@ -127,18 +144,13 @@ impl EventHandler for Handler {
             info!("creating application commands for guild: {:?}", &id);
             tokio::spawn(async move {
                 for cmd in all_cmd.iter() {
-                    if let Err(why) = id
-                        .create_application_command(&http, |command| {
+                    check_msg(
+                        id.create_application_command(&http, |command| {
                             command.clone_from(&cmd);
                             command
                         })
-                        .await
-                    {
-                        error!(
-                            "couldn't create application command for guild {:?}: {:?}",
-                            id, why
-                        );
-                    }
+                        .await,
+                    );
                 }
             });
         }
