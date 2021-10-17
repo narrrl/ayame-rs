@@ -481,7 +481,14 @@ impl SlashCommand for Search {
                     false,
                 );
 
-                e.field("Published:", result.time_published().to_rfc2822(), false);
+                e.field(
+                    "Published:",
+                    result
+                        .time_published()
+                        .format("%H:%M, %a %Y-%m-%d")
+                        .to_string(),
+                    false,
+                );
                 let mut mes = CreateMessage::default();
                 // we use the top search result as the first page
                 if index == 0 {

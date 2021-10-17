@@ -4,7 +4,6 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::string::ToString;
 use strum_macros::Display;
-use tracing::info;
 use url::Url;
 
 use crate::error::Error;
@@ -210,7 +209,6 @@ impl YoutubeSearch {
         let query = self._build_query(query);
         url.set_query(Some(&query));
         let url_string = url.to_string();
-        info!("created url {}", &url_string);
 
         let res = match reqwest::get(&url_string).await {
             Ok(res) => res,
