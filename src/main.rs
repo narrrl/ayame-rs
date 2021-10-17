@@ -135,8 +135,9 @@ impl EventHandler for Handler {
             })
             .await,
         );
+
         let guilds = ctx.cache.guilds().await;
-        let commands = get_all_create_commands(Scope::GLOBAL);
+        let commands = get_all_create_commands(Scope::GUILD);
         for id in guilds.iter() {
             let id = id.clone();
             let http = ctx.http.clone();
