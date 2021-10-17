@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
+use html_escape;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::string::ToString;
 use strum_macros::Display;
+use tracing::info;
+use url::Url;
 
 use crate::error::Error;
 
@@ -74,7 +77,7 @@ impl YoutubeResult {
 
     #[allow(dead_code)]
     pub fn title(&self) -> String {
-        self.snippet.title.clone()
+        html_escape::decode_html_entities(&self.snippet.title).to_string()
     }
 
     #[allow(dead_code)]
@@ -87,7 +90,7 @@ impl YoutubeResult {
 
     #[allow(dead_code)]
     pub fn channel_name(&self) -> String {
-        self.snippet.channel_title.clone()
+        html_escape::decode_html_entities(&self.snippet.channel_title).to_string()
     }
 
     #[allow(dead_code)]
@@ -148,6 +151,7 @@ pub struct YoutubeSearch {
     api_key: String,
     amount: Option<u8>,
     result_type: Type,
+    queries: Vec<(String, String)>,
 }
 
 impl YoutubeSearch {
@@ -157,6 +161,7 @@ impl YoutubeSearch {
             api_key: api_key.to_string(),
             amount: None,
             result_type: Type::NONE,
+            queries: vec![],
         }
     }
 
@@ -173,23 +178,45 @@ impl YoutubeSearch {
     }
 
     #[allow(dead_code)]
-    pub async fn search(&self, querry: &str) -> std::result::Result<YoutubeResponse, Error> {
-        let mut url = String::from("https://www.googleapis.com/youtube/v3/search?part=snippet");
-        url.push_str(&format!("&q={}", querry));
+    pub fn add_query<'a>(&'a mut self, query: &str, data: &str) -> &'a mut Self {
+        self.queries.push((String::from(query), String::from(data)));
+        self
+    }
+
+    #[allow(dead_code)]
+    fn _build_query(&self, search_term: &str) -> String {
+        let mut query = String::new();
+        query.push_str("part=snippet");
+        query.push_str(&format!("&q={}", search_term));
         if let Some(amount) = self.amount {
-            url.push_str(&format!("&maxResults={}", amount));
+            query.push_str(&format!("&maxResults={}", amount));
         }
-        url.push_str(&format!("&key={}", self.api_key));
         match self.result_type {
             Type::NONE => (),
-            _ => url.push_str(&format!("&type={}", self.result_type)),
+            _ => query.push_str(&format!("&type={}", self.result_type)),
         };
+        query.push_str(&format!("&key={}", self.api_key));
 
-        let res = match reqwest::get(&url).await {
+        for (q, d) in self.queries.iter() {
+            query.push_str(&format!("&{}={}", q, d));
+        }
+
+        query
+    }
+
+    #[allow(dead_code)]
+    pub async fn search(&self, query: &str) -> std::result::Result<YoutubeResponse, Error> {
+        let mut url = Url::parse("https://www.googleapis.com/youtube/v3/search").unwrap();
+        let query = self._build_query(query);
+        url.set_query(Some(&query));
+        let url_string = url.to_string();
+        info!("created url {}", &url_string);
+
+        let res = match reqwest::get(&url_string).await {
             Ok(res) => res,
             Err(why) => {
                 return Err(Error::from(format!(
-                    "youtube search  failed to send request: {:?}",
+                    "youtube search failed to send request: {:?}",
                     why
                 )));
             }
@@ -228,6 +255,9 @@ impl YoutubeSearch {
 
 #[allow(dead_code)]
 pub fn hyperlink_result(result: &YoutubeResult) -> String {
+    if let Type::CHANNEL = result.result_type() {
+        return format!("[{}]({})", result.title(), result.url(),);
+    }
     format!(
         "[{} - {}]({})",
         result.title(),
