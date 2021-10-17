@@ -71,8 +71,10 @@ dependencies = [
  "futures-io",
  "futures-util",
  "log",
+ "native-tls",
  "pin-project",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls",
  "tungstenite 0.11.1",
  "webpki-roots 0.20.0",
@@ -350,12 +352,6 @@ dependencies = [
  "pnet_macros",
  "pnet_macros_support",
 ]
-
-[[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
 name = "either"
@@ -998,7 +994,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dotenv",
  "fs_extra",
  "html-escape",
  "humantime",
@@ -1951,9 +1946,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.11.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4efe6fc2395938c8155973d7be49fe8d03a843726e285e100a8a383cc0154ce"
+checksum = "c2c2416fdedca8443ae44b4527de1ea633af61d8f7169ffa6e72c5b53d24efcc"
 dependencies = [
  "autocfg",
  "bytes 1.1.0",
@@ -1962,6 +1957,7 @@ dependencies = [
  "mio",
  "num_cpus",
  "once_cell",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "tokio-macros",
@@ -2134,6 +2130,7 @@ dependencies = [
  "httparse",
  "input_buffer 0.3.1",
  "log",
+ "native-tls",
  "rand 0.7.3",
  "sha-1",
  "url",

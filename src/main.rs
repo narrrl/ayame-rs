@@ -110,15 +110,38 @@ impl EventHandler for Handler {
         }
     }
     async fn ready(&self, ctx: Context, ready: Ready) {
-        let commands = ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
-            create_commands(commands)
-        })
-        .await;
-
-        println!(
-            "I now have the following global slash commands {:#?}",
-            commands
-        );
+        if let Err(why) =
+            ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
+                create_commands(commands)
+            })
+            .await
+        {
+            error!("couldn't create global application commands: {:?}", why);
+        }
+        let guilds = ctx.cache.guilds().await;
+        let commands = get_all_create_commands(Scope::GLOBAL);
+        for id in guilds.iter() {
+            let id = id.clone();
+            let http = ctx.http.clone();
+            let all_cmd = commands.clone();
+            info!("creating application commands for guild: {:?}", &id);
+            tokio::spawn(async move {
+                for cmd in all_cmd.iter() {
+                    if let Err(why) = id
+                        .create_application_command(&http, |command| {
+                            command.clone_from(&cmd);
+                            command
+                        })
+                        .await
+                    {
+                        error!(
+                            "couldn't create application command for guild {:?}: {:?}",
+                            id, why
+                        );
+                    }
+                }
+            });
+        }
         info!("Connected as {}", ready.user.name);
     }
 

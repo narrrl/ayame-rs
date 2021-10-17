@@ -23,6 +23,12 @@ use crate::model::youtube::*;
 
 use super::music::_get_songbird;
 
+#[derive(PartialEq)]
+pub enum Scope {
+    GUILD,
+    GLOBAL,
+}
+
 ///
 /// This trait represents a slash command
 ///
@@ -36,6 +42,7 @@ use super::music::_get_songbird;
 ///
 #[async_trait]
 pub trait SlashCommand {
+    fn scope(&self) -> Scope;
     fn alias(&self) -> String;
     async fn run(&self, ctx: Context, command: ApplicationCommandInteraction) -> CommandResult;
     fn create_application<'a>(
@@ -101,15 +108,30 @@ pub fn get_slash_handler() -> SlashCommandHandler {
 pub fn create_commands(commands: &mut CreateApplicationCommands) -> &mut CreateApplicationCommands {
     // we iterate over every command
     for slash in get_slash_handler().commands.iter() {
-        commands.create_application_command(|command| {
-            // get the command name from the alias
-            command.name(slash.alias());
-            // invoke the method to create the whole command
-            slash.create_application(command)
-        });
+        if let Scope::GLOBAL = slash.scope() {
+            commands.create_application_command(|command| {
+                // get the command name from the alias
+                command.name(slash.alias());
+                // invoke the method to create the whole command
+                slash.create_application(command)
+            });
+        }
     }
     // return all [`CreateApplicationCommand`] as [`CreateApplicationCommands`]
     commands
+}
+
+pub fn get_all_create_commands(filter: Scope) -> Vec<CreateApplicationCommand> {
+    let mut vec = vec![];
+    for slash in get_slash_handler().commands.iter() {
+        if filter.eq(&slash.scope()) {
+            let mut cmd = CreateApplicationCommand::default();
+            cmd.name(slash.alias());
+            slash.create_application(&mut cmd);
+            vec.push(cmd);
+        }
+    }
+    vec
 }
 
 // our [`SlashCommand`]'s
@@ -132,6 +154,9 @@ struct Search;
 
 #[async_trait]
 impl SlashCommand for Play {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("play")
     }
@@ -190,6 +215,9 @@ impl SlashCommand for Play {
 
 #[async_trait]
 impl SlashCommand for Mock {
+    fn scope(&self) -> Scope {
+        Scope::GLOBAL
+    }
     fn alias(&self) -> String {
         String::from("mock")
     }
@@ -233,6 +261,9 @@ impl SlashCommand for Mock {
 
 #[async_trait]
 impl SlashCommand for Invite {
+    fn scope(&self) -> Scope {
+        Scope::GLOBAL
+    }
     fn alias(&self) -> String {
         String::from("invite")
     }
@@ -253,6 +284,9 @@ impl SlashCommand for Invite {
 }
 #[async_trait]
 impl SlashCommand for Join {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("join")
     }
@@ -278,6 +312,9 @@ impl SlashCommand for Join {
 
 #[async_trait]
 impl SlashCommand for Leave {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("leave")
     }
@@ -300,6 +337,9 @@ impl SlashCommand for Leave {
 
 #[async_trait]
 impl SlashCommand for Skip {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("skip")
     }
@@ -322,6 +362,9 @@ impl SlashCommand for Skip {
 
 #[async_trait]
 impl SlashCommand for Mute {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("mute")
     }
@@ -344,6 +387,9 @@ impl SlashCommand for Mute {
 
 #[async_trait]
 impl SlashCommand for Deafen {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("deafen")
     }
@@ -366,6 +412,9 @@ impl SlashCommand for Deafen {
 
 #[async_trait]
 impl SlashCommand for Playing {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("playing")
     }
@@ -388,6 +437,9 @@ impl SlashCommand for Playing {
 
 #[async_trait]
 impl SlashCommand for Pause {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("pause")
     }
@@ -409,6 +461,9 @@ impl SlashCommand for Pause {
 }
 #[async_trait]
 impl SlashCommand for Resume {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("resume")
     }
@@ -431,6 +486,9 @@ impl SlashCommand for Resume {
 
 #[async_trait]
 impl SlashCommand for Search {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
     fn alias(&self) -> String {
         String::from("search")
     }
