@@ -98,6 +98,7 @@ impl<'a> SelectMenu<'a> {
             if self.has_selected {
                 break;
             } else if self.was_canceled {
+                let _ = self.clean_reactions().await;
                 return Err(Error::from("selection was canceled by user"));
             }
             match self.work().await {
@@ -118,6 +119,7 @@ impl<'a> SelectMenu<'a> {
             }
         }
 
+        let _ = self.clean_reactions().await;
         Ok((self.options.current_page, self.options.message))
     }
 
