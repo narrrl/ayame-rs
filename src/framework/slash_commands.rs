@@ -79,28 +79,30 @@ impl SlashCommandHandler {
     pub fn find<'a>(&'a self, key: &'a str) -> Option<&'a Box<dyn SlashCommand + Sync + Send>> {
         return self.commands.iter().find(|c| c.alias().eq(key));
     }
-}
 
-///
-/// Gets a [`SlashCommandHandler`] with all [`SlashCommand`]'s
-///
-pub fn get_slash_handler() -> SlashCommandHandler {
-    let mut handler = SlashCommandHandler::new();
-    handler.add_migration(Box::new(Play));
-    handler.add_migration(Box::new(Join));
-    handler.add_migration(Box::new(Invite));
-    handler.add_migration(Box::new(Mock));
-    handler.add_migration(Box::new(Leave));
-    handler.add_migration(Box::new(Skip));
-    handler.add_migration(Box::new(Mute));
-    handler.add_migration(Box::new(Deafen));
-    handler.add_migration(Box::new(Playing));
-    handler.add_migration(Box::new(Pause));
-    handler.add_migration(Box::new(Resume));
-    handler.add_migration(Box::new(Search));
-    handler
-}
+    pub fn get_all_create_commands(&self, filter: Scope) -> Vec<CreateApplicationCommand> {
+        let mut vec = vec![];
+        for slash in self.commands.iter() {
+            if filter.eq(&slash.scope()) {
+                let mut cmd = CreateApplicationCommand::default();
+                cmd.name(slash.alias());
+                slash.create_application(&mut cmd);
+                vec.push(cmd);
+            }
+        }
+        vec
+    }
 
+    pub fn get_all_aliases<'a>(&'a self, filter: Scope) -> Vec<String> {
+        let mut vec = vec![];
+        for slash in self.commands.iter() {
+            if filter.eq(&slash.scope()) {
+                vec.push(slash.alias());
+            }
+        }
+        vec
+    }
+}
 ///
 /// Stores all [`CreateApplicationCommand`] in a [`CreateApplicationCommands`] to send them to
 /// discord with one singe invocation
@@ -121,17 +123,24 @@ pub fn create_commands(commands: &mut CreateApplicationCommands) -> &mut CreateA
     commands
 }
 
-pub fn get_all_create_commands(filter: Scope) -> Vec<CreateApplicationCommand> {
-    let mut vec = vec![];
-    for slash in get_slash_handler().commands.iter() {
-        if filter.eq(&slash.scope()) {
-            let mut cmd = CreateApplicationCommand::default();
-            cmd.name(slash.alias());
-            slash.create_application(&mut cmd);
-            vec.push(cmd);
-        }
-    }
-    vec
+///
+/// Gets a [`SlashCommandHandler`] with all [`SlashCommand`]'s
+///
+pub fn get_slash_handler() -> SlashCommandHandler {
+    let mut handler = SlashCommandHandler::new();
+    handler.add_migration(Box::new(Play));
+    handler.add_migration(Box::new(Join));
+    handler.add_migration(Box::new(Invite));
+    handler.add_migration(Box::new(Mock));
+    handler.add_migration(Box::new(Leave));
+    handler.add_migration(Box::new(Skip));
+    handler.add_migration(Box::new(Mute));
+    handler.add_migration(Box::new(Deafen));
+    handler.add_migration(Box::new(Playing));
+    handler.add_migration(Box::new(Pause));
+    handler.add_migration(Box::new(Resume));
+    handler.add_migration(Box::new(Search));
+    handler
 }
 
 // our [`SlashCommand`]'s

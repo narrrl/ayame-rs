@@ -105,7 +105,10 @@ impl EventHandler for Handler {
             return;
         }
         info!("bot joined guild: {:?}, creating slash commands", guild.id);
-        for cmd in get_all_create_commands(Scope::GUILD).iter() {
+        for cmd in get_slash_handler()
+            .get_all_create_commands(Scope::GUILD)
+            .iter()
+        {
             check_msg(
                 guild
                     .id
@@ -136,8 +139,28 @@ impl EventHandler for Handler {
             .await,
         );
 
+        let handler = get_slash_handler();
+        info!(
+            "Found guild commands: {:?}",
+            handler
+                .get_all_aliases(Scope::GLOBAL)
+                .iter()
+                .map(|s| &**s)
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
+
         let guilds = ctx.cache.guilds().await;
-        let commands = get_all_create_commands(Scope::GUILD);
+        let commands = handler.get_all_create_commands(Scope::GUILD);
+        info!(
+            "Found guild commands: {:?}",
+            handler
+                .get_all_aliases(Scope::GUILD)
+                .iter()
+                .map(|s| &**s)
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
         for id in guilds.iter() {
             let id = id.clone();
             let http = ctx.http.clone();
@@ -155,6 +178,7 @@ impl EventHandler for Handler {
                 }
             });
         }
+
         info!("Connected as {}", ready.user.name);
     }
 
