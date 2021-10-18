@@ -12,7 +12,7 @@ use serenity::{
 use songbird::{
     driver::Bitrate,
     id::GuildId,
-    input::{Metadata, Restartable},
+    input::{ytdl, Metadata, Restartable},
     tracks::{PlayMode, TrackHandle},
     Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
 };
@@ -275,6 +275,7 @@ pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmb
 
         // Here, we use lazy restartable sources to make sure that we don't pay
         // for decoding, playback on tracks which aren't actually live yet.
+        let now = std::time::Instant::now();
         let source = match Restartable::ytdl(url, true).await {
             Ok(source) => source,
             Err(why) => {
@@ -283,6 +284,10 @@ pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmb
                 return Err("error sourcing ffmgep".to_string());
             }
         };
+        info!(
+            "Sourcing song took {}",
+            humantime::format_duration(now.elapsed())
+        );
 
         let mut e = default_embed();
         handler.enqueue_source(source.into());
