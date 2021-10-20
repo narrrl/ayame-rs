@@ -141,7 +141,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::play(ctx, &guild, url).await,
+        framework::music::play(ctx, &guild, &msg.channel_id, &msg.author.id, url).await,
     )
     .await
 }

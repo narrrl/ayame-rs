@@ -1,11 +1,15 @@
+use chrono::{DateTime, Utc};
 use serenity::{
     async_trait,
-    builder::{CreateEmbed, CreateMessage},
+    builder::CreateEmbed,
     client::{Cache, Context},
     http::Http,
     model::{
-        guild::Guild, id::UserId, misc::Mentionable, prelude::ChannelId,
-        prelude::GuildId as SerenityGuildId,
+        guild::Guild,
+        id::UserId,
+        misc::Mentionable,
+        prelude::ChannelId,
+        prelude::{GuildId as SerenityGuildId, User},
     },
     prelude::Mutex,
 };
@@ -14,7 +18,7 @@ use songbird::{
     id::GuildId,
     input::{Metadata, Restartable},
     tracks::{PlayMode, TrackHandle},
-    Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
+    Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird,
 };
 use std::{ops::Sub, sync::Arc, time::Duration};
 
@@ -119,7 +123,6 @@ pub async fn join(
     };
 
     let manager = _get_songbird(ctx).await;
-    let is_new_connection = !manager.get(guild_id).is_some();
     let send_http = ctx.http.clone();
     let (handle_lock, success) = manager.join(guild_id, connect_to).await;
 
@@ -136,28 +139,17 @@ pub async fn join(
         return Err("couldn't join the channel".to_string());
     }
     let mut handle = handle_lock.lock().await;
-    if is_new_connection {
-        handle.add_global_event(
-            Event::Track(TrackEvent::End),
-            TrackEndNotifier {
-                chan_id,
-                http: send_http.clone(),
-                guild_id: GuildId::from(guild_id),
-                manager: manager.clone(),
-            },
-        );
-
-        handle.add_global_event(
-            Event::Core(CoreEvent::ClientDisconnect),
-            LeaveWhenAlone {
-                chan_id,
-                cache: ctx.cache.clone(),
-                http: send_http,
-                guild_id: GuildId::from(guild_id),
-                manager,
-            },
-        );
-    }
+    handle.remove_all_global_events();
+    handle.add_global_event(
+        Event::Core(CoreEvent::ClientDisconnect),
+        LeaveWhenAlone {
+            chan_id,
+            cache: ctx.cache.clone(),
+            http: send_http,
+            guild_id: GuildId::from(guild_id),
+            manager,
+        },
+    );
     drop(handle);
     let mut e = default_embed();
     e.description(&format!("Joined {}", connect_to.mention()));
@@ -258,7 +250,13 @@ pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEm
 /// also does directly play if its the first song in queue and
 /// basically sends the [`now_playing`] command to inform the user
 /// that the song started playing
-pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmbed> {
+pub async fn play(
+    ctx: &Context,
+    guild: &Guild,
+    chan_id: &ChannelId,
+    author_id: &UserId,
+    url: String,
+) -> Result<CreateEmbed> {
     let guild_id = guild.id;
     // check if its actually a url
     // TODO: implement yt-search with search terms
@@ -289,11 +287,21 @@ pub async fn play(ctx: &Context, guild: &Guild, url: String) -> Result<CreateEmb
             humantime::format_duration(now.elapsed())
         );
 
-        let mut e = default_embed();
         handler.enqueue_source(source.into());
         let queue = handler.queue().current_queue();
         let track = queue.last().expect("couldn't get handle of queued track");
-        _embed_song(&mut e, track.metadata(), "Added song:");
+        let time = chrono::Utc::now();
+        let _ = track.add_event(
+            Event::Delayed(Duration::from_millis(20)),
+            NowPlaying {
+                http: ctx.http.clone(),
+                chan_id: chan_id.clone(),
+                author_id: author_id.clone(),
+                time,
+            },
+        );
+        let mut e = default_embed();
+        e.title(format!("Added Song to position {}", queue.len()));
         return Ok(e);
     } else {
         return Err(NOT_IN_VOICE_ERROR.to_string());
@@ -362,47 +370,44 @@ pub async fn loop_song(
     }
 }
 
-pub struct TrackEndNotifier {
+pub struct NowPlaying {
     chan_id: ChannelId,
     http: Arc<Http>,
-    guild_id: GuildId,
-    manager: Arc<Songbird>,
+    author_id: UserId,
+    time: DateTime<Utc>,
 }
 
-// TODO: that definetly needs some structure
-// somewhat better, but not the most beautiful code i've ever written
 #[async_trait]
-impl VoiceEventHandler for TrackEndNotifier {
+impl VoiceEventHandler for NowPlaying {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
-        if let EventContext::Track(track_list) = ctx {
-            let skipped_meta = match track_list.first() {
+        if let EventContext::Track(tracks) = ctx {
+            let meta = match tracks.first() {
                 Some((_, handle)) => handle.metadata().clone(),
                 None => {
-                    error!("couldn't get ended song");
-                    return None;
+                    error!("couldn't get song");
+                    return Some(Event::Cancel);
                 }
             };
-            if let Some(handler_lock) = self.manager.get(self.guild_id) {
-                let handler = handler_lock.lock().await;
-                let next_playing = handler
-                    .queue()
-                    .current()
-                    .and_then(|track| Some(track.metadata().clone()));
-                check_msg(
-                    self.chan_id
-                        .send_message(&self.http, |m| {
-                            _create_next_song_embed(m, next_playing, skipped_meta);
-                            m
-                        })
-                        .await,
-                );
+
+            let mut e = default_embed();
+            if let Ok(user) = self.http.get_user(*self.author_id.as_u64()).await {
+                _embed_song_with_author(&mut e, &meta, "Now Playing:", user, &self.time);
+            } else {
+                _embed_song(&mut e, &meta, "Now Playing:");
             }
+            check_msg(
+                self.chan_id
+                    .send_message(&self.http, |m| {
+                        m.set_embed(e);
+                        m
+                    })
+                    .await,
+            );
         }
 
         None
     }
 }
-
 struct LeaveWhenAlone {
     chan_id: ChannelId,
     cache: Arc<Cache>,
@@ -495,24 +500,6 @@ fn _hyperlink_song(data: &Metadata) -> String {
     finished_song
 }
 
-fn _create_next_song_embed(m: &mut CreateMessage, np: Option<Metadata>, sp: Metadata) {
-    let mut e = default_embed();
-    e.field("Finished:", _hyperlink_song(&sp), false);
-    e.field("Duration:", _duration_format(sp.duration), false);
-    if let Some(meta) = np {
-        e.field("Now Playing:", _hyperlink_song(&meta), false);
-        e.field("Duration", _duration_format(meta.duration), false);
-        if let Some(t) = meta.thumbnail {
-            e.image(t);
-        }
-    } else {
-        if let Some(t) = sp.thumbnail {
-            e.image(t);
-        }
-    }
-    m.set_embed(e);
-}
-
 fn _duration_format(duration: Option<Duration>) -> String {
     if let Some(d) = duration {
         if d != Duration::default() {
@@ -545,6 +532,22 @@ fn _embed_song(e: &mut CreateEmbed, track: &Metadata, field_title: &str) {
     if let Some(image) = &track.thumbnail {
         e.image(image);
     }
+}
+
+fn _embed_song_with_author(
+    e: &mut CreateEmbed,
+    track: &Metadata,
+    field_title: &str,
+    user: User,
+    time: &DateTime<Utc>,
+) {
+    e.footer(|f| {
+        f.text(&format!("Song added by {}", user.tag()))
+            .icon_url(user.avatar_url().unwrap_or(user.default_avatar_url()))
+    });
+    e.timestamp(time);
+
+    _embed_song(e, track, field_title);
 }
 
 async fn _get_bitrate_for_channel(channel: songbird::id::ChannelId, http: &Arc<Http>) -> i32 {

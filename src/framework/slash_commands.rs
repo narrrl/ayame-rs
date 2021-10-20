@@ -192,7 +192,14 @@ impl SlashCommand for Play {
                 }
             }
             // we execute the play command
-            let result = framework::music::play(&ctx, &guild, text.to_string()).await;
+            let result = framework::music::play(
+                &ctx,
+                &guild,
+                &channel_id,
+                &command.user.id,
+                text.to_string(),
+            )
+            .await;
             // check if the application command already responded
             if already_responded {
                 // if yes, we simply send a messag
@@ -536,7 +543,7 @@ impl SlashCommand for Search {
             let mut first_page = default_embed();
             for (index, result) in res.results().iter().enumerate() {
                 let mut e = default_embed();
-                e.thumbnail(result.thumbnail().url());
+                e.image(result.thumbnail().url());
                 e.field(
                     "Title:",
                     &format!("[{}]({})", result.title(), result.url()),
@@ -590,14 +597,14 @@ impl SlashCommand for Search {
             if manager.get(guild_id).is_none() {
                 let author_id = command.user.id;
                 let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
-                let is_error = result.is_err();
-                _send_message(&ctx.http, result, channel_id).await;
-                if is_error {
+                if result.is_err() {
                     return Ok(());
                 }
             }
             // and then we queue the desired song
-            let result = framework::music::play(&ctx, &guild, choice.url()).await;
+            let result =
+                framework::music::play(&ctx, &guild, &channel_id, &command.user.id, choice.url())
+                    .await;
             _send_message(&ctx.http, result, channel_id).await;
         }
         Ok(())

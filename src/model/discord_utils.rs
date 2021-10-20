@@ -26,7 +26,7 @@ pub fn default_embed() -> CreateEmbed {
     e
 }
 
-pub fn set_defaults_for_embed(e: &mut CreateEmbed) {
+fn set_defaults_for_embed(e: &mut CreateEmbed) {
     e.color(Color::from_rgb(238, 14, 97));
     let time = chrono::Utc::now();
     e.timestamp(&time);
