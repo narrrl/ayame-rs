@@ -12,7 +12,7 @@ use serenity::{
 use songbird::{
     driver::Bitrate,
     id::GuildId,
-    input::{ytdl, Metadata, Restartable},
+    input::{Metadata, Restartable},
     tracks::{PlayMode, TrackHandle},
     Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird, TrackEvent,
 };
