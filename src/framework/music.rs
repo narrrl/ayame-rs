@@ -421,21 +421,32 @@ impl VoiceEventHandler for LeaveWhenAlone {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
         // wait some seconds to be sure that the cache is up to date
         std::thread::sleep(Duration::from_secs(3));
-        let handle = self
-            .manager
-            .get(self.guild_id)
-            .expect("Couldn't get handle of call");
+        let handle = match self.manager.get(self.guild_id) {
+            Some(handle) => handle,
+            None => {
+                error!("couldn't get call of guild {}", self.guild_id);
+                return Some(Event::Cancel);
+            }
+        };
         // lock handle
+        let mut users = vec![];
         let mut handle = handle.lock().await;
-        let channel = self
-            .cache
-            .guild_channel(handle.current_channel().unwrap().0)
-            .await
-            .expect("Couldn't get channel");
-        let users = channel
-            .members(&self.cache)
-            .await
-            .expect("Couldn't get connected members");
+        if let Some(current_channel) = handle.current_channel() {
+            let channel = match self.cache.guild_channel(current_channel.0).await {
+                Some(channel) => channel,
+                None => {
+                    error!("couldn't get connected_channel of guild {}", self.guild_id);
+                    return Some(Event::Cancel);
+                }
+            };
+            users = match channel.members(&self.cache).await {
+                Ok(users) => users,
+                Err(why) => {
+                    error!("couldn't get users of channel {}: {:?}", channel, why);
+                    return Some(Event::Cancel);
+                }
+            };
+        }
         let mut no_user_connected = true;
         for user in users.iter() {
             if !user.user.bot {
