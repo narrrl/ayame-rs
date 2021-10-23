@@ -177,10 +177,14 @@ impl EventHandler for Handler {
                     );
                 }
             });
-            match id.get_application_commands(&ctx.http).await {
-                Ok(commands) => {
+            if let Ok(guild_commands) = id.get_application_commands(&ctx.http).await {
+                if commands.len() != guild_commands.len() {
+                    info!(
+                        "found dublicated commands for guild {:?} -> deleting dubicates",
+                        id
+                    );
                     let to_remove = handler.get_all_aliases(Scope::GLOBAL);
-                    commands
+                    guild_commands
                         .iter()
                         .filter(|c| to_remove.iter().any(|n| n.eq(&c.name)))
                         .for_each(|c| {
@@ -191,8 +195,7 @@ impl EventHandler for Handler {
                             });
                         });
                 }
-                Err(_) => error!("couldn't get application commands for guild {:?}", id),
-            };
+            }
         }
 
         info!("Connected as {}", ready.user.name);
