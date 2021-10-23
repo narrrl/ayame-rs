@@ -177,6 +177,22 @@ impl EventHandler for Handler {
                     );
                 }
             });
+            match id.get_application_commands(&ctx.http).await {
+                Ok(commands) => {
+                    let to_remove = handler.get_all_aliases(Scope::GLOBAL);
+                    commands
+                        .iter()
+                        .filter(|c| to_remove.iter().any(|n| n.eq(&c.name)))
+                        .for_each(|c| {
+                            let cmd_id = c.id.clone();
+                            let http = ctx.http.clone();
+                            tokio::spawn(async move {
+                                check_msg(id.delete_application_command(&http, cmd_id).await);
+                            });
+                        });
+                }
+                Err(_) => error!("couldn't get application commands for guild {:?}", id),
+            };
         }
 
         info!("Connected as {}", ready.user.name);
