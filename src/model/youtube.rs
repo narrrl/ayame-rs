@@ -109,7 +109,7 @@ impl YoutubeResult {
     #[allow(dead_code)]
     pub fn time_published(&self) -> DateTime<Utc> {
         DateTime::parse_from_rfc3339(&self.snippet.published_at)
-            .expect("Couldn't convert YouTube-Video publish time")
+            .unwrap_or(Utc::now().into())
             .into()
     }
 
