@@ -618,7 +618,7 @@ impl SlashCommand for Search {
             .description("Searches for music on Youtube")
             .create_option(|option| {
                 option
-                    .name("querry")
+                    .name("query")
                     .description("The search term")
                     .kind(ApplicationCommandOptionType::String)
                     .required(true)
