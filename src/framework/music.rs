@@ -58,8 +58,6 @@ pub async fn skip(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbe
         if let Err(_) = queue.skip() {
             return Err(NOTHING_PLAYING_ERROR.to_string());
         }
-        // we can unwrap safely the the current track, because it must be `Some`
-        // else the skip should have returned an error
         e.title("Skipped Song");
         return Ok(e);
     } else {
@@ -150,7 +148,6 @@ pub async fn join(
             manager,
         },
     );
-    drop(handle);
     let mut e = default_embed();
     e.description(&format!("Joined {}", connect_to.mention()));
     Ok(e)
@@ -240,7 +237,6 @@ pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEm
 
         e.title("Deafened");
     }
-    drop(handler);
     Ok(e)
 }
 
@@ -289,6 +285,7 @@ pub async fn play(
 
         handler.enqueue_source(source.into());
         let queue = handler.queue().current_queue();
+        // save to unwrap because we just queued a track
         let track = queue.last().expect("couldn't get handle of queued track");
         let time = chrono::Utc::now();
         let _ = track.add_event(
@@ -528,6 +525,7 @@ pub async fn _get_songbird(ctx: &Context) -> Arc<Songbird> {
     songbird::get(ctx)
         .await
         .expect("Songbird Voice client placed in at initialisation.")
+        .clone()
 }
 
 async fn _get_current_song(handle_lock: Arc<Mutex<Call>>) -> Option<TrackHandle> {
@@ -563,7 +561,11 @@ fn _embed_song_with_author(
 
 async fn _get_bitrate_for_channel(channel: songbird::id::ChannelId, http: &Arc<Http>) -> i32 {
     match http.get_channel(channel.0).await {
-        Ok(ch) => match ch.guild().expect("Only Guilds are supported").bitrate {
+        Ok(ch) => match ch
+            .guild()
+            .map(|ch| ch.bitrate)
+            .unwrap_or(Some(DEFAULT_BITRATE as u64))
+        {
             Some(bitrate) => bitrate as i32,
             // returns default bitrate when it was a textchannel
             None => DEFAULT_BITRATE,
