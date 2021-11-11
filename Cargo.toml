@@ -1,5 +1,5 @@
 [package]
-name = "nirust"
+name = "ayame-rs"
 version = "0.1.0"
 authors = ["Nils Pukropp <nils.pukropp@outlook.de>"]
 edition = "2018"

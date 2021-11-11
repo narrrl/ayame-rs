@@ -1,14 +1,14 @@
 #!/bin/bash
 
 ABSPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-FILE="nirust"
-PIDF="nirust.pid"
+FILE="ayame-rs"
+PIDF="ayame.pid"
 CONFIG="config.toml"
 
 function main() {
 	if [ "$1" == "start" ]; then
 		if [[ -f "$PIDF" ]]; then
-			printf "Nirust already running\n"
+			printf "Ayame already running\n"
 			exit -1
 		fi
 		if [[ ! -f "$FILE" ]]; then
