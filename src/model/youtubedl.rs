@@ -12,8 +12,7 @@ use serenity::{
     framework::standard::{CommandError, CommandResult},
     http::Http,
 };
-use tracing::error;
-use ytd_rs::{Arg, ResultType, YoutubeDL};
+use ytd_rs::{Arg, YoutubeDL};
 
 use lazy_static::*;
 
@@ -218,22 +217,13 @@ impl YTDL {
     ///
     async fn run_youtubedl(&self, ytd: &YoutubeDL, url: &str) -> Result<PathBuf, String> {
         // start download
-        let result = ytd.download();
-
-        // check output
-        match result.result_type() {
-            ResultType::SUCCESS => Ok(result.output_dir().clone()),
-            ResultType::IOERROR | ResultType::FAILURE => {
-                error!(
-                    "YoutubeDL exited with error: {:?}",
-                    result
-                        .output()
-                        .replace("Usage: youtube-dl [OPTIONS] URL [URL...]\\n\\n", "")
-                );
-                // return if error
+        let result = match ytd.download() {
+            Ok(result) => result,
+            Err(_) => {
                 return Err(format!("Couldn't download {}", url));
             }
-        }
+        };
+        Ok(result.output_dir().clone())
     }
 
     ///

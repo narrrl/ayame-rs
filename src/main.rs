@@ -10,6 +10,8 @@ mod configuration;
 
 mod framework;
 
+mod database;
+
 use chrono::{offset::Local, Timelike};
 use configuration::Config;
 use serenity::{
