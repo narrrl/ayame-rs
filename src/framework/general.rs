@@ -66,7 +66,7 @@ pub async fn invite(http: &Arc<Http>) -> CreateEmbed {
     e.description(
         "Those are the requirements for the bot to run without any restrictions. \
         The bot is open source and the source code can be found on \
-        [Github](https://github.com/nirusu99/nirust). 
+        [Github](https://github.com/nirusu99/ayame-rs). 
 
         [Click here](invite_url) to invite the bot with required permissions
         [Click here](admin_invite) to invite the bot with administrator privileges
