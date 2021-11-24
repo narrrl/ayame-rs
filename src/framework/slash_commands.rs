@@ -532,7 +532,7 @@ impl SlashCommand for Search {
             // if we got nothing, we inform the user and end the command
             if res.results().is_empty() {
                 let mut e = default_embed();
-                set_defaults_for_error(&mut e, "noting found");
+                set_defaults_for_error(&mut e, "nothing found");
                 _send_response(&ctx.http, Ok(e), &command).await;
                 return Ok(());
             }
