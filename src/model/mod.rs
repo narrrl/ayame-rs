@@ -74,7 +74,7 @@ fn run_upload(file: &str, file_name: &str, extension: &str) -> Result<Output, Er
         .arg("Max-Days: 1")
         .arg("--upload-file")
         .arg(file)
-        .arg(format!("http://transfer.sh/{}.{}", file_name, extension));
+        .arg(format!("https://transfer.sh/{}.{}", file_name, extension));
 
     // start
     match cmd.spawn() {
