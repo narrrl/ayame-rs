@@ -10,6 +10,7 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 ## building and running in GNU/Linux
 - run `./run.sh start`, the script will ask for the credentials
 - run `./run.sh stop` to stop the bot
+- run `./run.sh update` to update the bot
 
 ## Contact
 - **Discord**: ニルス#0420
