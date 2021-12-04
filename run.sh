@@ -13,12 +13,21 @@ function main() {
 		fi
 		if [[ ! -f "$FILE" ]]; then
 			cargo build --release
-			cp ./target/release/nirust .
+			cp ./target/release/$FILE .
 		fi
-		./nirust & echo $! > ./nirust.pid
+		./$FILE& echo $! > ./$PIDF
 	elif [ "$1" == "stop" ]; then
 		kill -SIGINT "$(cat $PIDF)"
 		rm $PIDF
+	elif [ "$1" == "update" ]; then
+		kill -SIGINT "$(cat $PIDF)"
+		rm ./$PIDF
+		rm ./$FILE
+		git fetch --all && git reset --hard && git clean -fd
+		git pull
+		cargo build --release
+		cp ./target/release/$FILE .
+		./$FILE & echo $! > ./$PIDF
 	else
 		printf "No argument provided\n"
 		exit -1
