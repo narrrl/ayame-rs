@@ -24,8 +24,6 @@ function stop() {
 	if [[ -f "$PIDF" ]]; then
 		kill -SIGINT "$(cat $PIDF)"
 		rm $PIDF
-	elif
-		printf "Ayame not running, nothing to stop\n"
 	fi
 }
 
