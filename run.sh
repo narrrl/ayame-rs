@@ -22,7 +22,7 @@ function main() {
 
 function stop() {
 	kill -SIGINT "$(cat $PIDF)"
-	if [[ ! -f "$PIDF" ]]; then
+	if [[ -f "$PIDF" ]]; then
 		rm $PIDF
 	fi
 }
@@ -42,12 +42,12 @@ function start() {
 function update() {
 	git fetch --all && git pull
 	cargo build --release
-	cp ./target/release/$FILE $FILE
+	cp ./target/release/$FILE .
 }
 
 
 
-funtion check_config() {
+function check_config() {
 	if [[ ! -f "$CONFIG" ]]; then
 		printf "Your bot token: "
 		read TOKEN
@@ -59,7 +59,6 @@ funtion check_config() {
 		read PREFIX
 		echo "prefix = \"$PREFIX\"" >> $CONFIG
 	fi
-
 }
 
 cd $ABSPATH
