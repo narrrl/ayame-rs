@@ -7,34 +7,47 @@ CONFIG="config.toml"
 
 function main() {
 	if [ "$1" == "start" ]; then
-		if [[ -f "$PIDF" ]]; then
-			printf "Ayame already running\n"
-			exit -1
-		fi
-		if [[ ! -f "$FILE" ]]; then
-			cargo build --release
-			cp ./target/release/$FILE .
-		fi
-		./$FILE& echo $! > ./$PIDF
+		start
 	elif [ "$1" == "stop" ]; then
-		kill -SIGINT "$(cat $PIDF)"
-		rm $PIDF
+		stop
 	elif [ "$1" == "update" ]; then
-		kill -SIGINT "$(cat $PIDF)"
-		rm ./$PIDF
-		rm ./$FILE
-		git fetch --all && git reset --hard && git clean -fd
-		git pull
-		cargo build --release
-		cp ./target/release/$FILE .
-		./$FILE & echo $! > ./$PIDF
+		stop
+		update
+		start
 	else
 		printf "No argument provided\n"
 		exit -1
 	fi
 }
 
-function check_config() {
+function stop() {
+	kill -SIGINT "$(cat $PIDF)"
+	if [[ ! -f "$PIDF" ]]; then
+		rm $PIDF
+	fi
+}
+
+function start() {
+	if [[ -f "$PIDF" ]]; then
+		printf "Ayame already running\n"
+		exit -1
+	fi
+	if [[ ! -f "$FILE" ]]; then
+		cargo build --release
+		cp ./target/release/$FILE .
+	fi
+	./$FILE > "$(date -I).log" & echo $! > ./$PIDF
+}
+
+function update() {
+	git fetch --all && git pull
+	cargo build --release
+	cp ./target/release/$FILE $FILE
+}
+
+
+
+funtion check_config() {
 	if [[ ! -f "$CONFIG" ]]; then
 		printf "Your bot token: "
 		read TOKEN
