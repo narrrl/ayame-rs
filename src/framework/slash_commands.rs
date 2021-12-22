@@ -181,7 +181,7 @@ impl SlashCommand for Play {
             // check if bot isn't connected just yet
             if manager.get(guild_id).is_none() {
                 let author_id = command.user.id;
-                let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
+                let result = framework::music::join(&ctx, &guild, author_id).await;
                 // if the bot couldn't join, we can stop the complete command
                 let is_error = result.is_err();
                 _send_response(&ctx.http, result, &command).await;
@@ -311,8 +311,7 @@ impl SlashCommand for Join {
         let guild_id = command.guild_id.unwrap();
         let guild = guild_id.to_guild_cached(&ctx.cache).await.unwrap();
         let author_id = command.user.id;
-        let channel_id = command.channel_id;
-        let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
+        let result = framework::music::join(&ctx, &guild, author_id).await;
         _send_response(&ctx.http, result, &command).await;
         Ok(())
     }
@@ -587,7 +586,10 @@ impl SlashCommand for Search {
 
             // which then gets us the selected song as a index
             // because the index of the pages is equal to the index of the video results
-            let (index, _) = menu.run().await?;
+            let index = match menu.run().await {
+                Ok((index, _)) => index,
+                Err(_) => return Ok(()),
+            };
 
             // thats why we can just get the result the user want from the
             // [`YoutubeResponse`] and unwrap it
@@ -596,7 +598,7 @@ impl SlashCommand for Search {
             // now we check if the bot is not connected yet
             if manager.get(guild_id).is_none() {
                 let author_id = command.user.id;
-                let result = framework::music::join(&ctx, &guild, author_id, channel_id).await;
+                let result = framework::music::join(&ctx, &guild, author_id).await;
                 if result.is_err() {
                     return Ok(());
                 }

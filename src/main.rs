@@ -12,11 +12,15 @@ mod framework;
 
 mod database;
 
-use chrono::{offset::Local, Timelike};
 use configuration::Config;
 use serenity::{
     async_trait,
-    model::{gateway::Activity, guild::Guild, id::GuildId, Permissions},
+    model::{
+        guild::Guild,
+        id::GuildId,
+        prelude::{Activity, VoiceState},
+        Permissions,
+    },
 };
 use serenity::{
     client::bridge::gateway::{GatewayIntents, ShardManager},
@@ -40,9 +44,14 @@ use serenity::{
 };
 use songbird::SerenityInit;
 
-use std::sync::atomic::Ordering;
-use std::{collections::HashSet, fs::remove_dir_all, sync::Arc, time::Duration};
-use std::{path::PathBuf, sync::atomic::AtomicBool};
+use std::path::PathBuf;
+use std::thread::sleep;
+use std::{
+    collections::{HashMap, HashSet},
+    fs::remove_dir_all,
+    sync::Arc,
+    time::Duration,
+};
 
 use tracing::{error, info};
 
@@ -95,18 +104,90 @@ impl TypeMapKey for ShardManagerContainer {
 }
 
 struct Handler {
-    is_loop_running: AtomicBool,
+    disconnects: Arc<Mutex<HashMap<u64, bool>>>,
 }
 
 // Ready and Resumed events to notify if the bot has started/resumed
 // TODO: this is the ugliest code i've ever written
 #[async_trait]
 impl EventHandler for Handler {
+    async fn voice_state_update(
+        &self,
+        ctx: Context,
+        guild: Option<GuildId>,
+        _old: Option<VoiceState>,
+        _new: VoiceState,
+    ) {
+        let guild_id = match guild {
+            Some(id) => id,
+            None => return,
+        };
+        // we check if a disconnect event is already runnig
+        let mut disconnects = self.disconnects.lock().await;
+        match disconnects.get(&guild_id.0) {
+            // if yes, just return and ignore
+            // for example if multiple users are disconnecting
+            // like for example when the fun gaming eve has ended :(
+            Some(b) if *b => return,
+            // else if the guild_id is not present or if no disconnect event is running insert true
+            // and start the disconnect event
+            _ => disconnects.insert(guild_id.0, true),
+        };
+        // we drop the mutex guard to move it to another thread
+        drop(disconnects);
+        // we get the arc mutex and clone it, beause it gets borrowed by the async move
+        let disconnects = self.disconnects.clone();
+        tokio::spawn(async move {
+            // we wait, maybe they just want to switch channel
+            sleep(Duration::from_secs(20));
+            // we can insert false, most likely everyone lefted already and the bot is about to
+            // disconnect
+            disconnects.lock().await.insert(guild_id.0, false);
+            let manager = songbird::get(&ctx)
+                .await
+                .expect("Couldn't get songbird manager");
+            let handle = match manager.get(guild_id) {
+                Some(handle) => handle,
+                None => return,
+            };
+            let call = handle.lock().await;
+            let mut users = vec![];
+            if let Some(current_channel) = call.current_channel() {
+                let channel = match ctx.cache.guild_channel(current_channel.0).await {
+                    Some(channel) => channel,
+                    None => return,
+                };
+                users = match channel.members(&ctx.cache).await {
+                    Ok(users) => users,
+                    Err(_) => return,
+                };
+            }
+            // we can drop the call, because we have everything we need
+            drop(call);
+            let mut no_user_connected = true;
+            for user in users.iter() {
+                if !user.user.bot {
+                    no_user_connected = false;
+                    break;
+                }
+            }
+            if no_user_connected {
+                if let Err(e) = manager.remove(guild_id).await {
+                    error!("failed to remove songbird manager: {:?}", e);
+                }
+            }
+        });
+    }
     async fn guild_create(&self, ctx: Context, guild: Guild, is_new: bool) {
         if !is_new {
             return;
         }
         info!("bot joined guild: {:?}, creating slash commands", guild.id);
+        ctx.set_activity(Activity::playing(&format!(
+            "in {} guilds!",
+            ctx.cache.guilds().await.len()
+        )))
+        .await;
         for cmd in get_slash_handler()
             .get_all_create_commands(Scope::GUILD)
             .iter()
@@ -206,30 +287,11 @@ impl EventHandler for Handler {
     async fn resume(&self, _: Context, _: ResumedEvent) {
         info!("Resumed");
     }
-    async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
+    async fn cache_ready(&self, ctx: Context, guilds: Vec<GuildId>) {
         info!("Cache built successfully!");
-        let ctx = Arc::new(ctx);
-        if !self.is_loop_running.load(Ordering::Relaxed) {
-            let ctx_clone = Arc::clone(&ctx);
-            tokio::spawn(async move {
-                loop {
-                    set_status_to_current_time(Arc::clone(&ctx_clone)).await;
-                    let sleep_timer = (60 - Local::now().second()) as u64;
-                    tokio::time::sleep(Duration::from_secs(sleep_timer)).await;
-                }
-            });
-
-            // Now that the loop is running, we set the bool to true
-            self.is_loop_running.swap(true, Ordering::Relaxed);
-        }
+        ctx.set_activity(Activity::playing(&format!("in {} guilds!", guilds.len())))
+            .await;
     }
-}
-
-async fn set_status_to_current_time(ctx: Arc<Context>) {
-    let current_time = Local::now();
-    let formatted_time = current_time.format("%H:%M, %a %b %e").to_string();
-
-    ctx.set_activity(Activity::playing(&formatted_time)).await;
 }
 
 #[group]
@@ -238,18 +300,7 @@ async fn set_status_to_current_time(ctx: Arc<Context>) {
 struct General;
 
 #[group]
-#[commands(
-    deafen,
-    join,
-    leave,
-    mute,
-    skip,
-    stop,
-    play,
-    play_pause,
-    now_playing,
-    loop_song
-)]
+#[commands(deafen, join, leave, mute, skip, stop, play, play_pause, now_playing)]
 struct Music;
 
 #[group]
@@ -346,7 +397,7 @@ async fn main() {
         .framework(framework)
         .intents(GatewayIntents::all())
         .event_handler(Handler {
-            is_loop_running: AtomicBool::new(false),
+            disconnects: Arc::new(Mutex::new(HashMap::new())),
         })
         .application_id(application_id)
         .register_songbird()

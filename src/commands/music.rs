@@ -36,11 +36,10 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
     let author_id = msg.author.id;
-    let chan_id = msg.channel_id;
     _send_response(
         &msg.channel_id,
         &ctx.http,
-        framework::music::join(&ctx, &guild, author_id, chan_id).await,
+        framework::music::join(&ctx, &guild, author_id).await,
     )
     .await
 }
@@ -130,8 +129,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let manager = framework::music::_get_songbird(&ctx).await;
     if manager.get(guild.id).is_none() {
         let author_id = msg.author.id;
-        let chan_id = msg.channel_id;
-        let result = framework::music::join(ctx, &guild, author_id, chan_id).await;
+        let result = framework::music::join(ctx, &guild, author_id).await;
         let is_err = result.is_err().clone();
         let _ = _send_response(&msg.channel_id, &ctx.http, result).await;
         if is_err {
@@ -171,32 +169,6 @@ async fn stop(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
         &msg.channel_id,
         &ctx.http,
         framework::music::stop(ctx, guild).await,
-    )
-    .await
-}
-
-#[command("loop")]
-#[only_in(guilds)]
-#[description("Loops the current song x times")]
-#[num_args(1)]
-async fn loop_song(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let times = match args.single::<usize>() {
-        Ok(url) => url,
-        Err(_) => {
-            return _send_response(
-                &msg.channel_id,
-                &ctx.http,
-                Err("invalid loop counter".to_string()),
-            )
-            .await;
-        }
-    };
-
-    let guild = msg.guild(&ctx.cache).await.unwrap().id;
-    _send_response(
-        &msg.channel_id,
-        &ctx.http,
-        framework::music::loop_song(&ctx, guild, times).await,
     )
     .await
 }

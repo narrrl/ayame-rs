@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serenity::{
     async_trait,
     builder::CreateEmbed,
-    client::{Cache, Context},
+    client::Context,
     http::Http,
     model::{
         guild::Guild,
@@ -15,10 +15,9 @@ use serenity::{
 };
 use songbird::{
     driver::Bitrate,
-    id::GuildId,
     input::{Metadata, Restartable},
     tracks::{PlayMode, TrackHandle},
-    Call, CoreEvent, Event, EventContext, EventHandler as VoiceEventHandler, Songbird,
+    Call, Event, EventContext, EventHandler as VoiceEventHandler, Songbird,
 };
 use std::{ops::Sub, sync::Arc, time::Duration};
 
@@ -96,12 +95,7 @@ pub async fn mute(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEmbe
 ///
 /// joins the the current channel of the message author
 ///
-pub async fn join(
-    ctx: &Context,
-    guild: &Guild,
-    author_id: UserId,
-    chan_id: ChannelId,
-) -> Result<CreateEmbed> {
+pub async fn join(ctx: &Context, guild: &Guild, author_id: UserId) -> Result<CreateEmbed> {
     // get guild id the message was send in
     let guild_id = guild.id;
 
@@ -121,7 +115,6 @@ pub async fn join(
     };
 
     let manager = _get_songbird(ctx).await;
-    let send_http = ctx.http.clone();
     let (handle_lock, success) = manager.join(guild_id, connect_to).await;
 
     if let Ok(_channel) = success {
@@ -132,22 +125,11 @@ pub async fn join(
         };
 
         handle.set_bitrate(Bitrate::BitsPerSecond(bitrate.clone()));
+        drop(handle);
         info!("setting bitrate {} for guild {}", bitrate, guild_id);
     } else {
         return Err("couldn't join the channel".to_string());
     }
-    let mut handle = handle_lock.lock().await;
-    handle.remove_all_global_events();
-    handle.add_global_event(
-        Event::Core(CoreEvent::ClientDisconnect),
-        LeaveWhenAlone {
-            chan_id,
-            cache: ctx.cache.clone(),
-            http: send_http,
-            guild_id: GuildId::from(guild_id),
-            manager,
-        },
-    );
     let mut e = default_embed();
     e.description(&format!("Joined {}", connect_to.mention()));
     Ok(e)
@@ -164,6 +146,7 @@ pub async fn play_pause(ctx: &Context, guild_id: SerenityGuildId) -> Result<Crea
                 return Err(NOTHING_PLAYING_ERROR.to_string());
             }
         };
+        drop(handler);
 
         let is_playing = match track.get_info().await {
             Ok(info) => info.playing == PlayMode::Play,
@@ -237,6 +220,7 @@ pub async fn deafen(ctx: &Context, guild_id: SerenityGuildId) -> Result<CreateEm
 
         e.title("Deafened");
     }
+    drop(handler);
     Ok(e)
 }
 
@@ -285,6 +269,7 @@ pub async fn play(
 
         handler.enqueue_source(source.into());
         let queue = handler.queue().current_queue();
+        drop(handler);
         // save to unwrap because we just queued a track
         let track = queue.last().expect("couldn't get handle of queued track");
         let time = chrono::Utc::now();
@@ -328,38 +313,10 @@ pub async fn now_playing(ctx: &Context, guild_id: SerenityGuildId) -> Result<Cre
             if let Some(image) = &track.metadata().thumbnail {
                 e.image(image);
             }
+            drop(handler);
             return Ok(e);
         } else {
-            return Err(NOTHING_PLAYING_ERROR.to_string());
-        }
-    } else {
-        return Err(NOT_IN_VOICE_ERROR.to_string());
-    }
-}
-
-pub async fn loop_song(
-    ctx: &Context,
-    guild_id: SerenityGuildId,
-    times: usize,
-) -> Result<CreateEmbed> {
-    if times > 10 {
-        return Err("a song can only be looped 10 times".to_string());
-    }
-
-    let manager = _get_songbird(ctx).await;
-
-    if let Some(handle_lock) = manager.get(guild_id) {
-        let handle = handle_lock.lock().await;
-
-        if let Some(track) = handle.queue().current() {
-            if let Err(_) = track.loop_for(times) {
-                return Err("looping is not supported for this track".to_string());
-            }
-            let mut e = default_embed();
-            e.field("Now looping", _hyperlink_song(track.metadata()), true);
-            e.field("Times", times.to_string(), true);
-            return Ok(e);
-        } else {
+            drop(handler);
             return Err(NOTHING_PLAYING_ERROR.to_string());
         }
     } else {
@@ -379,7 +336,11 @@ impl VoiceEventHandler for NowPlaying {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         if let EventContext::Track(tracks) = ctx {
             let meta = match tracks.first() {
-                Some((_, handle)) => handle.metadata().clone(),
+                Some((_, handle)) => {
+                    let meta = handle.metadata().clone();
+                    drop(handle);
+                    meta
+                }
                 None => {
                     error!("couldn't get song");
                     return Some(Event::Cancel);
@@ -402,85 +363,6 @@ impl VoiceEventHandler for NowPlaying {
             );
         }
 
-        None
-    }
-}
-struct LeaveWhenAlone {
-    chan_id: ChannelId,
-    cache: Arc<Cache>,
-    http: Arc<Http>,
-    manager: Arc<Songbird>,
-    guild_id: GuildId,
-}
-
-#[async_trait]
-impl VoiceEventHandler for LeaveWhenAlone {
-    async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
-        // wait some seconds to be sure that the cache is up to date
-        std::thread::sleep(Duration::from_secs(3));
-        let handle = match self.manager.get(self.guild_id) {
-            Some(handle) => handle,
-            None => {
-                error!("couldn't get call of guild {}", self.guild_id);
-                return Some(Event::Cancel);
-            }
-        };
-        // lock handle
-        let mut users = vec![];
-        let mut handle = handle.lock().await;
-        if let Some(current_channel) = handle.current_channel() {
-            let channel = match self.cache.guild_channel(current_channel.0).await {
-                Some(channel) => channel,
-                None => {
-                    error!("couldn't get connected_channel of guild {}", self.guild_id);
-                    return Some(Event::Cancel);
-                }
-            };
-            users = match channel.members(&self.cache).await {
-                Ok(users) => users,
-                Err(why) => {
-                    error!("couldn't get users of channel {}: {:?}", channel, why);
-                    return Some(Event::Cancel);
-                }
-            };
-        }
-        let mut no_user_connected = true;
-        for user in users.iter() {
-            if !user.user.bot {
-                no_user_connected = false;
-                break;
-            }
-        }
-        if no_user_connected {
-            handle
-                .queue()
-                .current()
-                .and_then(|track| Some(track.stop()));
-            handle.queue().stop();
-            handle.stop();
-            // now we have to destroy the guild handle which is behind
-            // a Mutex
-            let manager = self.manager.clone();
-            let guild_id = self.guild_id.clone();
-            // we drop our mutexguard to let the handle free
-            drop(handle);
-            // now we move the remove to a seperate function to delete
-            // it in the near future
-            tokio::spawn(async move {
-                if let Err(e) = manager.remove(guild_id).await {
-                    error!("failed to remove songbird manager: {:?}", e);
-                }
-            });
-            // create the info message
-            let mut embed = default_embed();
-            embed.title("Bot disconnected because no one was left in channel");
-            // send message
-            check_msg(
-                self.chan_id
-                    .send_message(&self.http, |m| m.set_embed(embed))
-                    .await,
-            );
-        }
         None
     }
 }
