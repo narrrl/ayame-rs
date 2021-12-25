@@ -15,3 +15,6 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 ## Contact
 - **Discord**: ニルス#0420
 - **Email**: nils@nirusu.codes
+
+## Invite
+[Invite](https://discord.com/api/oauth2/authorize?client_id=702485091842261035&scope=applications.commands+bot&permissions=26909993985) the bot which is hosted by me
