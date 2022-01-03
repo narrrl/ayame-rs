@@ -239,7 +239,6 @@ pub async fn play(
 ) -> Result<CreateEmbed> {
     let guild_id = guild.id;
     // check if its actually a url
-    // TODO: implement yt-search with search terms
     if !url.starts_with("http") {
         return Err("must provide a valid URL".to_string());
     }

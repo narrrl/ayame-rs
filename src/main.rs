@@ -107,8 +107,6 @@ struct Handler {
     disconnects: Arc<Mutex<HashMap<u64, bool>>>,
 }
 
-// Ready and Resumed events to notify if the bot has started/resumed
-// TODO: this is the ugliest code i've ever written
 #[async_trait]
 impl EventHandler for Handler {
     async fn voice_state_update(
