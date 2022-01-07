@@ -4,7 +4,6 @@ use serenity::http::Http;
 use serenity::model::prelude::*;
 use std::sync::Arc;
 
-// TODO: write helper?
 pub async fn invite(http: &Arc<Http>) -> CreateEmbed {
     let mut e = discord_utils::default_embed();
     // get the current connected user

@@ -6,6 +6,7 @@ pub mod slash_commands;
 
 use std::sync::Arc;
 
+use crate::model::discord_utils::{check_msg, default_embed};
 use crate::model::youtubedl::YTDL;
 use crate::model::Timestamp;
 use lazy_static::lazy_static;
@@ -15,19 +16,12 @@ use serenity::client::Cache;
 use serenity::framework::standard::CommandResult;
 use serenity::http::Http;
 use serenity::model::prelude::*;
-use serenity::utils::Color;
 use tokio::task;
 
 lazy_static! {
     pub static ref URL_REGEX: Regex = Regex::new(r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?").expect("Couldn't build URL Regex");
     pub static ref AUDIO_ONLY_REGEX: Regex = Regex::new(r"-audio").expect("Couldn't build URL Regex");
 }
-
-//TODO: look for a way to merge slash and normal. Currently slash commands need to answer with
-// a message. It is not enough to just send a message to the same channel.
-//
-// One idea would be to look into ['serenity::model::prelude::Context'] and try to merge the
-// Context from slash and normal commands.
 
 pub async fn ytd_with_stamps(
     http: &Arc<Http>,
@@ -74,15 +68,9 @@ pub async fn guild_icon(http: &Arc<Http>, guild: Guild, msg: &Message) -> Comman
             return Ok(());
         }
     };
-    msg.channel_id
-        .send_message(http, |m| {
-            m.embed(|e| {
-                e.image(icon);
-                e.color(Color::from_rgb(238, 14, 97));
-                e
-            })
-        })
-        .await?;
+    let mut e = default_embed();
+    e.image(icon);
+    check_msg(msg.channel_id.send_message(http, |m| m.set_embed(e)).await);
     Ok(())
 }
 
@@ -94,15 +82,9 @@ pub async fn avatar(http: &Arc<Http>, msg: &Message, user: &User) -> CommandResu
             return Ok(());
         }
     };
-    msg.channel_id
-        .send_message(http, |m| {
-            m.embed(|e| {
-                e.image(icon);
-                e.color(Color::from_rgb(238, 14, 97));
-                e
-            })
-        })
-        .await?;
+    let mut e = default_embed();
+    e.image(icon);
+    check_msg(msg.channel_id.send_message(http, |m| m.set_embed(e)).await);
 
     Ok(())
 }
@@ -117,26 +99,6 @@ pub async fn guild_info(http: &Arc<Http>, guild: Guild, msg: &Message) -> Comman
         None => String::new(),
     };
     let creation_date = guild.id.created_at();
-
-    // let members = &guild.members;
-
-    // TODO: was a really dumb way to get the admins
-    // let mut admins = vec![];
-    // for (id, member) in members.iter() {
-    //     if id.eq(&guild.owner_id) {
-    //         continue;
-    //     }
-    //     if let Ok(perms) = guild.member_permissions(http, id).await {
-    //         if !member.user.bot && perms.contains(Permissions::ADMINISTRATOR) {
-    //             admins.push(id);
-    //         }
-    //     }
-    // }
-
-    // let admins = admins
-    //     .into_iter()
-    //     .map(|i| format!("<@!{}>", i.to_string()))
-    //     .collect::<String>();
 
     let mut message = format!(
         "
@@ -161,17 +123,10 @@ pub async fn guild_info(http: &Arc<Http>, guild: Guild, msg: &Message) -> Comman
         message.push_str(&format!("AFK-Channel: <#{}>", ch.as_u64()));
     }
 
-    msg.channel_id
-        .send_message(http, |m| {
-            m.embed(|e| {
-                e.image(icon);
-                e.color(Color::from_rgb(238, 14, 97));
-                e.title(guild.name);
-                e.description(message);
-                e
-            })
-        })
-        .await?;
+    let mut e = default_embed();
+    e.image(icon).title(guild.name).description(message);
+
+    check_msg(msg.channel_id.send_message(http, |m| m.set_embed(e)).await);
 
     Ok(())
 }
