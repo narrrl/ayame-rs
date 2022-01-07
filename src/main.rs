@@ -224,7 +224,7 @@ impl EventHandler for Handler {
 
         let handler = get_slash_handler();
         info!(
-            "Found guild commands: {:?}",
+            "Found global commands: {:?}",
             handler
                 .get_all_aliases(Scope::GLOBAL)
                 .iter()
@@ -322,7 +322,7 @@ If you want more information about a specific command, just pass the command as 
 #[embed_error_colour = "#CC0000"]
 #[max_levenshtein_distance(3)]
 #[lacking_permissions = "Hide"]
-#[lacking_role = "Nothing"]
+#[lacking_role = "Strike"]
 #[wrong_channel = "Strike"]
 async fn help(
     context: &Context,
