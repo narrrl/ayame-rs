@@ -13,7 +13,6 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 - run `./run.sh update` to update the bot
 
 ## Contact
-- **Discord**: ニルス#0420
 - **Email**: nils@nirusu.codes
 
 ## Invite
