@@ -89,8 +89,6 @@ lazy_static! {
         perms.toggle(Permissions::DEAFEN_MEMBERS);
         perms.toggle(Permissions::MOVE_MEMBERS);
         perms.toggle(Permissions::USE_VAD);
-        perms.toggle(Permissions::USE_PUBLIC_THREADS);
-        perms.toggle(Permissions::USE_PRIVATE_THREADS);
         perms.toggle(Permissions::CREATE_INVITE);
         perms
     };
