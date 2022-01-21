@@ -41,7 +41,7 @@ features = [
     "model",
     "standard_framework",
     "utils",
-    "native_tls_backend",
+    "rustls_backend",
     "unstable_discord_api",
     "voice",
     "collector"
