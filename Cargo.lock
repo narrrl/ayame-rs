@@ -257,8 +257,9 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "command_attr"
-version = "0.3.7"
-source = "git+https://github.com/serenity-rs/serenity/?branch=current#1d05a1e6ecc078d355618114bfad3cf053016657"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e74a021f9d0b577821bf9f5b1a2be88677e95ee05713e5d44fb4236cfa1744c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -408,9 +409,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "779d043b6a0b90cc4c0ed7ee380a6504394cee7efd7db050e3774eee387324b2"
+checksum = "c3fcf0cee53519c866c09b5de1f6c56ff9d647101f81c1964fa632e148896cdf"
 dependencies = [
  "instant",
 ]
@@ -876,9 +877,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.113"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eef78b64d87775463c549fbd80e19249ef436ea3bf1de2a1eb7e717ec7fab1e9"
+checksum = "b0005d08a8f7b65fb8073cb697aa0b12b631ed251ce73d862ce50eeb52ce3b50"
 
 [[package]]
 name = "lock_api"
@@ -1281,9 +1282,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47aa80447ce4daf1717500037052af176af5d38cc3e571d9ec1c7353fc10c87d"
+checksum = "864d3e96a899863136fc6e99f3d7cae289dafe43bf2c5ac19b70df7210c0a145"
 dependencies = [
  "proc-macro2",
 ]
@@ -1625,18 +1626,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.134"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96b3c34c1690edf8174f5b289a336ab03f568a4460d8c6df75f2f3a692b3bc6a"
+checksum = "ce31e24b01e1e524df96f1c2fdd054405f8d7376249a5110886fb4b658484789"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.134"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "784ed1fbfa13fe191077537b0d70ec8ad1e903cfe04831da608aa36457cb653d"
+checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1645,9 +1646,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.75"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c059c05b48c5c0067d4b4b2b4f0732dd65feb52daf7e0ea09cd87e7dadc1af79"
+checksum = "d23c1ba4cf0efd44be32017709280b32d1cea5c3f1275c3b6d9e8bc54f758085"
 dependencies = [
  "itoa 1.0.1",
  "ryu",
@@ -1679,8 +1680,9 @@ dependencies = [
 
 [[package]]
 name = "serenity"
-version = "0.10.9"
-source = "git+https://github.com/serenity-rs/serenity/?branch=current#1d05a1e6ecc078d355618114bfad3cf053016657"
+version = "0.10.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dde86919535c6047e055d512641c5241320c01cb8fee54f1e5ba77c939a0ec23"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.11.0",
@@ -1705,9 +1707,9 @@ dependencies = [
 
 [[package]]
 name = "serenity-voice-model"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "158aeb823791f79bbb92110212970797757fee7102784453dcb9b172a8af272b"
+checksum = "8be3aec8849ca2fde1e8a5dfbed96fbd68e9b5f4283fbe277d8694ce811d4952"
 dependencies = [
  "bitflags",
  "enum_primitive",
@@ -1772,7 +1774,8 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.2.1"
-source = "git+https://github.com/serenity-rs/songbird/?branch=current#ecc47d588ab4bf492cf72d13e1dc0f039f4f3aab"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37584eec8ef3a793f51aa2f7093476904bd83475f3fa4fb786145c226a0e3f5e"
 dependencies = [
  "async-trait",
  "async-tungstenite 0.14.0",
@@ -1930,9 +1933,9 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.3"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
+checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
 dependencies = [
  "once_cell",
 ]

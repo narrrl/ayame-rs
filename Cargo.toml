@@ -28,8 +28,7 @@ html-escape = "0.2"
 url = "2.2"
 
 [dependencies.serenity]
-git = "https://github.com/serenity-rs/serenity/"
-branch = "current"
+version = "0.10"
 features = [
     "cache",
     "builder",
@@ -47,12 +46,8 @@ features = [
     ]
 
 [dependencies.songbird]
-git = "https://github.com/serenity-rs/songbird/"
-branch = "current"
+version = "0.2"
 features = ["gateway", "builtin-queue", "serenity-native", "driver", "yt-dlp" ]
-
-[patch.crates-io]
-serenity = { git = "https://github.com/serenity-rs/serenity/", branch = "current" }
 
 [profile.release]
 codegen-units = 1
