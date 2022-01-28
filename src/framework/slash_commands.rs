@@ -140,6 +140,7 @@ pub fn get_slash_handler() -> SlashCommandHandler {
     handler.add_migration(Box::new(Pause));
     handler.add_migration(Box::new(Resume));
     handler.add_migration(Box::new(Search));
+    handler.add_migration(Box::new(UwU));
     handler
 }
 
@@ -156,10 +157,56 @@ struct Playing;
 struct Pause;
 struct Resume;
 struct Search;
+struct UwU;
 
 //
-// **All [`SlashCommand`]'s gets implemented below here!**
+// **All [`SlashCommand`]s get implemented below here!**
 //
+
+#[async_trait]
+impl SlashCommand for UwU {
+    fn scope(&self) -> Scope {
+        Scope::GUILD
+    }
+    fn alias(&self) -> String {
+        String::from("uwu")
+    }
+
+    async fn run(&self, ctx: Context, command: ApplicationCommandInteraction) -> CommandResult {
+        let options = _get_options(&command, 0)?;
+        if let ApplicationCommandInteractionDataOptionValue::String(text) = options {
+            // mock text
+            let text = uwuifier::uwuify_str_sse(&text);
+            // send mock'ed text as response
+            check_msg(
+                command
+                    .create_interaction_response(&ctx.http, |response| {
+                        response
+                            .kind(InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|message| message.content(text))
+                    })
+                    .await,
+            );
+        }
+        Ok(())
+    }
+
+    fn create_application<'a>(
+        &self,
+        command: &'a mut CreateApplicationCommand,
+    ) -> &'a mut CreateApplicationCommand {
+        command
+            .description("uwuify your text")
+            .create_option(|option| {
+                option
+                    .name("text")
+                    .description("The text that gets uwuified")
+                    .kind(ApplicationCommandOptionType::String)
+                    .required(true)
+            });
+        command
+    }
+}
 
 #[async_trait]
 impl SlashCommand for Play {

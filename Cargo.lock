@@ -99,6 +99,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "atty"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
+dependencies = [
+ "hermit-abi",
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "audiopus"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -148,6 +159,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uwuify",
  "ytd-rs",
 ]
 
@@ -247,6 +259,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ee52072ec15386f770805afd189a01c8841be8696bed250fa2f13c4c0d6dfb7"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "clap"
+version = "2.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0610544180c38b88101fecf2dd634b174a62eef6946f84dfc6a7127512b381c"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "bitflags",
+ "strsim",
+ "textwrap",
+ "unicode-width",
+ "vec_map",
 ]
 
 [[package]]
@@ -626,9 +653,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c9de88456263e249e241fcd211d3954e2c9b0ef7ccfc235a444eb367cae3689"
+checksum = "d9f1f717ddc7b2ba36df7e871fd88db79326551d3d6f1fc406fbfd28b582ff8e"
 dependencies = [
  "bytes 1.1.0",
  "fnv",
@@ -877,9 +904,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.114"
+version = "0.2.115"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0005d08a8f7b65fb8073cb697aa0b12b631ed251ce73d862ce50eeb52ce3b50"
+checksum = "0a8d982fa7a96a000f6ec4cfe966de9703eccde29750df2bb8949da91b0e818d"
 
 [[package]]
 name = "lock_api"
@@ -1145,6 +1172,12 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
+
+[[package]]
+name = "owo-colors"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2386b4ebe91c2f7f51082d4cefa145d030e33a1842a96b12e4885cc3c01f7a55"
 
 [[package]]
 name = "parking_lot"
@@ -1763,9 +1796,9 @@ checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "socket2"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f82496b90c36d70af5fcd482edaa2e0bd16fade569de1330405fecbbdac736b"
+checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi",
@@ -1847,6 +1880,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "strsim"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
+
+[[package]]
 name = "strum"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1909,6 +1948,15 @@ dependencies = [
  "redox_syscall",
  "remove_dir_all",
  "winapi",
+]
+
+[[package]]
+name = "textwrap"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]
@@ -1978,9 +2026,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.15.0"
+version = "1.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbbf1c778ec206785635ce8ad57fe52b3009ae9e0c9f574a728f3049d3e55838"
+checksum = "0c27a64b625de6d309e8c57716ba93021dccf1b3b5c97edd6d3dd2d2135afc0a"
 dependencies = [
  "bytes 1.1.0",
  "libc",
@@ -2246,6 +2294,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8895849a949e7845e06bd6dc1aa51731a103c42707010a5b591c0038fb73385b"
 
 [[package]]
+name = "unicode-width"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ed742d4ea2bd1176e236172c8429aaf54486e7ac098db29ffe6529e0ce50973"
+
+[[package]]
 name = "unicode-xid"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2307,10 +2361,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4bf03e0ca70d626ecc4ba6b0763b934b6f2976e8c744088bb3c1d646fbb1ad0"
 
 [[package]]
+name = "uwuify"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3db6840b7adcfd2e866c79157cc890ecdbbc1f739607134039ae64eaa6c07e24"
+dependencies = [
+ "clap",
+ "owo-colors",
+ "parking_lot",
+ "thiserror",
+]
+
+[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "vec_map"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "version_check"
