@@ -1,4 +1,6 @@
+use crate::model::discord_utils::check_msg;
 use crate::model::image_processing;
+use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, File};
 use std::io::Write;
 
@@ -104,5 +106,46 @@ async fn addemote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 
     msg.react(&ctx.http, emote).await?;
 
+    Ok(())
+}
+
+#[command("delemote")]
+#[only_in(guilds)]
+#[required_permissions("MANAGE_EMOJIS")]
+#[num_args(1)]
+#[usage("[emote_name]")]
+#[description("Removes all occurencies of emotes with that name from that guild")]
+async fn delete_emote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    Ok(())
+}
+
+#[command("rmdbemotes")]
+#[only_in(guilds)]
+#[required_permissions("MANAGE_EMOJIS")]
+#[num_args(0)]
+#[description(
+    "Removes all emotes with duplicate names (only one of them) ignoring underscores and case"
+)]
+async fn delete_duplicate_emotes(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).await.unwrap();
+    let emotes = guild.emojis(&ctx.http).await?;
+    let mut to_delete: HashMap<String, HashSet<&EmojiId>> = HashMap::new();
+    for emote in emotes.iter() {
+        to_delete
+            .entry(str::replace(&emote.name, "_", "").to_lowercase())
+            .or_insert(HashSet::new())
+            .insert(&emote.id);
+    }
+    let to_delete = to_delete
+        .into_iter()
+        .filter(|(_id, dubs)| dubs.len() > 1)
+        .map(|(_id, dubs)| dubs)
+        .collect::<Vec<HashSet<&EmojiId>>>();
+    for mut set in to_delete {
+        for id in set.drain().skip(1) {
+            check_msg(guild.delete_emoji(&ctx.http, id).await);
+        }
+    }
     Ok(())
 }

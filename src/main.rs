@@ -305,7 +305,7 @@ struct Music;
 struct Owner;
 
 #[group]
-#[commands(addemote)]
+#[commands(addemote, delete_emote, delete_duplicate_emotes)]
 #[description = "A group for admin utility to manage your server"]
 struct Admin;
 
