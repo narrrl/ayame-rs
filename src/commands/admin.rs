@@ -117,6 +117,17 @@ async fn addemote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 #[description("Removes all occurencies of emotes with that name from that guild")]
 async fn delete_emote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let guild = msg.guild(&ctx.cache).await.unwrap();
+    let emote_name = match args.current() {
+        Some(arg) => arg,
+        None => return Ok(()),
+    };
+    let mut emotes = guild.emojis(&ctx.http).await?;
+    emotes.retain(|e| e.name == emote_name);
+    for emote in emotes.drain(..) {
+        let id = emote.id;
+        check_msg(guild.delete_emoji(&ctx.http, id).await);
+    }
+
     Ok(())
 }
 
