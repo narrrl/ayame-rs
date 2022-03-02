@@ -242,20 +242,6 @@ impl EventHandler for Handler {
         );
         for id in guilds.iter() {
             let id = id.clone();
-            let http = ctx.http.clone();
-            let all_cmd = commands.clone();
-            info!("creating application commands for guild: {:?}", &id);
-            tokio::spawn(async move {
-                for cmd in all_cmd.iter() {
-                    check_msg(
-                        id.create_application_command(&http, |command| {
-                            command.clone_from(&cmd);
-                            command
-                        })
-                        .await,
-                    );
-                }
-            });
             if let Ok(guild_commands) = id.get_application_commands(&ctx.http).await {
                 if commands.len() != guild_commands.len() {
                     info!(
@@ -273,6 +259,20 @@ impl EventHandler for Handler {
                                 check_msg(id.delete_application_command(&http, cmd_id).await);
                             });
                         });
+                    info!("creating application commands for guild: {:?}", &id);
+                    let http = ctx.http.clone();
+                    let all_cmd = commands.clone();
+                    tokio::spawn(async move {
+                        for cmd in all_cmd.iter() {
+                            check_msg(
+                                id.create_application_command(&http, |command| {
+                                    command.clone_from(&cmd);
+                                    command
+                                })
+                                .await,
+                            );
+                        }
+                    });
                 }
             }
         }
@@ -387,7 +387,7 @@ async fn main() {
         .help(&HELP)
         .bucket("youtubedl", |b| b.time_span(180).limit(1))
         .await;
-    let application_id: u64 = CONFIG.get_application_id();
+    let application_id: &u64 = CONFIG.get_application_id();
 
     let mut client = Client::builder(&token)
         .framework(framework)
@@ -395,7 +395,7 @@ async fn main() {
         .event_handler(Handler {
             disconnects: Arc::new(Mutex::new(HashMap::new())),
         })
-        .application_id(application_id)
+        .application_id(*application_id)
         .register_songbird()
         .await
         .expect("Err creating client");

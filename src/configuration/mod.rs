@@ -10,19 +10,20 @@ pub struct Config {
     application_id: u64,
     copy_codec: Option<bool>,
     youtube_api_key: String,
+    mensa_api_key: Option<String>,
 }
 
 impl Config {
-    pub fn token(&self) -> String {
-        self.token.clone()
+    pub fn token<'a>(&'a self) -> &'a String {
+        &self.token
     }
 
-    pub fn prefix(&self) -> String {
-        self.prefix.clone()
+    pub fn prefix<'a>(&'a self) -> &'a String {
+        &self.prefix
     }
 
-    pub fn get_application_id(&self) -> u64 {
-        self.application_id.clone()
+    pub fn get_application_id<'a>(&'a self) -> &'a u64 {
+        &self.application_id
     }
 
     pub fn copy_codec(&self) -> bool {
@@ -33,8 +34,12 @@ impl Config {
         }
     }
 
-    pub fn youtube_api_key(&self) -> String {
-        self.youtube_api_key.clone()
+    pub fn mensa_api_key<'a>(&'a self) -> &'a Option<String> {
+        &self.mensa_api_key
+    }
+
+    pub fn youtube_api_key<'a>(&'a self) -> &'a String {
+        &self.youtube_api_key
     }
 }
 

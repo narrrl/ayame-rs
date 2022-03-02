@@ -65,12 +65,12 @@ pub async fn invite(http: &Arc<Http>) -> CreateEmbed {
     e.description(
         "Those are the requirements for the bot to run without any restrictions. \
         The bot is open source and the source code can be found on \
-        [Github](https://github.com/nirusu99/ayame-rs). 
+        [Github](https://github.com/nirusu99/ayame-rs).
 
         [Click here](invite_url) to invite the bot with required permissions
         [Click here](admin_invite) to invite the bot with administrator privileges
 
-        Why should you invite the bot with elevated permissions? 
+        Why should you invite the bot with elevated permissions?
         Because future releases might not be supported by the current set of permissions. \
         That means if a new command or feature doesn't work then that could mean that you have to \
         invite the bot again with the new set of permissions. \
