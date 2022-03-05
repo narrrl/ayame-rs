@@ -28,6 +28,7 @@ reqwest = "^0"
 html-escape = "^0"
 url = "^2"
 uwuify = "^0"
+poise = "^0"
 
 [dependencies.serenity]
 version = "^0"

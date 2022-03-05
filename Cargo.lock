@@ -145,6 +145,7 @@ dependencies = [
  "humantime",
  "image",
  "lazy_static",
+ "poise",
  "rand 0.8.5",
  "regex",
  "reqwest",
@@ -1162,9 +1163,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
 
 [[package]]
 name = "opaque-debug"
@@ -1341,6 +1342,12 @@ dependencies = [
  "deflate",
  "miniz_oxide 0.5.1",
 ]
+
+[[package]]
+name = "poise"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af980799a938dcc09ba0dd12dcf28487789560f0de573f1545f54f776a188d1a"
 
 [[package]]
 name = "poly1305"
