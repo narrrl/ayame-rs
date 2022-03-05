@@ -152,7 +152,7 @@ dependencies = [
  "serde",
  "serde-xml-rs",
  "serde_json",
- "serenity",
+ "serenity 0.10.10 (git+https://github.com/serenity-rs/serenity.git)",
  "songbird",
  "strum",
  "strum_macros",
@@ -293,8 +293,7 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 [[package]]
 name = "command_attr"
 version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e74a021f9d0b577821bf9f5b1a2be88677e95ee05713e5d44fb4236cfa1744c"
+source = "git+https://github.com/serenity-rs/serenity.git#4eee51c2cbbd4f50a6c50bb09b5cf10fa83cffd5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1778,6 +1777,29 @@ dependencies = [
  "bitflags",
  "bytes 1.1.0",
  "chrono",
+ "flate2",
+ "futures",
+ "percent-encoding",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "typemap_rev",
+ "url",
+]
+
+[[package]]
+name = "serenity"
+version = "0.10.10"
+source = "git+https://github.com/serenity-rs/serenity.git#4eee51c2cbbd4f50a6c50bb09b5cf10fa83cffd5"
+dependencies = [
+ "async-trait",
+ "async-tungstenite 0.11.0",
+ "base64 0.13.0",
+ "bitflags",
+ "bytes 1.1.0",
+ "chrono",
  "command_attr",
  "flate2",
  "futures",
@@ -1878,7 +1900,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "serenity",
+ "serenity 0.10.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "serenity-voice-model",
  "spin_sleep",
  "streamcatcher",

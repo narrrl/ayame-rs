@@ -31,7 +31,7 @@ uwuify = "^0"
 poise = "^0"
 
 [dependencies.serenity]
-version = "^0"
+git = "https://github.com/serenity-rs/serenity.git"
 features = [
     "cache",
     "builder",
