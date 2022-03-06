@@ -1,13 +1,14 @@
 use itertools::Itertools;
-use std::str::FromStr;
+use mensa_swfr_rs::mensa::Day;
+use std::{collections::HashMap, str::FromStr};
 
 use crate::{
     utils::{create_mensa_plan_by_day, translate_weekday, weekday_german},
     Context, Error,
 };
 use chrono::{Datelike, Utc, Weekday};
-use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateSelectMenu};
-use tracing::{error, info};
+use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateSelectMenuOptions};
+use tracing::error;
 
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn mock(
@@ -41,21 +42,8 @@ pub(crate) async fn mensa(
             None => Utc::now().weekday(),
         };
 
-        let embed = match days.get(&day) {
-            Some(day) => match create_mensa_plan_by_day(day) {
-                Ok(embed) => embed,
-                Err(why) => {
-                    error!("{:?}", why);
-                    return Ok(());
-                }
-            },
-            None => {
-                let mut e = CreateEmbed::default();
-                e.title("Keine Mensa für den ausgewählten Tag");
-                e
-            }
-        };
         let uuid = ctx.id();
+        let embed = create_mensa_embed(&days, &day);
         ctx.send(|m| {
             m.embed(|e| {
                 e.clone_from(&embed);
@@ -64,24 +52,8 @@ pub(crate) async fn mensa(
             .components(|c| {
                 c.create_action_row(|ar| {
                     ar.create_select_menu(|menu| {
-                        menu.options(|op| {
-                            for d in days
-                                .keys()
-                                .map(|w| *w)
-                                .sorted_by(|a, b| Ord::cmp(&(*a as u8), &(*b as u8)))
-                            {
-                                op.create_option(|p| {
-                                    p.label(format!("{}", weekday_german(&d)))
-                                        .value(format!("{}", weekday_german(&d)));
-                                    if d == day {
-                                        p.default_selection(true);
-                                    }
-                                    p
-                                });
-                            }
-                            op
-                        })
-                        .custom_id(uuid)
+                        menu.options(|e| create_mensa_options(e, &day, &days))
+                            .custom_id(uuid)
                     })
                 })
             })
@@ -107,20 +79,7 @@ pub(crate) async fn mensa(
                     }
                 };
 
-                let embed = match days.get(&day) {
-                    Some(day) => match create_mensa_plan_by_day(day) {
-                        Ok(embed) => embed,
-                        Err(why) => {
-                            error!("{:?}", why);
-                            return Ok(());
-                        }
-                    },
-                    None => {
-                        let mut e = CreateEmbed::default();
-                        e.title("Keine Mensa für den ausgewählten Tag");
-                        e
-                    }
-                };
+                let embed = create_mensa_embed(&days, &day);
                 let mut msg = mci.message.clone();
                 msg.edit(ctx.discord(), |m| m.set_embed(embed)).await?;
 
@@ -131,7 +90,48 @@ pub(crate) async fn mensa(
             }
         }
     } else {
-        ctx.say("No mensa api key provided").await?;
+        error!("No mensa api key provided");
     }
     Ok(())
+}
+
+fn create_mensa_options<'a>(
+    opt: &'a mut CreateSelectMenuOptions,
+    day: &Weekday,
+    days: &HashMap<Weekday, &Day>,
+) -> &'a mut CreateSelectMenuOptions {
+    for d in days
+        .keys()
+        .map(|w| *w)
+        .sorted_by(|a, b| Ord::cmp(&(*a as u8), &(*b as u8)))
+    {
+        opt.create_option(|p| {
+            p.label(format!("{}", weekday_german(&d)))
+                .value(format!("{}", weekday_german(&d)));
+            if d == *day {
+                p.default_selection(true);
+            }
+            p
+        });
+    }
+
+    opt
+}
+
+fn create_mensa_embed(days: &HashMap<Weekday, &Day>, day: &Weekday) -> CreateEmbed {
+    match days.get(day) {
+        Some(day) => match create_mensa_plan_by_day(day) {
+            Ok(embed) => embed,
+            Err(_) => {
+                let mut e = CreateEmbed::default();
+                e.title("Keine Mensa für den ausgewählten Tag");
+                return e;
+            }
+        },
+        None => {
+            let mut e = CreateEmbed::default();
+            e.title("Keine Mensa für den ausgewählten Tag");
+            e
+        }
+    }
 }
