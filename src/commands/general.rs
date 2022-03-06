@@ -81,8 +81,6 @@ pub(crate) async fn mensa(
                             }
                             op
                         })
-                        .max_values(1)
-                        .min_values(1)
                         .custom_id(uuid)
                     })
                 })
@@ -123,7 +121,6 @@ pub(crate) async fn mensa(
                         e
                     }
                 };
-
                 let mut msg = mci.message.clone();
                 msg.edit(ctx.discord(), |m| m.set_embed(embed)).await?;
 
