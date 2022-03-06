@@ -81,7 +81,17 @@ pub(crate) async fn mensa(
 
                 let embed = create_mensa_embed(&days, &day);
                 let mut msg = mci.message.clone();
-                msg.edit(ctx.discord(), |m| m.set_embed(embed)).await?;
+                msg.edit(ctx.discord(), |m| {
+                    m.set_embed(embed).components(|c| {
+                        c.create_action_row(|ar| {
+                            ar.create_select_menu(|menu| {
+                                menu.options(|e| create_mensa_options(e, &day, &days))
+                                    .custom_id(uuid)
+                            })
+                        })
+                    })
+                })
+                .await?;
 
                 mci.create_interaction_response(ctx.discord(), |ir| {
                     ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
