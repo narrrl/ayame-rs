@@ -46,7 +46,7 @@ pub fn create_mensa_plan_by_day(
         embed.field(
             &menu.art,
             format!(
-                "{}\n\nZusatz: {}\n\nStudenten: {}\n\nMitarbeiter: {}\n\nGäste: {}\n\nSchüler:  {}",
+                "{}\n\nZusatz: {}\n\nPreis: {}/{}/{}",
                 menu.name,
                 match &menu.food_type {
                     Some(typ) => typ,
@@ -55,9 +55,8 @@ pub fn create_mensa_plan_by_day(
                 price.price_students,
                 price.price_workers,
                 price.price_guests,
-                price.price_school
             ),
-            true,
+            false,
         );
     }
     Ok(embed)
