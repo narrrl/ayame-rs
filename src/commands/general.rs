@@ -27,7 +27,7 @@ pub(crate) async fn mensa(
     let config = crate::configuration::config();
     let mensa_key = config.mensa_api_key();
     if let Some(mensa_key) = mensa_key {
-        let plan = mensa_swfr_rs::get_week_rampart(mensa_key).await?;
+        let plan = mensa_swfr_rs::request_rempart(mensa_key).await?;
         let days = plan.days();
         let day = match day {
             Some(day) => match Weekday::from_str(&translate_weekday(&day)) {
