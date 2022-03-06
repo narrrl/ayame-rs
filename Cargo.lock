@@ -1084,7 +1084,7 @@ dependencies = [
 [[package]]
 name = "mensa-swfr-rs"
 version = "0.1.0"
-source = "git+https://github.com/Nirusu99/mensa-swfr-rs?branch=main#ae8727eaa462dbd30b053d8973e7a653de13b4e2"
+source = "git+https://github.com/Nirusu99/mensa-swfr-rs?branch=main#7b635ce98f435a90df5ff2aab44b6ee4c68b4595"
 dependencies = [
  "chrono",
  "humantime",
