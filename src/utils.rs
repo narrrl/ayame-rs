@@ -1,3 +1,4 @@
+use chrono::Weekday;
 use mensa_swfr_rs::mensa;
 use std::path::PathBuf;
 
@@ -35,20 +36,19 @@ pub fn create_mensa_plan_by_day(
     day: &mensa::Day,
 ) -> Result<CreateEmbed, Box<dyn std::error::Error>> {
     let mut embed = CreateEmbed::default();
-    embed.title(day.weekday()?);
+    embed.title(format!(
+        "{} ({})",
+        weekday_german(&day.weekday()?),
+        day.to_chrono()?.format("%d.%m.%Y")
+    ));
     for menu in day.menues.iter() {
         let price = &menu.price;
         embed.field(
-            &menu.name,
+            &menu.art,
             format!(
-                "Kind:               {}
-        Type:               {}
-        Students:           {}
-        Workers:            {}
-        Guests:             {}
-        Students (School):  {}",
-                menu.art,
-                match menu.food_type {
+                "{}\n\nZusatz: {}\n\nStudenten: {}\n\nMitarbeiter: {}\n\nGäste: {}\n\nSchüler:  {}",
+                menu.name,
+                match &menu.food_type {
                     Some(typ) => typ,
                     None => "None",
                 },
@@ -57,8 +57,33 @@ pub fn create_mensa_plan_by_day(
                 price.price_guests,
                 price.price_school
             ),
-            false,
+            true,
         );
     }
     Ok(embed)
+}
+
+pub fn translate_weekday(wd: &str) -> String {
+    match wd.to_lowercase().as_str() {
+        "montag" | "mo" => format!("{}", Weekday::Mon),
+        "dienstag" | "di" => format!("{}", Weekday::Tue),
+        "mittwoch" | "mi" => format!("{}", Weekday::Wed),
+        "donnerstag" | "do" => format!("{}", Weekday::Thu),
+        "freitag" | "fr" => format!("{}", Weekday::Fri),
+        "samstag" | "sa" => format!("{}", Weekday::Sat),
+        "sonntag" | "so" => format!("{}", Weekday::Sun),
+        _ => String::from(wd),
+    }
+}
+
+pub fn weekday_german(wd: &Weekday) -> String {
+    match wd {
+        Weekday::Mon => String::from("Montag"),
+        Weekday::Tue => String::from("Dienstag"),
+        Weekday::Wed => String::from("Mittwoch"),
+        Weekday::Thu => String::from("Donnerstag"),
+        Weekday::Fri => String::from("Freitag"),
+        Weekday::Sat => String::from("Samstag"),
+        Weekday::Sun => String::from("Sonntag"),
+    }
 }

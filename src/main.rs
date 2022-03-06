@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use commands::general::*;
 use poise::serenity_prelude::{self as serenity, Http};
+use tracing::{error, info};
 
 mod commands;
 mod configuration;
@@ -22,7 +23,7 @@ async fn event_listener(
 ) -> Result<(), Error> {
     match event {
         poise::Event::Ready { data_about_bot } => {
-            println!("{} is connected!", data_about_bot.user.name)
+            info!("{} is connected!", data_about_bot.user.name)
         }
         _ => {}
     }
@@ -58,14 +59,14 @@ async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Command { error, ctx } => {
-            println!(
+            error!(
                 "Command '{}' returned error {:?}",
                 ctx.command().name,
                 error
             );
         }
         poise::FrameworkError::Listener { error, event } => {
-            println!(
+            error!(
                 "Listener returned error during {:?} event: {:?}",
                 event.name(),
                 error
@@ -73,7 +74,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
-                println!("Error while handling error: {}", e)
+                error!("Error while handling error: {}", e)
             }
         }
     }
@@ -81,6 +82,10 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 
 #[tokio::main]
 async fn main() {
+    if let Err(_) = std::env::var("RUST_LOG") {
+        std::env::set_var("RUST_LOG", "INFO");
+    }
+    tracing_subscriber::fmt::init();
     let config = configuration::config();
     let http = Http::new_with_token(configuration::config().token());
     let owners = match http.get_current_application_info().await {
@@ -98,7 +103,7 @@ async fn main() {
     };
 
     let options = poise::FrameworkOptions {
-        commands: vec![help(), mock(), register(), boop()],
+        commands: vec![help(), mock(), register(), mensa()],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
         },

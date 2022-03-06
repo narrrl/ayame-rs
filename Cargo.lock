@@ -160,6 +160,7 @@ dependencies = [
  "html-escape",
  "humantime",
  "image",
+ "itertools",
  "lazy_static",
  "mensa-swfr-rs",
  "poise",
@@ -972,6 +973,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68f2d64f2edebec4ce84ad108148e67e1064789bee435edc5b60ad398714a3a9"
 
 [[package]]
+name = "itertools"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1074,7 +1084,7 @@ dependencies = [
 [[package]]
 name = "mensa-swfr-rs"
 version = "0.1.0"
-source = "git+https://github.com/Nirusu99/mensa-swfr-rs?branch=main#6977cedef1259a54bd1369f5c26f595f52735fa2"
+source = "git+https://github.com/Nirusu99/mensa-swfr-rs?branch=main#8ab9da1511d5f053679bd1823679d240032d43bc"
 dependencies = [
  "chrono",
  "humantime",

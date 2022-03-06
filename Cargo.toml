@@ -30,6 +30,7 @@ url = "^2"
 uwuify = "^0"
 poise = { git = "https://github.com/kangalioo/poise", branch = "develop", features = ["collector"] }
 mensa-swfr-rs = {git = "https://github.com/Nirusu99/mensa-swfr-rs", branch = "main"}
+itertools = "^0"
 
 [dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity.git"
