@@ -22,10 +22,12 @@ impl Config {
         &self.prefix
     }
 
+    #[allow(dead_code)]
     pub fn get_application_id<'a>(&'a self) -> &'a u64 {
         &self.application_id
     }
 
+    #[allow(dead_code)]
     pub fn copy_codec(&self) -> bool {
         if let Some(b) = self.copy_codec {
             b
@@ -38,6 +40,7 @@ impl Config {
         &self.mensa_api_key
     }
 
+    #[allow(dead_code)]
     pub fn youtube_api_key<'a>(&'a self) -> &'a String {
         &self.youtube_api_key
     }

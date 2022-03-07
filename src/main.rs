@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use commands::general::*;
-use poise::serenity_prelude::{self as serenity, Http};
+use poise::serenity_prelude::{self as serenity, Http, Mutex};
 use tracing::{error, info};
 
 mod commands;
@@ -9,7 +9,7 @@ mod configuration;
 mod utils;
 
 struct Data {
-    config: std::sync::Mutex<configuration::Config>,
+    config: Mutex<configuration::Config>,
 }
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -103,7 +103,7 @@ async fn main() {
     };
 
     let options = poise::FrameworkOptions {
-        commands: vec![help(), mock(), register(), mensa()],
+        commands: vec![help(), mock(), register(), mensa(), invite()],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
         },
@@ -124,12 +124,10 @@ async fn main() {
     };
 
     // The Framework builder will automatically retrieve the bot owner and application ID via the
-    // passed token, so that information need not be passed here
     poise::Framework::build()
         .client_settings(move |client_builder| {
             client_builder.intents(serenity::GatewayIntents::all())
         })
-        // Configure the client with your Discord bot token in the environment.
         .token(config.token())
         .options(options)
         .user_data_setup(|ctx, _data_about_bot, _framework| {
@@ -140,7 +138,7 @@ async fn main() {
                 )))
                 .await;
                 Ok(Data {
-                    config: std::sync::Mutex::new(config),
+                    config: Mutex::new(config),
                 })
             })
         })

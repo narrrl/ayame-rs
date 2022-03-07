@@ -7,7 +7,7 @@ use crate::{
     Context, Error,
 };
 use chrono::{Datelike, Utc, Weekday};
-use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateSelectMenuOptions};
+use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateSelectMenuOptions, Invite};
 use tracing::error;
 
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
@@ -20,12 +20,30 @@ pub(crate) async fn mock(
 }
 
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
+pub(crate) async fn invite(ctx: Context<'_>) -> Result<(), Error> {
+    match ctx.guild() {
+        Some(_) => {}
+        None => {
+            return {
+                ctx.say("You can only invite into guilds").await?;
+                Ok(())
+            }
+        }
+    };
+
+    let inv = Invite::create(&ctx.discord().http, ctx.channel_id(), |f| f).await?;
+    ctx.send(|m| m.ephemeral(true).content(inv.url())).await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn mensa(
     ctx: Context<'_>,
     #[description = "The day to look up"] day: Option<String>,
 ) -> Result<(), Error> {
-    let config = crate::configuration::config();
+    let config = ctx.data().config.lock().await;
     let mensa_key = config.mensa_api_key();
+    drop(&config);
     if let Some(mensa_key) = mensa_key {
         let plan = mensa_swfr_rs::request_rempart(mensa_key).await?;
         let days = plan.days();
