@@ -1,18 +1,15 @@
 pub mod join;
 pub mod leave;
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use tracing::error;
 
 use async_trait::async_trait;
 use poise::{
     serenity_prelude::{
-        ChannelId, Context as SerenityContext, CreateMessage, GuildChannel, GuildId, Member,
-        Message, Result, UserId,
+        ChannelId, Context as SerenityContext, CreateMessage, GuildId, Member, Message, Result,
+        UserId,
     },
     Context,
 };
@@ -20,20 +17,28 @@ use songbird::{Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
 use crate::music::leave::leave;
 
-pub struct MusicContext<'a, U, E> {
+pub struct MusicContext<'a, U, E>
+where
+    U: Send + Sync,
+    E: Send + Sync,
+{
     pub channel_id: ChannelId,
     pub guild_id: GuildId,
     pub author_id: UserId,
     pub ctx: Context<'a, U, E>,
 }
 
-impl<'a, U, E> MusicContext<'a, U, E> {
+impl<'a, U, E> MusicContext<'a, U, E>
+where
+    U: Send + Sync,
+    E: Send + Sync,
+{
     pub async fn send<'b, F>(self, f: F) -> Result<Message>
     where
         for<'c> F: FnOnce(&'c mut CreateMessage<'b>) -> &'c mut CreateMessage<'b>,
     {
         self.channel_id
-            .send_message(self.ctx.discord().http, f)
+            .send_message(&self.ctx.discord().http, f)
             .await
     }
 
@@ -42,12 +47,20 @@ impl<'a, U, E> MusicContext<'a, U, E> {
     }
 }
 
-struct TimeoutHandler<'a, U, E> {
+struct TimeoutHandler<'a, U, E>
+where
+    U: Send + Sync,
+    E: Send + Sync,
+{
     pub ctx: MusicContext<'a, U, E>,
 }
 
 #[async_trait]
-impl<'a, U, E> EventHandler for TimeoutHandler<'a, U, E> {
+impl<'a, U, E> EventHandler for TimeoutHandler<'a, U, E>
+where
+    U: Send + Sync,
+    E: Send + Sync,
+{
     async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
         let channel = match self
             .ctx
@@ -78,7 +91,11 @@ impl<'a, U, E> EventHandler for TimeoutHandler<'a, U, E> {
     }
 }
 
-impl<'a, U, E> TimeoutHandler<'a, U, E> {
+impl<'a, U, E> TimeoutHandler<'a, U, E>
+where
+    U: Send + Sync,
+    E: Send + Sync,
+{
     fn is_alone(&self, members: &Vec<Member>) -> bool {
         for mem in members.iter() {
             if !mem.user.bot {
