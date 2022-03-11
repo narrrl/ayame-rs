@@ -6,6 +6,7 @@ use tracing::{error, info};
 
 mod commands;
 mod configuration;
+mod music;
 mod utils;
 
 struct Data {

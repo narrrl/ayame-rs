@@ -15,6 +15,7 @@ regex = "1"
 toml = "^0"
 fs_extra = "^1"
 tokio = { version = "^1", features = ["full", "time"] }
+tokio-stream = "^0"
 strum_macros = "^0"
 strum = { version = "^0", features = ["derive"] }
 serde = "^1"
