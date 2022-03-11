@@ -1,5 +1,6 @@
 use chrono::Weekday;
 use mensa_swfr_rs::mensa;
+use regex::Regex;
 use std::path::PathBuf;
 
 use poise::serenity_prelude::CreateEmbed;
@@ -47,7 +48,7 @@ pub fn create_mensa_plan_by_day(
             &menu.art,
             format!(
                 "{}\n\nZusatz: {}\n\nPreis: {}/{}/{}",
-                menu.name,
+                Regex::new(r"--+").unwrap().replace(&menu.name, "\n\n!!! "),
                 match &menu.food_type {
                     Some(typ) => typ,
                     None => "None",

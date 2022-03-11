@@ -30,9 +30,9 @@ pub(crate) async fn invite(ctx: Context<'_>) -> Result<(), Error> {
             }
         }
     };
-
     let inv = Invite::create(&ctx.discord().http, ctx.channel_id(), |f| f).await?;
     ctx.send(|m| m.ephemeral(true).content(inv.url())).await?;
+
     Ok(())
 }
 
