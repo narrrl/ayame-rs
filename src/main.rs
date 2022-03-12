@@ -1,11 +1,10 @@
-use std::collections::HashSet;
-
 use commands::general::*;
 use commands::music::*;
-use poise::serenity_prelude::{self as serenity, Http, Mutex};
+use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
 use songbird::SongbirdKey;
 use tracing::{error, info};
+use utils::check_result;
 
 mod commands;
 mod configuration;
@@ -43,7 +42,6 @@ async fn help(
 ) -> Result<(), Error> {
     let config = poise::builtins::HelpConfiguration {
         extra_text_at_bottom: "\
-Hello! こんにちは！Hola! Bonjour! 您好! 안녕하세요~
 If you want more information about a specific command, just pass the command as argument.",
         ..Default::default()
     };
@@ -64,11 +62,7 @@ async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Command { error, ctx } => {
-            error!(
-                "Command '{}' returned error {:?}",
-                ctx.command().name,
-                error
-            );
+            check_result(ctx.say(format!("Error: {}", error.to_string())).await)
         }
         poise::FrameworkError::Listener { error, event } => {
             error!(
@@ -92,21 +86,6 @@ async fn main() {
     }
     tracing_subscriber::fmt::init();
     let config = configuration::config();
-    let http = Http::new_with_token(configuration::config().token());
-    let owners = match http.get_current_application_info().await {
-        Ok(info) => {
-            let mut owners = HashSet::new();
-            if let Some(team) = info.team {
-                owners.insert(team.owner_user_id);
-            } else {
-                owners.insert(info.owner.id);
-            }
-
-            owners
-        }
-        Err(why) => panic!("Could not access application info: {:?}", why),
-    };
-
     let options = poise::FrameworkOptions {
         commands: vec![
             help(),
@@ -132,7 +111,6 @@ async fn main() {
             )),
             ..Default::default()
         },
-        owners,
         ..Default::default()
     };
 
