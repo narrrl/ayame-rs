@@ -137,6 +137,18 @@ async fn main() {
     };
 
     poise::Framework::build()
+        .client_settings(move |client_builder: serenity::ClientBuilder| {
+            // get songbird instance
+            let voice = Songbird::serenity();
+            client_builder
+                // TODO: lazy to use all intents
+                .intents(serenity::GatewayIntents::all())
+                // register songbird as VoiceGatewayManager
+                .voice_manager_arc(voice.clone())
+                // insert songbird into data
+                .type_map_insert::<SongbirdKey>(voice)
+        })
+        .token(config.token())
         .user_data_setup(|ctx, _data_about_bot, _framework| {
             Box::pin(async move {
                 // set activity to "{prefix}help"
@@ -151,18 +163,6 @@ async fn main() {
                 })
             })
         })
-        .client_settings(move |client_builder: serenity::ClientBuilder| {
-            // get songbird instance
-            let voice = Songbird::serenity();
-            client_builder
-                // TODO: lazy to use all intents
-                .intents(serenity::GatewayIntents::all())
-                // register songbird as VoiceGatewayManager
-                .voice_manager_arc(voice.clone())
-                // insert songbird into data
-                .type_map_insert::<SongbirdKey>(voice)
-        })
-        .token(config.token())
         .options(options)
         .run()
         .await

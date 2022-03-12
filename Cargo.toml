@@ -54,10 +54,14 @@ features = [
     ]
 
 [dependencies.songbird]
-version = "^0"
+git = "https://github.com/serenity-rs/songbird"
+branch = "next"
 features = ["gateway", "builtin-queue", "serenity-native", "driver", "yt-dlp" ]
 
 [profile.release]
 codegen-units = 1
 lto = "fat"
 panic = "abort"
+
+[patch.crates-io]
+serenity = { git = 'https://github.com/serenity-rs/serenity', branch = 'next' }
