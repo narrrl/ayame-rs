@@ -136,25 +136,30 @@ async fn main() {
         ..Default::default()
     };
 
-    // The Framework builder will automatically retrieve the bot owner and application ID via the
     poise::Framework::build()
         .user_data_setup(|ctx, _data_about_bot, _framework| {
             Box::pin(async move {
+                // set activity to "{prefix}help"
                 ctx.set_activity(serenity::Activity::listening(format!(
                     "{}help",
                     config.prefix()
                 )))
                 .await;
+                // store config in Data
                 Ok(Data {
                     config: Mutex::new(config),
                 })
             })
         })
-        .client_settings(move |client_builder| {
+        .client_settings(move |client_builder: serenity::ClientBuilder| {
+            // get songbird instance
             let voice = Songbird::serenity();
             client_builder
+                // TODO: lazy to use all intents
                 .intents(serenity::GatewayIntents::all())
+                // register songbird as VoiceGatewayManager
                 .voice_manager_arc(voice.clone())
+                // insert songbird into data
                 .type_map_insert::<SongbirdKey>(voice)
         })
         .token(config.token())

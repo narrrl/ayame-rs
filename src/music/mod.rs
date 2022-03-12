@@ -6,25 +6,24 @@ use std::sync::Arc;
 use tracing::error;
 
 use async_trait::async_trait;
-use poise::serenity_prelude::{
-    ChannelId, Context as SerenityContext, CreateMessage, GuildId, Member, Message, Result, UserId,
-};
+use poise::serenity_prelude::{self as serenity, Context as SerenityContext};
 use songbird::{Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
 use crate::{music::leave::leave, Context as PoiseContext};
 
 #[derive(Clone)]
 pub struct MusicContext {
-    pub channel_id: ChannelId,
-    pub guild_id: GuildId,
-    pub author_id: UserId,
+    pub channel_id: serenity::ChannelId,
+    pub guild_id: serenity::GuildId,
+    pub author_id: serenity::UserId,
     pub ctx: SerenityContext,
 }
 
 impl MusicContext {
-    pub async fn send<'b, F>(&self, f: F) -> Result<Message>
+    pub async fn send<'b, F>(&self, f: F) -> serenity::Result<serenity::Message>
     where
-        for<'c> F: FnOnce(&'c mut CreateMessage<'b>) -> &'c mut CreateMessage<'b>,
+        for<'c> F:
+            FnOnce(&'c mut serenity::CreateMessage<'b>) -> &'c mut serenity::CreateMessage<'b>,
     {
         self.channel_id.send_message(&self.ctx.http, f).await
     }
@@ -62,7 +61,7 @@ impl EventHandler for TimeoutHandler {
 }
 
 impl TimeoutHandler {
-    fn is_alone(&self, members: &Vec<Member>) -> bool {
+    fn is_alone(&self, members: &Vec<serenity::Member>) -> bool {
         for mem in members.iter() {
             if !mem.user.bot {
                 return false;
