@@ -1,3 +1,5 @@
+use poise::serenity_prelude::Mentionable;
+
 use crate::{
     music::{self, MusicContext},
     Context, Error,
@@ -27,9 +29,10 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
         }
     };
 
-    let call = music::join::join(
+    let _ = music::join::join(
+        &ctx,
         &MusicContext {
-            ctx: ctx.clone(),
+            ctx: ctx.discord().clone(),
             guild_id: guild.id,
             channel_id: ctx.channel_id(),
             author_id: ctx.author().id,
@@ -37,6 +40,31 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
         &channel_id,
     )
     .await?;
+
+    ctx.say(format!("Joined {}", channel_id.mention())).await?;
+
+    Ok(())
+}
+
+#[poise::command(prefix_command, slash_command, category = "Music")]
+pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
+    let guild = match ctx.guild() {
+        Some(guild) => guild,
+        None => {
+            ctx.say("only in guilds").await?;
+            return Ok(());
+        }
+    };
+
+    let _ = music::leave::leave(&MusicContext {
+        ctx: ctx.discord().clone(),
+        guild_id: guild.id,
+        channel_id: ctx.channel_id(),
+        author_id: ctx.author().id,
+    })
+    .await?;
+
+    ctx.say("Left voice").await?;
 
     Ok(())
 }

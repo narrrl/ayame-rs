@@ -175,6 +175,7 @@ dependencies = [
  "songbird",
  "strum",
  "strum_macros",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "toml",

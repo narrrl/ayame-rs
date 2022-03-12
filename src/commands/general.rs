@@ -13,7 +13,9 @@ use tracing::error;
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn mock(
     ctx: Context<'_>,
-    #[description = "The text to convert"] text: String,
+    #[description = "The text to convert"]
+    #[rest]
+    text: String,
 ) -> Result<(), Error> {
     ctx.say(crate::utils::mock_text(&text)).await?;
     Ok(())

@@ -1,15 +1,19 @@
 use std::collections::HashSet;
 
 use commands::general::*;
+use commands::music::*;
 use poise::serenity_prelude::{self as serenity, Http, Mutex};
+use songbird::Songbird;
+use songbird::SongbirdKey;
 use tracing::{error, info};
 
 mod commands;
 mod configuration;
+mod error;
 mod music;
 mod utils;
 
-struct Data {
+pub struct Data {
     config: Mutex<configuration::Config>,
 }
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -104,7 +108,15 @@ async fn main() {
     };
 
     let options = poise::FrameworkOptions {
-        commands: vec![help(), mock(), register(), mensa(), invite()],
+        commands: vec![
+            help(),
+            mock(),
+            register(),
+            mensa(),
+            invite(),
+            join(),
+            leave(),
+        ],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
         },
@@ -126,11 +138,6 @@ async fn main() {
 
     // The Framework builder will automatically retrieve the bot owner and application ID via the
     poise::Framework::build()
-        .client_settings(move |client_builder| {
-            client_builder.intents(serenity::GatewayIntents::all())
-        })
-        .token(config.token())
-        .options(options)
         .user_data_setup(|ctx, _data_about_bot, _framework| {
             Box::pin(async move {
                 ctx.set_activity(serenity::Activity::listening(format!(
@@ -143,6 +150,15 @@ async fn main() {
                 })
             })
         })
+        .client_settings(move |client_builder| {
+            let voice = Songbird::serenity();
+            client_builder
+                .intents(serenity::GatewayIntents::all())
+                .voice_manager_arc(voice.clone())
+                .type_map_insert::<SongbirdKey>(voice)
+        })
+        .token(config.token())
+        .options(options)
         .run()
         .await
         .expect("Client error");

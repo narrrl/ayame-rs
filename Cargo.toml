@@ -33,6 +33,7 @@ poise = { git = "https://github.com/kangalioo/poise", branch = "develop", featur
 mensa-swfr-rs = {git = "https://github.com/Nirusu99/mensa-swfr-rs", branch = "main"}
 itertools = "^0"
 once_cell = "^1"
+thiserror = "^1"
 
 [dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity.git"
