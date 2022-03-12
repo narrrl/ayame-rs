@@ -8,7 +8,9 @@ use crate::{
 };
 use chrono::{Datelike, Utc, Weekday};
 use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateSelectMenuOptions, Invite};
-use tracing::error;
+
+pub const UNKNOWN_WEEKDAY: &'static str = "unknown weekday";
+pub const NO_MENSA_KEY: &'static str = "no mensa key provided";
 
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn mock(
@@ -52,12 +54,7 @@ pub(crate) async fn mensa(
         let day = match day {
             Some(day) => match Weekday::from_str(&translate_weekday(&day)) {
                 Ok(day) => day,
-                Err(_) => {
-                    return {
-                        ctx.say("Unbekannter Wochentag").await?;
-                        Ok(())
-                    }
-                }
+                Err(_) => return Err(Error::Input(UNKNOWN_WEEKDAY)),
             },
             None => Utc::now().weekday(),
         };
@@ -91,12 +88,7 @@ pub(crate) async fn mensa(
             if let Some(day) = dds.get(0) {
                 let day = match Weekday::from_str(&translate_weekday(&day)) {
                     Ok(day) => day,
-                    Err(_) => {
-                        return {
-                            ctx.say("Unbekannter Wochentag").await?;
-                            Ok(())
-                        }
-                    }
+                    Err(_) => return Err(Error::Input(UNKNOWN_WEEKDAY)),
                 };
 
                 let embed = create_mensa_embed(&days, &day);
@@ -119,10 +111,10 @@ pub(crate) async fn mensa(
                 .await?;
             }
         }
+        Ok(())
     } else {
-        error!("No mensa api key provided");
+        Err(Error::Failure(NO_MENSA_KEY))
     }
-    Ok(())
 }
 
 fn create_mensa_options<'a>(

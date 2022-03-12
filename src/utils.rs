@@ -8,6 +8,10 @@ use rand::Rng;
 
 use tracing::error;
 
+use crate::{Context, Error};
+
+pub const NOT_IN_GUILD: &'static str = "only in guilds";
+
 pub fn bot_dir() -> PathBuf {
     let mut dir = std::env::current_exe().expect("couldn't get bot directory");
     dir.pop();
@@ -93,5 +97,12 @@ pub fn weekday_german(wd: &Weekday) -> String {
 pub fn check_result<T>(result: SerenityResult<T>) {
     if let Err(why) = result {
         error!("error: {:?}", why);
+    }
+}
+
+pub(crate) async fn guild_only(ctx: Context<'_>) -> Result<bool, Error> {
+    match ctx.guild() {
+        Some(_) => Ok(true),
+        None => Err(Error::Input(NOT_IN_GUILD)),
     }
 }

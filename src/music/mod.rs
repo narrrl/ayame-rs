@@ -20,6 +20,7 @@ pub struct MusicContext {
 }
 
 impl MusicContext {
+    #[allow(dead_code)]
     pub async fn send<'b, F>(&self, f: F) -> serenity::Result<serenity::Message>
     where
         for<'c> F:
@@ -71,6 +72,7 @@ impl TimeoutHandler {
     }
 }
 
+#[allow(dead_code)]
 pub async fn get_poise(ctx: &PoiseContext<'_>) -> Option<Arc<Songbird>> {
     let data = ctx.discord().data.read().await;
     data.get::<SongbirdKey>().cloned()

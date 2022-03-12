@@ -1,5 +1,6 @@
 use commands::general::*;
 use commands::music::*;
+use commands::owner::*;
 use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
 use songbird::SongbirdKey;
@@ -15,7 +16,7 @@ mod utils;
 pub struct Data {
     config: Mutex<configuration::Config>,
 }
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Error = error::AyameError;
 
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -62,7 +63,11 @@ async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Command { error, ctx } => {
-            check_result(ctx.say(format!("Error: {}", error.to_string())).await)
+            if let Error::Input(error) = error {
+                check_result(ctx.say(format!("Error: {}", error.to_string())).await)
+            } else {
+                error!("Error while executing command: {:?}", error)
+            }
         }
         poise::FrameworkError::Listener { error, event } => {
             error!(
@@ -95,6 +100,7 @@ async fn main() {
             invite(),
             join(),
             leave(),
+            shutdown(),
         ],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
