@@ -1,7 +1,9 @@
 use mensa_swfr_rs::error::MensaError;
-use poise::serenity_prelude::Error as SerenityError;
+use poise::serenity_prelude::{Color, Error as SerenityError};
 use songbird::error::{ConnectionError, JoinError};
 use thiserror::Error;
+
+use crate::{utils::check_result, Context};
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -36,3 +38,19 @@ pub enum AyameError {
 // static anyway. Let's hope for the best lol
 unsafe impl Send for AyameError {}
 unsafe impl Sync for AyameError {}
+
+impl AyameError {
+    pub async fn send_error(&self, ctx: &Context<'_>) {
+        check_result(
+            ctx.send(|m| {
+                m.embed(|em| {
+                    em.title("Error!")
+                        .color(Color::RED)
+                        .description(&self.to_string())
+                })
+                .ephemeral(true)
+            })
+            .await,
+        )
+    }
+}
