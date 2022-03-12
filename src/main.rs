@@ -12,9 +12,9 @@ mod utils;
 struct Data {
     config: Mutex<configuration::Config>,
 }
-type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
-type Context<'a> = poise::Context<'a, Data, Error>;
+pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 async fn event_listener(
     _ctx: &serenity::Context,

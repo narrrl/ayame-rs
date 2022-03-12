@@ -15,25 +15,20 @@ use poise::{
 };
 use songbird::{Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
-use crate::music::leave::leave;
+use crate::{music::leave::leave, Context as PoiseContext, Data, Error};
 
-pub struct MusicContext<'a, U, E>
-where
-    U: Send + Sync,
-    E: Send + Sync,
-{
+#[derive(Clone)]
+pub struct MusicContext<'a> {
     pub channel_id: ChannelId,
     pub guild_id: GuildId,
     pub author_id: UserId,
-    pub ctx: Context<'a, U, E>,
+    pub ctx: Context<'a, Data, Error>,
 }
 
-impl<'a, U, E> MusicContext<'a, U, E>
-where
-    U: Send + Sync,
-    E: Send + Sync,
-{
-    pub async fn send<'b, F>(self, f: F) -> Result<Message>
+impl Copy for MusicContext<'_> {}
+
+impl<'a> MusicContext<'a> {
+    pub async fn send<'b, F>(&self, f: F) -> Result<Message>
     where
         for<'c> F: FnOnce(&'c mut CreateMessage<'b>) -> &'c mut CreateMessage<'b>,
     {
@@ -47,32 +42,24 @@ where
     }
 }
 
-struct TimeoutHandler<'a, U, E>
-where
-    U: Send + Sync,
-    E: Send + Sync,
-{
-    pub ctx: MusicContext<'a, U, E>,
+struct TimeoutHandler<'a> {
+    pub mtx: MusicContext<'a>,
 }
 
 #[async_trait]
-impl<'a, U, E> EventHandler for TimeoutHandler<'a, U, E>
-where
-    U: Send + Sync,
-    E: Send + Sync,
-{
+impl EventHandler for TimeoutHandler<'_> {
     async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
         let channel = match self
-            .ctx
+            .mtx
             .serenity()
             .cache
-            .guild_channel(self.ctx.channel_id.0)
+            .guild_channel(self.mtx.channel_id.0)
         {
             Some(channel) => channel,
             None => return None,
         };
 
-        let members = match channel.members(&self.ctx.ctx.discord().cache).await {
+        let members = match channel.members(&self.mtx.ctx.discord().cache).await {
             Ok(mems) => mems,
             Err(why) => {
                 error!("failed to get members of voice channel: {:?}", why);
@@ -81,7 +68,7 @@ where
         };
 
         if self.is_alone(&members) {
-            if let Err(why) = leave(&self.ctx).await {
+            if let Err(why) = leave(&self.mtx).await {
                 error!("leaving voice channel returned error: {:?}", why);
             }
             Some(Event::Cancel)
@@ -91,11 +78,7 @@ where
     }
 }
 
-impl<'a, U, E> TimeoutHandler<'a, U, E>
-where
-    U: Send + Sync,
-    E: Send + Sync,
-{
+impl TimeoutHandler<'_> {
     fn is_alone(&self, members: &Vec<Member>) -> bool {
         for mem in members.iter() {
             if !mem.user.bot {
@@ -106,7 +89,7 @@ where
     }
 }
 
-pub async fn get<U, E>(ctx: &Context<'_, U, E>) -> Option<Arc<Songbird>> {
+pub async fn get(ctx: &PoiseContext<'_>) -> Option<Arc<Songbird>> {
     let data = ctx.discord().data.read().await;
     data.get::<SongbirdKey>().cloned()
 }

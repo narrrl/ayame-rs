@@ -3,8 +3,10 @@ use mensa_swfr_rs::mensa;
 use regex::Regex;
 use std::path::PathBuf;
 
-use poise::serenity_prelude::CreateEmbed;
+use poise::{serenity::Result as SerenityResult, serenity_prelude::CreateEmbed};
 use rand::Rng;
+
+use tracing::error;
 
 pub fn bot_dir() -> PathBuf {
     let mut dir = std::env::current_exe().expect("couldn't get bot directory");
@@ -85,5 +87,11 @@ pub fn weekday_german(wd: &Weekday) -> String {
         Weekday::Fri => String::from("Freitag"),
         Weekday::Sat => String::from("Samstag"),
         Weekday::Sun => String::from("Sonntag"),
+    }
+}
+
+pub fn check_result<T>(result: SerenityResult<T>) {
+    if let Err(why) = result {
+        error!("error: {:?}", why);
     }
 }
