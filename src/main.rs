@@ -53,14 +53,6 @@ If you want more information about a specific command, just pass the command as 
     Ok(())
 }
 
-/// Register slash commands in this guild or globally
-/// Run with no arguments to register in guild, run with argument "global" to register globally.
-#[poise::command(prefix_command, hide_in_help)]
-async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
-    poise::builtins::register_application_commands(ctx, global).await?;
-    Ok(())
-}
-
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Command { error, ctx } => {
@@ -101,6 +93,7 @@ async fn main() {
             help(),
             mock(),
             register(),
+            unregister(),
             mensa(),
             invite(),
             join(),
