@@ -19,6 +19,7 @@ use crate::error::*;
     global_cooldown = 3
 )]
 pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.defer().await?;
     let guild = ctx
         .guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
@@ -59,6 +60,7 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
     global_cooldown = 3
 )]
 pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.defer().await?;
     let guild = ctx
         .guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
@@ -89,6 +91,7 @@ pub(crate) async fn play(
     #[rest]
     input: String,
 ) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
     let guild = ctx
         .guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
@@ -124,7 +127,6 @@ pub(crate) async fn play(
                 .description("added song")
                 .image(song.thumbnail().url())
         })
-        .ephemeral(true)
     })
     .await?;
     Ok(())
@@ -138,6 +140,7 @@ pub(crate) async fn play(
     global_cooldown = 3
 )]
 pub(crate) async fn skip(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.defer().await?;
     let guild = ctx
         .guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
