@@ -12,6 +12,7 @@ mod configuration;
 mod error;
 mod music;
 mod utils;
+mod youtube;
 
 pub struct Data {
     config: Mutex<configuration::Config>,
@@ -104,6 +105,8 @@ async fn main() {
             invite(),
             join(),
             leave(),
+            play(),
+            skip(),
             shutdown(),
         ],
         listener: |ctx, event, framework, user_data| {

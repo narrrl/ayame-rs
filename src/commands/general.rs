@@ -9,8 +9,7 @@ use crate::{
 use chrono::{Datelike, Utc, Weekday};
 use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateSelectMenuOptions, Invite};
 
-pub const UNKNOWN_WEEKDAY: &'static str = "unknown weekday";
-pub const NO_MENSA_KEY: &'static str = "no mensa key provided";
+use crate::error::*;
 
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn mock(

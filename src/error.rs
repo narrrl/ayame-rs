@@ -1,9 +1,19 @@
 use mensa_swfr_rs::error::MensaError;
 use poise::serenity_prelude::{Color, Error as SerenityError};
+use reqwest::Error as ReqwestError;
 use songbird::error::{ConnectionError, JoinError};
+use songbird::input::error::Error as SongbirdError;
+use songbird::tracks::TrackError;
 use thiserror::Error;
 
 use crate::{utils::check_result, Context};
+
+pub const NOT_IN_VOICE: &'static str = "not in a voice channel";
+pub const NO_SEARCH_RESULTS: &'static str = "nothing found";
+pub const NOTHING_PLAYING: &'static str = "nothing playing";
+pub const FAILD_TO_GET_SONGBIRD: &'static str = "couldn't get songbird";
+pub const UNKNOWN_WEEKDAY: &'static str = "unknown weekday";
+pub const NO_MENSA_KEY: &'static str = "no mensa key provided";
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -27,6 +37,22 @@ pub enum AyameError {
         #[from]
         source: ConnectionError,
     },
+    #[error("{:?}", source)]
+    SongbirdError {
+        #[from]
+        source: SongbirdError,
+    },
+    #[error("{:?}", source)]
+    ReqwestError {
+        #[from]
+        source: ReqwestError,
+    },
+    #[error("{:?}", source)]
+    TrackError {
+        #[from]
+        source: TrackError,
+    },
+
     #[error("{:?}", source)]
     Mensa {
         #[from]
