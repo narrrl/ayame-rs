@@ -16,7 +16,7 @@ async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {
     );
 
     call.add_global_event(
-        Event::Periodic(Duration::from_secs(10), Some(Duration::from_secs(3))),
+        Event::Periodic(Duration::from_millis(1500), None),
         NotificationHandler { mtx: mtx.clone() },
     );
 }
