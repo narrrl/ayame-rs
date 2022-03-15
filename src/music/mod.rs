@@ -41,7 +41,6 @@ pub struct MusicContext {
 
 struct NotificationHandler {
     pub mtx: MusicContext,
-    pub always_new: bool,
 }
 
 impl NotificationHandler {
@@ -92,6 +91,16 @@ impl NotificationHandler {
             .delete_message(self.mtx.channel_id.0, old_msg.0)
             .await;
     }
+
+    async fn is_newest<'a>(&'a self, msg_id: &MessageId) -> bool {
+        match self.mtx.http.get_messages(self.mtx.channel_id.0, "").await {
+            Ok(msgs) => msgs
+                .first()
+                .and_then(|m| Some(&m.id == msg_id))
+                .unwrap_or(false),
+            Err(_) => false,
+        }
+    }
 }
 
 #[async_trait]
@@ -130,7 +139,9 @@ impl EventHandler for NotificationHandler {
 
         let mut messages_map = self.mtx.data.song_messages.lock().await;
         match messages_map.get_mut(&self.mtx.guild_id) {
+            // check if we already have a message
             Some(id) => {
+                // get the message from the id
                 let mut message = match self.mtx.http.get_message(self.mtx.channel_id.0, id.0).await
                 {
                     Ok(msg) => msg,
@@ -140,7 +151,9 @@ impl EventHandler for NotificationHandler {
                         return None;
                     }
                 };
-                let message = if self.always_new {
+                // either delete message and send new
+                // or update old message
+                let message = if !self.is_newest(&message.id).await {
                     self.send_new_message(&embed, Some(message.id)).await
                 } else {
                     check_result_ayame(self.edit_message(&embed, &mut message, None).await);
@@ -151,6 +164,7 @@ impl EventHandler for NotificationHandler {
                     messages_map.insert(self.mtx.guild_id, msg.id);
                 }
             }
+            // else create a message
             None => {
                 let message = match self.send_new_message(&embed, None).await {
                     Ok(msg) => msg,

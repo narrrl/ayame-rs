@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use poise::serenity_prelude::{ChannelId, Mutex};
-use songbird::{Call, Event, TrackEvent};
+use songbird::{Call, Event};
 
 use super::{MusicContext, NotificationHandler, TimeoutHandler};
 use crate::Error;
@@ -16,18 +16,8 @@ async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {
     );
 
     call.add_global_event(
-        Event::Periodic(Duration::from_secs(15), Some(Duration::from_secs(5))),
-        NotificationHandler {
-            mtx: mtx.clone(),
-            always_new: false,
-        },
-    );
-    call.add_global_event(
-        Event::Track(TrackEvent::End),
-        NotificationHandler {
-            mtx: mtx.clone(),
-            always_new: true,
-        },
+        Event::Periodic(Duration::from_secs(10), Some(Duration::from_secs(3))),
+        NotificationHandler { mtx: mtx.clone() },
     );
 }
 
