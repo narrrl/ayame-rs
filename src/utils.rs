@@ -100,6 +100,12 @@ pub fn check_result<T>(result: SerenityResult<T>) {
     }
 }
 
+pub fn check_result_ayame<T>(result: Result<T, Error>) {
+    if let Err(why) = result {
+        error!("error: {:?}", why);
+    }
+}
+
 pub(crate) async fn guild_only(ctx: Context<'_>) -> Result<bool, Error> {
     match ctx.guild() {
         Some(_) => Ok(true),

@@ -16,12 +16,18 @@ async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {
     );
 
     call.add_global_event(
-        Event::Periodic(Duration::from_secs(10), Some(Duration::from_secs(1))),
-        NotificationHandler { mtx: mtx.clone() },
+        Event::Periodic(Duration::from_secs(15), Some(Duration::from_secs(5))),
+        NotificationHandler {
+            mtx: mtx.clone(),
+            always_new: false,
+        },
     );
     call.add_global_event(
         Event::Track(TrackEvent::End),
-        NotificationHandler { mtx: mtx.clone() },
+        NotificationHandler {
+            mtx: mtx.clone(),
+            always_new: true,
+        },
     );
 }
 

@@ -16,10 +16,11 @@ use tracing::error;
 use async_trait::async_trait;
 use poise::serenity_prelude::{
     self as serenity, Cache, ChannelId, Context as SerenityContext, CreateEmbed, GuildId, Http,
-    MessageId, Mutex, User,
+    Message, MessageId, Mutex, User,
 };
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
+use crate::utils::check_result_ayame;
 use crate::{music::leave::leave, Context as PoiseContext, Error};
 
 use crate::{error::*, Data};
@@ -42,11 +43,62 @@ pub struct MusicContext {
 
 struct NotificationHandler {
     pub mtx: MusicContext,
+    pub always_new: bool,
+}
+
+impl NotificationHandler {
+    async fn send_new_message(
+        &self,
+        embed: &CreateEmbed,
+        old_msg: Option<MessageId>,
+    ) -> Result<Message, Error> {
+        if let Some(old_msg) = old_msg {
+            self.delete_old(old_msg).await;
+        }
+        Ok(self
+            .mtx
+            .channel_id
+            .send_message(&self.mtx.http, |m| {
+                m.embed(|e| {
+                    e.clone_from(embed);
+                    e
+                })
+            })
+            .await?)
+    }
+
+    async fn edit_message(
+        &self,
+        embed: &CreateEmbed,
+        message: &mut Message,
+        old_msg: Option<MessageId>,
+    ) -> Result<(), Error> {
+        if let Some(old_msg) = old_msg {
+            self.delete_old(old_msg).await;
+        }
+        message
+            .edit(&self.mtx.http, |m| {
+                m.embed(|e| {
+                    e.clone_from(embed);
+                    e
+                })
+            })
+            .await?;
+        Ok(())
+    }
+
+    async fn delete_old(&self, old_msg: MessageId) {
+        let _ = self
+            .mtx
+            .http
+            .delete_message(self.mtx.channel_id.0, old_msg.0)
+            .await;
+    }
 }
 
 #[async_trait]
 impl EventHandler for NotificationHandler {
-    async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
+    async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         let songbird = &self.mtx.songbird;
 
         let call = match songbird.get(self.mtx.guild_id) {
@@ -58,6 +110,7 @@ impl EventHandler for NotificationHandler {
 
         let queue = call.queue();
         let current = queue.current();
+        drop(call);
 
         let embed = match current {
             Some(current) => {
@@ -89,27 +142,19 @@ impl EventHandler for NotificationHandler {
                         return None;
                     }
                 };
-                let _ = message
-                    .edit(&self.mtx.http, |m| {
-                        m.embed(|e| {
-                            e.clone_from(&embed);
-                            e
-                        })
-                    })
-                    .await;
+                let message = if self.always_new {
+                    self.send_new_message(&embed, Some(message.id)).await
+                } else {
+                    check_result_ayame(self.edit_message(&embed, &mut message, None).await);
+                    drop(messages_map);
+                    return None;
+                };
+                if let Ok(msg) = message {
+                    messages_map.insert(self.mtx.guild_id, msg.id);
+                }
             }
             None => {
-                let message = match self
-                    .mtx
-                    .channel_id
-                    .send_message(&self.mtx.http, |m| {
-                        m.embed(|e| {
-                            e.clone_from(&embed);
-                            e
-                        })
-                    })
-                    .await
-                {
+                let message = match self.send_new_message(&embed, None).await {
                     Ok(msg) => msg,
                     Err(_) => {
                         drop(messages_map);
@@ -269,7 +314,7 @@ pub async fn embed_song(track: &TrackHandle, user: Option<User>) -> CreateEmbed 
         (Some(cd), Some(d)) => {
             let mut bar = Bar::new();
             bar.set_style("[=>-]");
-            bar.set_len(10);
+            bar.set_len(30);
             bar.set(cd.as_secs() as f64 / d.as_secs() as f64);
             bar
         }

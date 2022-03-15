@@ -3,7 +3,7 @@ use songbird::input::Restartable;
 use tokio::join;
 
 use crate::{
-    music::{self, duration_format, hyperlink_song, MusicContext},
+    music::{self, hyperlink_song, MusicContext},
     utils::guild_only,
     youtube::{Type, YoutubeSearch},
     Context, Error,
