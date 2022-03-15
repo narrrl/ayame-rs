@@ -1,6 +1,5 @@
 # nirust
 [![Build status](https://github.com/nirusu99/ayame-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/nirusu99/ayame-rs/actions)
-[![dependency status](https://deps.rs/repo/github/nirusu99/ayame-rs/status.svg)](https://deps.rs/repo/github/nirusu99/ayame-rs)
 
 A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nirubot) in Rust.
 
