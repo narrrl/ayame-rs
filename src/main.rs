@@ -1,11 +1,18 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use commands::general::*;
 use commands::music::*;
 use commands::owner::*;
+use poise::serenity_prelude::GuildId;
+use poise::serenity_prelude::MessageId;
+use poise::serenity_prelude::UserId;
 use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
 use songbird::SongbirdKey;
 use tracing::{error, info};
 use utils::check_result;
+use uuid::Uuid;
 
 mod commands;
 mod configuration;
@@ -14,8 +21,11 @@ mod music;
 mod utils;
 mod youtube;
 
+#[derive(Clone)]
 pub struct Data {
-    config: Mutex<configuration::Config>,
+    config: Arc<Mutex<configuration::Config>>,
+    song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
+    song_messages: Arc<Mutex<HashMap<GuildId, MessageId>>>,
 }
 pub type Error = error::AyameError;
 
@@ -25,7 +35,7 @@ async fn event_listener(
     _ctx: &serenity::Context,
     event: &poise::Event<'_>,
     _framework: &poise::Framework<Data, Error>,
-    _user_data: &Data,
+    _data: &Data,
 ) -> Result<(), Error> {
     match event {
         poise::Event::Ready { data_about_bot } => {
@@ -125,7 +135,7 @@ async fn main() {
             // get songbird instance
             let voice = Songbird::serenity();
             client_builder
-                // TODO: lazy to use all intents
+                // TODO: lazy so use all intents
                 .intents(serenity::GatewayIntents::all())
                 // register songbird as VoiceGatewayManager
                 .voice_manager_arc(voice.clone())
@@ -143,7 +153,9 @@ async fn main() {
                 .await;
                 // store config in Data
                 Ok(Data {
-                    config: Mutex::new(config),
+                    config: Arc::new(Mutex::new(config)),
+                    song_queues: Arc::new(Mutex::new(HashMap::new())),
+                    song_messages: Arc::new(Mutex::new(HashMap::new())),
                 })
             })
         })

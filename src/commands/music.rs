@@ -3,7 +3,7 @@ use songbird::input::Restartable;
 use tokio::join;
 
 use crate::{
-    music::{self, MusicContext},
+    music::{self, duration_format, hyperlink_song, MusicContext},
     utils::guild_only,
     youtube::{Type, YoutubeSearch},
     Context, Error,
@@ -16,7 +16,8 @@ use crate::error::*;
     slash_command,
     category = "Music",
     check = "guild_only",
-    global_cooldown = 3
+    global_cooldown = 3,
+    ephemeral
 )]
 pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
@@ -32,22 +33,21 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
         None => return Err(Error::Input(NOT_IN_VOICE)),
     };
 
-    let _ = music::join::join(
+    music::join::join(
         &MusicContext {
-            ctx: ctx.discord().clone(),
+            songbird: music::get_poise(&ctx).await?,
             guild_id: guild.id,
             channel_id: ctx.channel_id(),
-            author_id: ctx.author().id,
+            data: ctx.data().clone(),
+            http: ctx.discord().http.clone(),
+            cache: ctx.discord().cache.clone(),
         },
         &channel_id,
     )
     .await?;
 
-    ctx.send(|m| {
-        m.content(format!("Joined {}", channel_id.mention()))
-            .ephemeral(true)
-    })
-    .await?;
+    ctx.send(|m| m.content(format!("Joined {}", channel_id.mention())))
+        .await?;
 
     Ok(())
 }
@@ -64,17 +64,9 @@ pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     let guild = ctx
         .guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
-    let _ = music::leave::leave(&MusicContext {
-        ctx: ctx.discord().clone(),
-        guild_id: guild.id,
-        channel_id: ctx.channel_id(),
-        author_id: ctx.author().id,
-    })
-    .await?;
+    music::leave::leave(&music::get_poise(&ctx).await?, guild.id).await?;
 
-    ctx.send(|m| m.content("Left voice").ephemeral(true))
-        .await?;
-
+    ctx.send(|m| m.content("Left voice")).await?;
     Ok(())
 }
 
@@ -83,7 +75,8 @@ pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     slash_command,
     category = "Music",
     check = "guild_only",
-    global_cooldown = 3
+    global_cooldown = 3,
+    ephemeral
 )]
 pub(crate) async fn play(
     ctx: Context<'_>,
@@ -115,20 +108,20 @@ pub(crate) async fn play(
     let call_future = music::get_call_else_join(&ctx, &guild.id, &channel_id);
 
     let (source, call) = join!(source_future, call_future);
-    let (source, call) = (source?, call?);
+    let (call, source) = (call?, source?);
 
-    let mut call = call.lock().await;
-    call.enqueue_source(source.into());
-    drop(call);
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title(song.title())
-                .url(song.url())
-                .description("added song")
-                .image(song.thumbnail().url())
-        })
-    })
-    .await?;
+    let track = music::play::play(&call, source.into()).await?;
+
+    let uuid = track.uuid();
+
+    let user_id = ctx.author().id;
+
+    let mut requests = ctx.data().song_queues.lock().await;
+    requests.insert(uuid, user_id);
+    drop(requests);
+
+    ctx.say(format!("Added song: {}", hyperlink_song(track.metadata())))
+        .await?;
     Ok(())
 }
 

@@ -34,6 +34,8 @@ mensa-swfr-rs = {git = "https://github.com/Nirusu99/mensa-swfr-rs", branch = "ma
 itertools = "^0"
 once_cell = "^1"
 thiserror = "^1"
+uuid = "^0"
+progressing = "3.0.2"
 
 [dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity.git"

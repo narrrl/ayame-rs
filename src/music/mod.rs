@@ -1,38 +1,126 @@
 pub mod join;
 pub mod leave;
 pub mod now_playing;
+pub mod play;
 pub mod skip;
 
 use std::sync::Arc;
+use std::time::Duration;
 
+use progressing::{clamping::Bar, Baring};
+
+use songbird::input::Metadata;
+use songbird::tracks::TrackHandle;
 use tracing::error;
 
 use async_trait::async_trait;
 use poise::serenity_prelude::{
-    self as serenity, ChannelId, Context as SerenityContext, GuildId, Mutex,
+    self as serenity, Cache, ChannelId, Context as SerenityContext, CreateEmbed, GuildId, Http,
+    MessageId, Mutex, User,
 };
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
 use crate::{music::leave::leave, Context as PoiseContext, Error};
 
-use crate::error::*;
+use crate::{error::*, Data};
 
 #[derive(Clone)]
 pub struct MusicContext {
+    // the text channel
     pub channel_id: serenity::ChannelId,
+    // the guild in which the bot plays music
     pub guild_id: serenity::GuildId,
-    pub author_id: serenity::UserId,
-    pub ctx: SerenityContext,
+    // cache for faster operations
+    pub cache: Arc<Cache>,
+    // http for sending messages and stuff
+    pub http: Arc<Http>,
+    // data because, idk maybe in the future
+    pub data: Data,
+    // songbird for call/tracks
+    pub songbird: Arc<Songbird>,
 }
 
-impl MusicContext {
-    #[allow(dead_code)]
-    pub async fn send<'b, F>(&self, f: F) -> serenity::Result<serenity::Message>
-    where
-        for<'c> F:
-            FnOnce(&'c mut serenity::CreateMessage<'b>) -> &'c mut serenity::CreateMessage<'b>,
-    {
-        self.channel_id.send_message(&self.ctx.http, f).await
+struct NotificationHandler {
+    pub mtx: MusicContext,
+}
+
+#[async_trait]
+impl EventHandler for NotificationHandler {
+    async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
+        let songbird = &self.mtx.songbird;
+
+        let call = match songbird.get(self.mtx.guild_id) {
+            Some(call) => call,
+            None => return Some(Event::Cancel),
+        };
+
+        let call = call.lock().await;
+
+        let queue = call.queue();
+        let current = queue.current();
+
+        let embed = match current {
+            Some(current) => {
+                let user_map = self.mtx.data.song_queues.lock().await;
+                let user = match user_map.get(&current.uuid()) {
+                    Some(id) => id.to_user_cached(&self.mtx.cache).await,
+                    None => None,
+                };
+                drop(user_map);
+
+                embed_song(&current, user).await
+            }
+            None => {
+                let mut e = CreateEmbed::default();
+                e.title("Nothing is playing!");
+                e
+            }
+        };
+
+        let mut messages_map = self.mtx.data.song_messages.lock().await;
+        match messages_map.get_mut(&self.mtx.guild_id) {
+            Some(id) => {
+                let mut message = match self.mtx.http.get_message(self.mtx.channel_id.0, id.0).await
+                {
+                    Ok(msg) => msg,
+                    Err(_) => {
+                        messages_map.remove(&self.mtx.guild_id);
+                        drop(messages_map);
+                        return None;
+                    }
+                };
+                let _ = message
+                    .edit(&self.mtx.http, |m| {
+                        m.embed(|e| {
+                            e.clone_from(&embed);
+                            e
+                        })
+                    })
+                    .await;
+            }
+            None => {
+                let message = match self
+                    .mtx
+                    .channel_id
+                    .send_message(&self.mtx.http, |m| {
+                        m.embed(|e| {
+                            e.clone_from(&embed);
+                            e
+                        })
+                    })
+                    .await
+                {
+                    Ok(msg) => msg,
+                    Err(_) => {
+                        drop(messages_map);
+                        return None;
+                    }
+                };
+                messages_map.insert(self.mtx.guild_id, message.id);
+            }
+        };
+        drop(messages_map);
+        None
     }
 }
 
@@ -43,15 +131,7 @@ struct TimeoutHandler {
 #[async_trait]
 impl EventHandler for TimeoutHandler {
     async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
-        let songbird = match get_serenity(&self.mtx.ctx).await {
-            Ok(sb) => sb,
-            Err(why) => {
-                error!("{}", why);
-                return Some(Event::Cancel);
-            }
-        };
-
-        let voice_id = match songbird.get(self.mtx.guild_id.0) {
+        let voice_id = match self.mtx.songbird.get(self.mtx.guild_id.0) {
             Some(call) => {
                 let call = call.lock().await;
                 match call.current_channel() {
@@ -61,12 +141,12 @@ impl EventHandler for TimeoutHandler {
             }
             None => return Some(Event::Cancel),
         };
-        let channel = match self.mtx.ctx.cache.guild_channel(voice_id.0) {
+        let channel = match self.mtx.cache.guild_channel(voice_id.0) {
             Some(channel) => channel,
             None => return None,
         };
 
-        let members = match channel.members(&self.mtx.ctx.cache).await {
+        let members = match channel.members(&self.mtx.cache).await {
             Ok(mems) => mems,
             Err(why) => {
                 error!("failed to get members of voice channel: {:?}", why);
@@ -75,7 +155,7 @@ impl EventHandler for TimeoutHandler {
         };
 
         if self.is_alone(&members) {
-            if let Err(why) = leave(&self.mtx).await {
+            if let Err(why) = leave(&self.mtx.songbird, self.mtx.guild_id).await {
                 error!("leaving voice channel returned error: {:?}", why);
             }
             Some(Event::Cancel)
@@ -96,19 +176,6 @@ impl TimeoutHandler {
     }
 }
 
-pub struct TrackNotifier {
-    pub mtx: MusicContext,
-}
-
-#[async_trait]
-impl EventHandler for TrackNotifier {
-    async fn act(&self, event: &EventContext<'_>) -> Option<Event> {
-        if let EventContext::Track(_) = event {}
-        None
-    }
-}
-
-#[allow(dead_code)]
 pub async fn get_poise(ctx: &PoiseContext<'_>) -> Result<Arc<Songbird>, Error> {
     get_serenity(ctx.discord()).await
 }
@@ -133,14 +200,94 @@ pub async fn get_call_else_join(
         None => {
             join::join(
                 &MusicContext {
-                    ctx: ctx.discord().clone(),
+                    songbird: get_poise(&ctx).await?,
                     guild_id: *guild_id,
                     channel_id: ctx.channel_id(),
-                    author_id: ctx.author().id,
+                    data: ctx.data().clone(),
+                    http: ctx.discord().http.clone(),
+                    cache: ctx.discord().cache.clone(),
                 },
                 channel_id,
             )
             .await
         }
     }
+}
+
+pub fn hyperlink_song(data: &Metadata) -> String {
+    let mut finished_song = "[".to_string();
+    if let Some(title) = &data.title {
+        finished_song.push_str(title);
+    }
+
+    finished_song.push_str(" - ");
+
+    if let Some(artist) = &data.artist {
+        finished_song.push_str(artist);
+    }
+
+    finished_song.push_str("](");
+
+    if let Some(link) = &data.source_url {
+        finished_song.push_str(link);
+    }
+
+    finished_song.push_str(")");
+
+    finished_song
+}
+
+pub fn duration_format(duration: Option<Duration>) -> String {
+    if let Some(d) = duration {
+        if d != Duration::default() {
+            return humantime::format_duration(
+                // we don't want milliseconds
+                d - Duration::from_millis(d.subsec_millis().into()),
+            )
+            .to_string();
+        }
+    }
+    "unknown".to_string()
+}
+
+pub async fn embed_song(track: &TrackHandle, user: Option<User>) -> CreateEmbed {
+    let mut e = CreateEmbed::default();
+    let duration = track.metadata().duration;
+
+    let current_duration = match track.get_info().await {
+        Ok(info) => Some(info.play_time),
+        Err(_) => None,
+    };
+
+    let duration_str = format!(
+        "{}/{}",
+        duration_format(current_duration),
+        duration_format(duration)
+    );
+
+    let bar = match (current_duration, duration) {
+        (Some(cd), Some(d)) => {
+            let mut bar = Bar::new();
+            bar.set_style("[=>-]");
+            bar.set_len(10);
+            bar.set(cd.as_secs() as f64 / d.as_secs() as f64);
+            bar
+        }
+        _ => Bar::new(),
+    };
+
+    e.field("Now playing:", hyperlink_song(track.metadata()), false)
+        .field("Duration:", format!("{}\n{}", duration_str, bar), false);
+    if let Some(thumbnail) = &track.metadata().thumbnail {
+        e.image(thumbnail);
+    }
+    if let Some(user) = user {
+        e.author(|a| {
+            if let Some(avatar) = user.avatar_url() {
+                a.icon_url(avatar);
+            }
+            a.name(user.name)
+        });
+    }
+    e
 }

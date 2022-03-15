@@ -11,7 +11,13 @@ use poise::serenity_prelude::{self as serenity, CreateEmbed, CreateSelectMenuOpt
 
 use crate::error::*;
 
-#[poise::command(prefix_command, slash_command, track_edits, category = "General")]
+#[poise::command(
+    prefix_command,
+    slash_command,
+    track_edits,
+    category = "General",
+    ephemeral
+)]
 pub(crate) async fn mock(
     ctx: Context<'_>,
     #[description = "The text to convert"]
@@ -34,7 +40,7 @@ pub(crate) async fn invite(ctx: Context<'_>) -> Result<(), Error> {
         }
     };
     let inv = Invite::create(&ctx.discord().http, ctx.channel_id(), |f| f).await?;
-    ctx.send(|m| m.ephemeral(true).content(inv.url())).await?;
+    ctx.send(|m| m.content(inv.url())).await?;
 
     Ok(())
 }
