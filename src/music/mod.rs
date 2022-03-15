@@ -98,7 +98,7 @@ impl NotificationHandler {
 
 #[async_trait]
 impl EventHandler for NotificationHandler {
-    async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
+    async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
         let songbird = &self.mtx.songbird;
 
         let call = match songbird.get(self.mtx.guild_id) {
