@@ -119,9 +119,11 @@ impl EventHandler for NotificationHandler {
         let current = queue.current();
         drop(call);
 
+        let mut song_status = self.mtx.data.song_status.lock().await;
         let embed = match current {
             Some(current) => {
                 let user_map = self.mtx.data.song_queues.lock().await;
+                song_status.insert(self.mtx.guild_id, false);
                 let user = match user_map.get(&current.uuid()) {
                     Some(id) => id.to_user_cached(&self.mtx.cache).await,
                     None => None,
@@ -131,25 +133,32 @@ impl EventHandler for NotificationHandler {
                 embed_song(&current, user).await
             }
             None => {
+                if *song_status.entry(self.mtx.guild_id).or_insert(true) {
+                    return None;
+                }
+                song_status.insert(self.mtx.guild_id, true);
                 let mut e = CreateEmbed::default();
                 e.title("Nothing is playing!");
                 e
             }
         };
+        drop(song_status);
 
         let mut messages_map = self.mtx.data.song_messages.lock().await;
         match messages_map.get_mut(&self.mtx.guild_id) {
             // check if we already have a message
             Some(id) => {
                 // get the message from the id
-                let mut message = match self.mtx.http.get_message(self.mtx.channel_id.0, id.0).await
-                {
-                    Ok(msg) => msg,
-                    Err(_) => {
-                        messages_map.remove(&self.mtx.guild_id);
-                        drop(messages_map);
-                        return None;
-                    }
+                let mut message = match self.mtx.cache.message(self.mtx.channel_id.0, id.0) {
+                    Some(msg) => msg,
+                    None => match self.mtx.http.get_message(self.mtx.channel_id.0, id.0).await {
+                        Ok(msg) => msg,
+                        Err(_) => {
+                            messages_map.remove(&self.mtx.guild_id);
+                            drop(messages_map);
+                            return None;
+                        }
+                    },
                 };
                 // either delete message and send new
                 // or update old message

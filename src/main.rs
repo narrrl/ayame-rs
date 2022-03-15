@@ -26,6 +26,7 @@ pub struct Data {
     config: Arc<Mutex<configuration::Config>>,
     song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
     song_messages: Arc<Mutex<HashMap<GuildId, MessageId>>>,
+    song_status: Arc<Mutex<HashMap<GuildId, bool>>>,
 }
 pub type Error = error::AyameError;
 
@@ -156,6 +157,7 @@ async fn main() {
                     config: Arc::new(Mutex::new(config)),
                     song_queues: Arc::new(Mutex::new(HashMap::new())),
                     song_messages: Arc::new(Mutex::new(HashMap::new())),
+                    song_status: Arc::new(Mutex::new(HashMap::new())),
                 })
             })
         })
