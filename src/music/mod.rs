@@ -7,8 +7,6 @@ pub mod skip;
 use std::sync::Arc;
 use std::time::Duration;
 
-use progressing::{clamping::Bar, Baring};
-
 use songbird::input::Metadata;
 use songbird::tracks::TrackHandle;
 use tracing::error;
@@ -20,7 +18,7 @@ use poise::serenity_prelude::{
 };
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
-use crate::utils::check_result_ayame;
+use crate::utils::{check_result_ayame, Bar};
 use crate::{music::leave::leave, Context as PoiseContext, Error};
 
 use crate::{error::*, Data};
@@ -265,12 +263,6 @@ pub fn hyperlink_song(data: &Metadata) -> String {
         finished_song.push_str(title);
     }
 
-    finished_song.push_str(" - ");
-
-    if let Some(artist) = &data.artist {
-        finished_song.push_str(artist);
-    }
-
     finished_song.push_str("](");
 
     if let Some(link) = &data.source_url {
@@ -312,13 +304,16 @@ pub async fn embed_song(track: &TrackHandle, user: Option<User>) -> CreateEmbed 
 
     let bar = match (current_duration, duration) {
         (Some(cd), Some(d)) => {
-            let mut bar = Bar::new();
-            bar.set_style("[=>-]");
+            let mut bar = Bar {
+                pos_icon: String::from("<a:gandalf_pls:899788418358345809>"),
+                line_icon: String::from("="),
+                ..Default::default()
+            };
             bar.set_len(30);
             bar.set(cd.as_secs() as f64 / d.as_secs() as f64);
-            bar
+            bar.to_string()
         }
-        _ => Bar::new(),
+        _ => "".to_string(),
     };
 
     e.field("Now playing:", hyperlink_song(track.metadata()), false)

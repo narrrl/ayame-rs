@@ -1,7 +1,8 @@
 use chrono::Weekday;
+use core::fmt;
 use mensa_swfr_rs::mensa;
 use regex::Regex;
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 use poise::{serenity::Result as SerenityResult, serenity_prelude::CreateEmbed};
 use rand::Rng;
@@ -110,5 +111,54 @@ pub(crate) async fn guild_only(ctx: Context<'_>) -> Result<bool, Error> {
     match ctx.guild() {
         Some(_) => Ok(true),
         None => Err(Error::Input(NOT_IN_GUILD)),
+    }
+}
+
+pub struct Bar {
+    pub pos_icon: String,
+
+    pub line_icon: String,
+
+    pub length: usize,
+
+    pub pos: f64,
+}
+
+impl Default for Bar {
+    fn default() -> Bar {
+        Bar {
+            pos_icon: ">".to_string(),
+            line_icon: "=".to_string(),
+            length: 30,
+            pos: 0.0f64,
+        }
+    }
+}
+
+impl Bar {
+    pub fn set<'a>(&'a mut self, pos: f64) -> &'a mut Bar {
+        self.pos = pos;
+        self
+    }
+
+    pub fn set_len<'a>(&'a mut self, len: usize) -> &'a mut Bar {
+        self.length = len;
+        self
+    }
+}
+
+impl Display for Bar {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        let r: usize = (self.pos * self.length as f64) as usize;
+        let prev = self.line_icon.repeat(r);
+        let (h, next) = if r >= self.length {
+            (String::new(), String::new())
+        } else {
+            (
+                String::from(&self.pos_icon),
+                self.line_icon.repeat(self.length - r - 1),
+            )
+        };
+        write!(fmt, "[{}{}{}]", prev, h, next)
     }
 }
