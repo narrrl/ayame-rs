@@ -47,6 +47,7 @@ pub(crate) async fn addemote(
     #[description = "Name of the emote"] emote_name: String,
     #[description = "The emote that gets added"] emote: serenity::Attachment,
 ) -> Result<(), Error> {
+    ctx.defer_or_broadcast();
     let guild = ctx
         .guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
