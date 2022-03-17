@@ -33,6 +33,7 @@ pub(crate) async fn mock(
 
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn invite(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
     ctx.guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
     let inv = Invite::create(&ctx.discord().http, ctx.channel_id(), |f| f).await?;
@@ -47,7 +48,7 @@ pub(crate) async fn addemote(
     #[description = "Name of the emote"] emote_name: String,
     #[description = "The emote that gets added"] emote: serenity::Attachment,
 ) -> Result<(), Error> {
-    ctx.defer_or_broadcast();
+    ctx.defer_or_broadcast().await?;
     let guild = ctx
         .guild()
         .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
@@ -73,6 +74,7 @@ pub(crate) async fn mensa(
     ctx: Context<'_>,
     #[description = "The day to look up"] day: Option<String>,
 ) -> Result<(), Error> {
+    ctx.defer_or_broadcast().await?;
     let config = ctx.data().config.lock().await;
     let mensa_key = config.mensa_api_key();
     drop(&config);
