@@ -4,6 +4,7 @@ use reqwest::Error as ReqwestError;
 use songbird::error::{ConnectionError, JoinError};
 use songbird::input::error::Error as SongbirdError;
 use songbird::tracks::TrackError;
+use std::io::Error as IOError;
 use thiserror::Error;
 
 use crate::{utils::check_result, Context};
@@ -52,9 +53,13 @@ pub enum AyameError {
         #[from]
         source: TrackError,
     },
-
     #[error("{:?}", source)]
-    Mensa {
+    IOError {
+        #[from]
+        source: IOError,
+    },
+    #[error("{:?}", source)]
+    MensaError {
         #[from]
         source: MensaError,
     },

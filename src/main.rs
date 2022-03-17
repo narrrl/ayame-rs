@@ -17,6 +17,7 @@ use uuid::Uuid;
 mod commands;
 mod configuration;
 mod error;
+mod model;
 mod music;
 mod utils;
 mod youtube;
@@ -112,6 +113,7 @@ async fn main() {
             play(),
             skip(),
             shutdown(),
+            addemote(),
         ],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
