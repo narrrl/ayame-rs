@@ -1,4 +1,4 @@
-use poise::serenity_prelude::Mentionable;
+use poise::serenity_prelude::{Mentionable, Message};
 use songbird::input::Restartable;
 use tokio::join;
 
@@ -84,6 +84,18 @@ pub(crate) async fn play(
     #[rest]
     input: String,
 ) -> Result<(), Error> {
+    register_and_play(ctx, &input).await
+}
+
+#[poise::command(context_menu_command = "Play message content", check = "guild_only")]
+pub(crate) async fn play_message_content(
+    ctx: Context<'_>,
+    #[description = "Message to be played"] message: Message,
+) -> Result<(), Error> {
+    register_and_play(ctx, &message.content).await
+}
+
+async fn register_and_play(ctx: Context<'_>, input: &str) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
     let guild = ctx
         .guild()
@@ -99,7 +111,7 @@ pub(crate) async fn play(
     let mut req = YoutubeSearch::new(config.youtube_api_key());
     drop(config);
     req.set_amount(1).set_filter(Type::VIDEO);
-    let res = req.search(&input).await?;
+    let res = req.search(input).await?;
     let song = res
         .results()
         .first()

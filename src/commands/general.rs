@@ -42,7 +42,13 @@ pub(crate) async fn invite(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command, track_edits, category = "General")]
+#[poise::command(
+    prefix_command,
+    slash_command,
+    track_edits,
+    category = "General",
+    required_permissions = "MANAGE_EMOJIS_AND_STICKERS"
+)]
 pub(crate) async fn addemote(
     ctx: Context<'_>,
     #[description = "Name of the emote"] emote_name: String,
@@ -186,4 +192,15 @@ fn create_mensa_embed(days: &HashMap<Weekday, &Day>, day: &Weekday) -> CreateEmb
             e
         }
     }
+}
+
+#[poise::command(slash_command, prefix_command, context_menu_command = "Avatar of user")]
+pub(crate) async fn avatar(
+    ctx: Context<'_>,
+    #[description = "user that you want the avatar from"] user: serenity::User,
+) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
+    ctx.say(user.avatar_url().unwrap_or(String::from("No avatar")))
+        .await?;
+    Ok(())
 }

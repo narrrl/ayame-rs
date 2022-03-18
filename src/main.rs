@@ -11,7 +11,6 @@ use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
 use songbird::SongbirdKey;
 use tracing::{error, info};
-use utils::check_result;
 use uuid::Uuid;
 
 mod commands;
@@ -94,6 +93,7 @@ async fn main() {
     let config = configuration::config();
     let options = poise::FrameworkOptions {
         commands: vec![
+            avatar(),
             help(),
             mock(),
             register(),
@@ -106,6 +106,7 @@ async fn main() {
             skip(),
             shutdown(),
             addemote(),
+            play_message_content(),
         ],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
