@@ -103,6 +103,7 @@ async fn main() {
             join(),
             leave(),
             play(),
+            search(),
             skip(),
             shutdown(),
             addemote(),

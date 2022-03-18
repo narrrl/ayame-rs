@@ -3,9 +3,9 @@ use songbird::input::Restartable;
 use tokio::join;
 
 use crate::{
-    music::{self, hyperlink_song, MusicContext},
+    music::{self, hyperlink_song, MusicContext, YoutubeSearchMenu},
     utils::guild_only,
-    youtube::{Type, YoutubeSearch},
+    youtube::{Type, YoutubeResult, YoutubeSearch},
     Context, Error,
 };
 
@@ -78,13 +78,52 @@ pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     global_cooldown = 3,
     ephemeral
 )]
+pub(crate) async fn search(
+    ctx: Context<'_>,
+    #[description = "Search term for youtube"]
+    #[rest]
+    input: String,
+) -> Result<(), Error> {
+    ctx.defer().await?;
+    let config = ctx.data().config.lock().await;
+    let mut req = YoutubeSearch::new(config.youtube_api_key());
+    drop(config);
+    req.set_amount(5).set_filter(Type::VIDEO);
+    let res = req.search(&input).await?;
+    let results = res.results();
+    if results.is_empty() {
+        return Err(Error::Input(NO_SEARCH_RESULTS));
+    }
+    let menu = YoutubeSearchMenu { results };
+
+    let song = menu.get_response(&ctx).await?;
+    register_and_play(ctx, &song).await
+}
+
+#[poise::command(
+    prefix_command,
+    slash_command,
+    category = "Music",
+    check = "guild_only",
+    global_cooldown = 3,
+    ephemeral
+)]
 pub(crate) async fn play(
     ctx: Context<'_>,
     #[description = "The search query or the link"]
     #[rest]
     input: String,
 ) -> Result<(), Error> {
-    register_and_play(ctx, &input).await
+    let config = ctx.data().config.lock().await;
+    let mut req = YoutubeSearch::new(config.youtube_api_key());
+    drop(config);
+    req.set_amount(1).set_filter(Type::VIDEO);
+    let res = req.search(&input).await?;
+    let song = res
+        .results()
+        .first()
+        .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+    register_and_play(ctx, &song).await
 }
 
 #[poise::command(context_menu_command = "Play message content", check = "guild_only")]
@@ -92,10 +131,19 @@ pub(crate) async fn play_message_content(
     ctx: Context<'_>,
     #[description = "Message to be played"] message: Message,
 ) -> Result<(), Error> {
-    register_and_play(ctx, &message.content).await
+    let config = ctx.data().config.lock().await;
+    let mut req = YoutubeSearch::new(config.youtube_api_key());
+    drop(config);
+    req.set_amount(1).set_filter(Type::VIDEO);
+    let res = req.search(&message.content).await?;
+    let song = res
+        .results()
+        .first()
+        .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+    register_and_play(ctx, &song).await
 }
 
-async fn register_and_play(ctx: Context<'_>, input: &str) -> Result<(), Error> {
+async fn register_and_play(ctx: Context<'_>, song: &YoutubeResult) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
     let guild = ctx
         .guild()
@@ -107,15 +155,6 @@ async fn register_and_play(ctx: Context<'_>, input: &str) -> Result<(), Error> {
         },
         None => return Err(Error::Input(NOT_IN_VOICE)),
     };
-    let config = ctx.data().config.lock().await;
-    let mut req = YoutubeSearch::new(config.youtube_api_key());
-    drop(config);
-    req.set_amount(1).set_filter(Type::VIDEO);
-    let res = req.search(input).await?;
-    let song = res
-        .results()
-        .first()
-        .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
     let source_future = Restartable::ytdl(song.url(), true);
     let call_future = music::get_call_else_join(&ctx, &guild.id, &channel_id);
 

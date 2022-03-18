@@ -15,6 +15,9 @@ pub const NOTHING_PLAYING: &'static str = "nothing playing";
 pub const FAILD_TO_GET_SONGBIRD: &'static str = "couldn't get songbird";
 pub const UNKNOWN_WEEKDAY: &'static str = "unknown weekday";
 pub const NO_MENSA_KEY: &'static str = "no mensa key provided";
+pub const UNKNOWN_RESPONSE: &'static str = "got unknown response";
+pub const EVENT_CANCELED: &'static str = "the event was canceled";
+pub const COULDNT_GET_MSG: &'static str = "couldn't get message";
 
 #[derive(Error, Debug)]
 #[non_exhaustive]

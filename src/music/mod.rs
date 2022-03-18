@@ -18,6 +18,7 @@ use poise::serenity_prelude::{
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
 use crate::utils::{check_result_ayame, Bar};
+use crate::youtube::{hyperlink_result, YoutubeResult};
 use crate::{music::leave::leave, Context as PoiseContext, Error};
 
 use crate::{error::*, Data};
@@ -352,4 +353,123 @@ pub async fn embed_song(track: &TrackHandle, user: Option<User>) -> CreateEmbed 
         });
     }
     e
+}
+
+pub fn song_menu_embed<'a>(e: &'a mut CreateEmbed, song: &YoutubeResult) -> &'a mut CreateEmbed {
+    e.author(|a| a.name(song.channel_name()).url(song.channel_url()))
+        .image(song.thumbnail().url())
+        .description(hyperlink_result(&song))
+}
+
+pub struct YoutubeSearchMenu<'a> {
+    pub results: &'a Vec<YoutubeResult>,
+}
+
+impl<'a> YoutubeSearchMenu<'a> {
+    pub async fn get_response(
+        &'a self,
+        ctx: &'a crate::Context<'_>,
+    ) -> Result<&'a YoutubeResult, Error> {
+        let msg_id = self.send_message(&ctx).await?;
+        let mut current = self
+            .results
+            .first()
+            .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+        let mut i: usize = 0;
+        while let Some(mci) = serenity::CollectComponentInteraction::new(ctx.discord())
+            .author_id(ctx.author().id)
+            .channel_id(ctx.channel_id())
+            .timeout(std::time::Duration::from_secs(120))
+            .await
+        {
+            match mci.data.custom_id.as_str() {
+                "previous" => {
+                    i = if i == 0 { self.results.len() } else { i - 1 };
+                    current = self
+                        .results
+                        .get(i)
+                        .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+                }
+                "next" => {
+                    i = if i == self.results.len() - 1 {
+                        0
+                    } else {
+                        i + 1
+                    };
+                    current = self
+                        .results
+                        .get(i)
+                        .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+                }
+                "play" => {
+                    mci.create_interaction_response(ctx.discord(), |ir| {
+                        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
+                    })
+                    .await?;
+                    return Ok(current);
+                }
+                "cancel" => {
+                    mci.create_interaction_response(ctx.discord(), |ir| {
+                        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
+                    })
+                    .await?;
+                    return Err(Error::Input(EVENT_CANCELED));
+                }
+                _ => return Err(Error::Failure(UNKNOWN_RESPONSE)),
+            };
+            ctx.discord()
+                .http
+                .get_message(ctx.channel_id().into(), msg_id.into())
+                .await?
+                .edit(&ctx.discord().http, |m| {
+                    m.embed(|e| song_menu_embed(e, current))
+                })
+                .await?;
+
+            mci.create_interaction_response(ctx.discord(), |ir| {
+                ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
+            })
+            .await?;
+        }
+        Ok(current)
+    }
+
+    async fn send_message(&self, ctx: &crate::Context<'_>) -> Result<MessageId, Error> {
+        let item = self
+            .results
+            .first()
+            .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+        let msg = ctx
+            .send(|m| {
+                m.embed(|e| song_menu_embed(e, item)).components(|c| {
+                    c.create_action_row(|a| {
+                        a.create_button(|b| {
+                            b.custom_id("previous")
+                                .style(serenity::ButtonStyle::Primary)
+                                .label("Previous")
+                        })
+                        .create_button(|b| {
+                            b.custom_id("next")
+                                .style(serenity::ButtonStyle::Primary)
+                                .label("Next")
+                        })
+                    })
+                    .create_action_row(|a| {
+                        a.create_button(|b| {
+                            b.custom_id("play")
+                                .style(serenity::ButtonStyle::Success)
+                                .label("Play")
+                        })
+                        .create_button(|b| {
+                            b.custom_id("cancel")
+                                .style(serenity::ButtonStyle::Danger)
+                                .label("Cancel")
+                        })
+                    })
+                })
+            })
+            .await?
+            .ok_or_else(|| Error::Failure(COULDNT_GET_MSG))?;
+        Ok(msg.message().await?.id)
+    }
 }
