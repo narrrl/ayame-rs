@@ -1,5 +1,6 @@
 use mensa_swfr_rs::error::MensaError;
 use poise::serenity_prelude::{Color, Error as SerenityError};
+use regex::Error as RegexError;
 use reqwest::Error as ReqwestError;
 use songbird::error::{ConnectionError, JoinError};
 use songbird::input::error::Error as SongbirdError;
@@ -65,6 +66,11 @@ pub enum AyameError {
     MensaError {
         #[from]
         source: MensaError,
+    },
+    #[error("{:?}", source)]
+    RegexError {
+        #[from]
+        source: RegexError,
     },
 }
 
