@@ -402,17 +402,11 @@ impl<'a> YoutubeSearchMenu<'a> {
                         .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
                 }
                 "play" => {
-                    mci.create_interaction_response(ctx.discord(), |ir| {
-                        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
-                    })
-                    .await?;
+                    self.post(&ctx, &mci).await?;
                     return Ok(current);
                 }
                 "cancel" => {
-                    mci.create_interaction_response(ctx.discord(), |ir| {
-                        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
-                    })
-                    .await?;
+                    self.post(&ctx, &mci).await?;
                     return Err(Error::Input(EVENT_CANCELED));
                 }
                 _ => return Err(Error::Failure(UNKNOWN_RESPONSE)),
@@ -425,13 +419,25 @@ impl<'a> YoutubeSearchMenu<'a> {
                     m.embed(|e| song_menu_embed(e, current))
                 })
                 .await?;
-
-            mci.create_interaction_response(ctx.discord(), |ir| {
-                ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
-            })
-            .await?;
+            self.post(&ctx, &mci).await?;
         }
+        ctx.discord()
+            .http
+            .delete_message(ctx.channel_id().into(), msg_id.into())
+            .await?;
         Ok(current)
+    }
+
+    async fn post(
+        &self,
+        ctx: &crate::Context<'_>,
+        mci: &Arc<serenity::MessageComponentInteraction>,
+    ) -> Result<(), Error> {
+        mci.create_interaction_response(ctx.discord(), |ir| {
+            ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
+        })
+        .await?;
+        Ok(())
     }
 
     async fn send_message(&self, ctx: &crate::Context<'_>) -> Result<MessageId, Error> {
