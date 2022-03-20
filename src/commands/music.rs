@@ -133,7 +133,7 @@ pub(crate) async fn play(
     register_and_play(ctx, song.url()).await
 }
 
-#[poise::command(context_menu_command = "Play message content", check = "guild_only")]
+#[poise::command(context_menu_command = "play message", check = "guild_only")]
 pub(crate) async fn play_message_content(
     ctx: Context<'_>,
     #[description = "Message to be played"] message: Message,

@@ -194,7 +194,7 @@ fn create_mensa_embed(days: &HashMap<Weekday, &Day>, day: &Weekday) -> CreateEmb
     }
 }
 
-#[poise::command(slash_command, prefix_command, context_menu_command = "Avatar of user")]
+#[poise::command(slash_command, prefix_command, context_menu_command = "get avatar")]
 pub(crate) async fn avatar(
     ctx: Context<'_>,
     #[description = "user that you want the avatar from"] user: serenity::User,
