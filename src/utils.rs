@@ -233,7 +233,7 @@ impl SelectMenuOptions {
         current_page: usize,
         timeout: u64,
         msg_id: Option<MessageId>,
-        controls: Vec<Control>,
+        controls: Vec<Vec<Control>>,
     ) -> Self {
         Self {
             current_page,
