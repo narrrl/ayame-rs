@@ -219,10 +219,7 @@ impl<'a> SelectMenu<'a> {
                 ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
             })
             .await?;
-            if self.was_canceled {
-                return Err(Error::Input(EVENT_CANCELED));
-            }
-            if self.has_selected {
+            if self.has_selected || self.was_canceled {
                 break;
             }
             if let Some(msg_id) = self.options.msg_id {
@@ -247,6 +244,9 @@ impl<'a> SelectMenu<'a> {
                     .delete_message(self.ctx.channel_id().into(), msg_id.into())
                     .await?;
             }
+        }
+        if self.was_canceled {
+            return Err(Error::Input(EVENT_CANCELED));
         }
         Ok((self.options.current_page, self.options.msg_id))
     }
