@@ -7,15 +7,15 @@ use std::{fmt::Display, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 use poise::{
     serenity::Result as SerenityResult,
     serenity_prelude::{
-        self as serenity, Button, ChannelId, CreateActionRow, CreateButton, CreateEmbed,
-        CreateInputText, CreateMessage, CreateSelectMenu, Message, MessageId, UserId,
+        self as serenity, CreateActionRow, CreateButton, CreateEmbed, CreateInputText,
+        CreateSelectMenu, MessageId,
     },
 };
 use rand::Rng;
 
 use tracing::error;
 
-use crate::{Context, Error};
+use crate::{error::*, Context, Error};
 
 pub const NOT_IN_GUILD: &'static str = "only in guilds";
 
@@ -171,7 +171,7 @@ impl Display for Bar {
 
 pub struct SelectMenu<'a> {
     ctx: &'a Context<'a>,
-    pages: &'a Vec<CreateMessage<'a>>,
+    pages: &'a Vec<CreateEmbed>,
     options: SelectMenuOptions,
     has_selected: bool,
     was_canceled: bool,
@@ -180,7 +180,7 @@ pub struct SelectMenu<'a> {
 impl<'a> SelectMenu<'a> {
     pub fn new(
         ctx: &'a Context<'a>,
-        pages: &'a Vec<CreateMessage<'a>>,
+        pages: &'a Vec<CreateEmbed>,
         options: SelectMenuOptions,
     ) -> Self {
         Self {
@@ -192,7 +192,7 @@ impl<'a> SelectMenu<'a> {
         }
     }
 
-    pub async fn run(mut self) -> Result<(usize, Option<Message>), Error> {
+    pub async fn run(mut self) -> Result<(usize, Option<MessageId>), Error> {
         self.register().await?;
 
         while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.discord())
@@ -200,15 +200,55 @@ impl<'a> SelectMenu<'a> {
             .channel_id(self.ctx.channel_id())
             .timeout(std::time::Duration::from_secs(self.options.timeout))
             .await
-        {}
-
-        // TODO: implement
-        unimplemented!();
+        {
+            let action = Arc::clone(
+                &self
+                    .options
+                    .controls
+                    .iter()
+                    .flatten()
+                    .find(|ctrl| ctrl.button.id() == mci.data.custom_id)
+                    .ok_or_else(|| Error::Failure("invalid button for menu"))?
+                    .function,
+            );
+            action(&mut self).await;
+            mci.create_interaction_response(self.ctx.discord(), |ir| {
+                ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
+            })
+            .await?;
+            if self.was_canceled {
+                return Err(Error::Input("interaction was canceled"));
+            }
+            if self.has_selected {
+                break;
+            }
+            if let Some(msg_id) = self.options.msg_id {
+                let page = self
+                    .pages
+                    .get(self.options.current_page)
+                    .ok_or_else(|| Error::Failure("invalid page for menu"))?;
+                self.ctx
+                    .discord()
+                    .http
+                    .get_message(self.ctx.channel_id().into(), msg_id.into())
+                    .await?
+                    .edit(&self.ctx.discord().http, |m| m.set_embed(page.clone()))
+                    .await?;
+            }
+        }
+        Ok((self.options.current_page, self.options.msg_id))
     }
 
     async fn register(&mut self) -> Result<(), Error> {
-        self.ctx
+        let msg_handle = self
+            .ctx
             .send(|m| {
+                if let Some(page) = self.pages.get(self.options.current_page) {
+                    m.embed(|e| {
+                        e.clone_from(page);
+                        e
+                    });
+                }
                 m.components(|c| {
                     for row in self.options.controls.iter() {
                         c.create_action_row(|a| create_action_row(a, row));
@@ -217,6 +257,8 @@ impl<'a> SelectMenu<'a> {
                 })
             })
             .await?;
+        let msg_handle = msg_handle.ok_or_else(|| Error::Failure(COULDNT_GET_MSG))?;
+        self.options.msg_id = Some(msg_handle.message().await?.id);
         Ok(())
     }
 }
@@ -260,8 +302,14 @@ pub struct Control {
     function: ControlFunction,
 }
 
+impl Control {
+    pub fn new(button: MenuComponent, function: ControlFunction) -> Self {
+        Self { button, function }
+    }
+}
+
 pub type ControlFunction = Arc<
-    dyn for<'b> Fn(&'b mut SelectMenu<'_>, Button) -> Pin<Box<dyn Future<Output = ()> + 'b + Send>>
+    dyn for<'b> Fn(&'b mut SelectMenu<'_>) -> Pin<Box<dyn Future<Output = ()> + 'b + Send>>
         + Sync
         + Send,
 >;
@@ -279,6 +327,48 @@ pub enum MenuComponent {
         create: CreateSelectMenu,
         id: String,
     },
+}
+
+impl MenuComponent {
+    fn id(&self) -> String {
+        match self {
+            Self::ButtonComponent { create, id } => id,
+            Self::SelectComponent { create, id } => id,
+            Self::InputComponent { create, id } => id,
+        }
+        .clone()
+    }
+
+    pub fn button<F>(id: &str, f: F) -> MenuComponent
+    where
+        F: FnOnce(&mut CreateButton) -> &mut CreateButton,
+    {
+        let mut b = CreateButton::default();
+        Self::ButtonComponent {
+            create: f(&mut b).clone(),
+            id: id.to_string(),
+        }
+    }
+    pub fn select<F>(id: &str, f: F) -> MenuComponent
+    where
+        F: FnOnce(&mut CreateSelectMenu) -> &mut CreateSelectMenu,
+    {
+        let mut b = CreateSelectMenu::default();
+        Self::SelectComponent {
+            create: f(&mut b).clone(),
+            id: id.to_string(),
+        }
+    }
+    pub fn input<F>(id: &str, f: F) -> MenuComponent
+    where
+        F: FnOnce(&mut CreateInputText) -> &mut CreateInputText,
+    {
+        let mut b = CreateInputText::default();
+        Self::InputComponent {
+            create: f(&mut b).clone(),
+            id: id.to_string(),
+        }
+    }
 }
 
 fn create_action_row<'b>(
@@ -302,4 +392,29 @@ fn create_action_row<'b>(
         };
     }
     a
+}
+
+// some default functions for menus
+pub async fn next_page(menu: &mut SelectMenu<'_>) {
+    if menu.options.current_page == menu.pages.len() - 1 {
+        menu.options.current_page = 0;
+    } else {
+        menu.options.current_page += 1;
+    }
+}
+
+pub async fn prev_page(menu: &mut SelectMenu<'_>) {
+    if menu.options.current_page == 0 {
+        menu.options.current_page = menu.pages.len() - 1;
+    } else {
+        menu.options.current_page -= 1;
+    }
+}
+
+pub async fn select_page(menu: &mut SelectMenu<'_>) {
+    menu.has_selected = true;
+}
+
+pub async fn cancel(menu: &mut SelectMenu<'_>) {
+    menu.was_canceled = true;
 }

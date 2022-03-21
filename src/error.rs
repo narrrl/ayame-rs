@@ -19,6 +19,7 @@ pub const NO_MENSA_KEY: &'static str = "no mensa key provided";
 pub const UNKNOWN_RESPONSE: &'static str = "got unknown response";
 pub const EVENT_CANCELED: &'static str = "the event was canceled";
 pub const COULDNT_GET_MSG: &'static str = "couldn't get message";
+pub const EMPTY_MENU: &'static str = "can't initialize empty menu";
 
 #[derive(Error, Debug)]
 #[non_exhaustive]

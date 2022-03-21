@@ -360,6 +360,13 @@ pub fn song_menu_embed<'a>(e: &'a mut CreateEmbed, song: &YoutubeResult) -> &'a 
         .image(song.thumbnail().url())
         .description(hyperlink_result(&song))
 }
+pub fn embed_song_for_menu(song: &YoutubeResult) -> CreateEmbed {
+    let mut e = CreateEmbed::default();
+    e.author(|a| a.name(song.channel_name()).url(song.channel_url()))
+        .image(song.thumbnail().url())
+        .description(hyperlink_result(&song));
+    e
+}
 
 pub struct YoutubeSearchMenu<'a> {
     pub results: &'a Vec<YoutubeResult>,
