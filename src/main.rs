@@ -127,7 +127,7 @@ async fn main() {
         ..Default::default()
     };
 
-    poise::Framework::build()
+    let client = poise::Framework::build()
         .client_settings(move |client_builder: serenity::ClientBuilder| {
             // get songbird instance
             let voice = Songbird::serenity();
@@ -140,7 +140,7 @@ async fn main() {
                 .type_map_insert::<SongbirdKey>(voice)
         })
         .token(config.token())
-        .user_data_setup(|ctx, _data_about_bot, _framework| {
+        .user_data_setup(|ctx, _data_about_bot, framework| {
             Box::pin(async move {
                 // set activity to "{prefix}help"
                 ctx.set_activity(serenity::Activity::listening(format!(
@@ -148,6 +148,13 @@ async fn main() {
                     config.prefix()
                 )))
                 .await;
+                let shard_manager = framework.shard_manager();
+                tokio::spawn(async move {
+                    tokio::signal::ctrl_c()
+                        .await
+                        .expect("Could not register ctrl+c handler");
+                    shard_manager.lock().await.shutdown_all().await;
+                });
                 // store config in Data
                 Ok(Data {
                     config: Arc::new(Mutex::new(config)),
@@ -157,8 +164,9 @@ async fn main() {
                 })
             })
         })
-        .options(options)
-        .run()
-        .await
-        .expect("Client error");
+        .options(options);
+
+    if let Err(why) = client.run_autosharded().await {
+        error!("Client error: {:?}", why);
+    }
 }
