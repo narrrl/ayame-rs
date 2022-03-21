@@ -403,10 +403,12 @@ impl<'a> YoutubeSearchMenu<'a> {
                 }
                 "play" => {
                     self.post(&ctx, &mci).await?;
+                    self.delete_message(&ctx, msg_id.into()).await?;
                     return Ok(current);
                 }
                 "cancel" => {
                     self.post(&ctx, &mci).await?;
+                    self.delete_message(&ctx, msg_id.into()).await?;
                     return Err(Error::Input(EVENT_CANCELED));
                 }
                 _ => return Err(Error::Failure(UNKNOWN_RESPONSE)),
@@ -421,10 +423,7 @@ impl<'a> YoutubeSearchMenu<'a> {
                 .await?;
             self.post(&ctx, &mci).await?;
         }
-        ctx.discord()
-            .http
-            .delete_message(ctx.channel_id().into(), msg_id.into())
-            .await?;
+        self.delete_message(&ctx, msg_id.into()).await?;
         Ok(current)
     }
 
@@ -437,6 +436,15 @@ impl<'a> YoutubeSearchMenu<'a> {
             ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
         })
         .await?;
+        Ok(())
+    }
+
+    async fn delete_message(&self, ctx: &crate::Context<'_>, msg_id: u64) -> Result<(), Error> {
+        ctx.discord()
+            .http
+            .delete_message(ctx.channel_id().into(), msg_id)
+            .await?;
+
         Ok(())
     }
 
