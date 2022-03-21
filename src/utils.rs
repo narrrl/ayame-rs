@@ -182,14 +182,17 @@ impl<'a> SelectMenu<'a> {
         ctx: &'a Context<'a>,
         pages: &'a Vec<CreateEmbed>,
         options: SelectMenuOptions,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        if pages.is_empty() {
+            return Err(Error::Input(EMPTY_MENU));
+        }
+        Ok(Self {
             ctx,
             pages,
             options,
             has_selected: false,
             was_canceled: false,
-        }
+        })
     }
 
     pub async fn run(mut self) -> Result<(usize, Option<MessageId>), Error> {
@@ -208,7 +211,7 @@ impl<'a> SelectMenu<'a> {
                     .iter()
                     .flatten()
                     .find(|ctrl| ctrl.button.id() == mci.data.custom_id)
-                    .ok_or_else(|| Error::Failure("invalid button for menu"))?
+                    .ok_or_else(|| Error::Failure(UNKNOWN_RESPONSE))?
                     .function,
             );
             action(&mut self).await;
@@ -217,7 +220,7 @@ impl<'a> SelectMenu<'a> {
             })
             .await?;
             if self.was_canceled {
-                return Err(Error::Input("interaction was canceled"));
+                return Err(Error::Input(EVENT_CANCELED));
             }
             if self.has_selected {
                 break;
@@ -226,13 +229,22 @@ impl<'a> SelectMenu<'a> {
                 let page = self
                     .pages
                     .get(self.options.current_page)
-                    .ok_or_else(|| Error::Failure("invalid page for menu"))?;
+                    .ok_or_else(|| Error::Failure(UNKNOWN_RESPONSE))?;
                 self.ctx
                     .discord()
                     .http
                     .get_message(self.ctx.channel_id().into(), msg_id.into())
                     .await?
                     .edit(&self.ctx.discord().http, |m| m.set_embed(page.clone()))
+                    .await?;
+            }
+        }
+        if let Some(msg_id) = self.options.msg_id {
+            if self.options.delete_msg {
+                self.ctx
+                    .discord()
+                    .http
+                    .delete_message(self.ctx.channel_id().into(), msg_id.into())
                     .await?;
             }
         }
@@ -268,6 +280,7 @@ pub struct SelectMenuOptions {
     timeout: u64,
     msg_id: Option<MessageId>,
     controls: Vec<Vec<Control>>,
+    delete_msg: bool,
 }
 
 impl SelectMenuOptions {
@@ -276,12 +289,14 @@ impl SelectMenuOptions {
         timeout: u64,
         msg_id: Option<MessageId>,
         controls: Vec<Vec<Control>>,
+        delete_msg: bool,
     ) -> Self {
         Self {
             current_page,
             timeout,
             msg_id,
             controls,
+            delete_msg,
         }
     }
 }
@@ -293,6 +308,7 @@ impl Default for SelectMenuOptions {
             timeout: 120,
             msg_id: None,
             controls: vec![],
+            delete_msg: false,
         }
     }
 }
@@ -332,9 +348,9 @@ pub enum MenuComponent {
 impl MenuComponent {
     fn id(&self) -> String {
         match self {
-            Self::ButtonComponent { create, id } => id,
-            Self::SelectComponent { create, id } => id,
-            Self::InputComponent { create, id } => id,
+            Self::ButtonComponent { create: _, id } => id,
+            Self::SelectComponent { create: _, id } => id,
+            Self::InputComponent { create: _, id } => id,
         }
         .clone()
     }
@@ -349,6 +365,7 @@ impl MenuComponent {
             id: id.to_string(),
         }
     }
+    #[allow(dead_code)]
     pub fn select<F>(id: &str, f: F) -> MenuComponent
     where
         F: FnOnce(&mut CreateSelectMenu) -> &mut CreateSelectMenu,
@@ -359,6 +376,7 @@ impl MenuComponent {
             id: id.to_string(),
         }
     }
+    #[allow(dead_code)]
     pub fn input<F>(id: &str, f: F) -> MenuComponent
     where
         F: FnOnce(&mut CreateInputText) -> &mut CreateInputText,

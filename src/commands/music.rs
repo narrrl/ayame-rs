@@ -126,9 +126,9 @@ pub(crate) async fn search(
             Arc::new(|m| Box::pin(cancel(m))),
         ),
     ];
-    let options = SelectMenuOptions::new(0, 120, None, vec![first_row, sec_row]);
+    let options = SelectMenuOptions::new(0, 120, None, vec![first_row, sec_row], true);
     let pages = results.iter().map(|r| embed_song_for_menu(&r)).collect();
-    let menu = SelectMenu::new(&ctx, &pages, options);
+    let menu = SelectMenu::new(&ctx, &pages, options)?;
     let (i, _) = menu.run().await?;
     music::play::register_and_play(
         ctx,
