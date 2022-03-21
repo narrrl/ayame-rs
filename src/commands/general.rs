@@ -14,13 +14,7 @@ use poise::serenity_prelude::{
 
 use crate::error::*;
 
-#[poise::command(
-    prefix_command,
-    slash_command,
-    track_edits,
-    category = "General",
-    ephemeral
-)]
+#[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn mock(
     ctx: Context<'_>,
     #[description = "The text to convert"]
@@ -28,6 +22,29 @@ pub(crate) async fn mock(
     text: String,
 ) -> Result<(), Error> {
     ctx.say(crate::utils::mock_text(&text)).await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command, slash_command, track_edits, category = "General")]
+pub(crate) async fn uwu(
+    ctx: Context<'_>,
+    #[description = "The text to convert"]
+    #[rest]
+    text: String,
+) -> Result<(), Error> {
+    ctx.say(uwuifier::uwuify_str_sse(&text)).await?;
+    Ok(())
+}
+
+#[poise::command(context_menu_command = "uwuify message")]
+pub(crate) async fn uwuify(ctx: Context<'_>, msg: serenity::Message) -> Result<(), Error> {
+    ctx.say(uwuifier::uwuify_str_sse(&msg.content)).await?;
+    Ok(())
+}
+
+#[poise::command(context_menu_command = "mock message")]
+pub(crate) async fn mockify(ctx: Context<'_>, msg: serenity::Message) -> Result<(), Error> {
+    ctx.say(crate::utils::mock_text(&msg.content)).await?;
     Ok(())
 }
 
