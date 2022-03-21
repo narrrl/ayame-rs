@@ -2,9 +2,15 @@ use chrono::Weekday;
 use core::fmt;
 use mensa_swfr_rs::mensa;
 use regex::Regex;
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 
-use poise::{serenity::Result as SerenityResult, serenity_prelude::CreateEmbed};
+use poise::{
+    serenity::Result as SerenityResult,
+    serenity_prelude::{
+        self as serenity, Button, ChannelId, CreateActionRow, CreateButton, CreateEmbed,
+        CreateInputText, CreateMessage, CreateSelectMenu, Message, MessageId, UserId,
+    },
+};
 use rand::Rng;
 
 use tracing::error;
@@ -161,4 +167,139 @@ impl Display for Bar {
         };
         write!(fmt, "[{}{}{}]", prev, h, next)
     }
+}
+
+pub struct SelectMenu<'a> {
+    ctx: &'a Context<'a>,
+    pages: &'a Vec<CreateMessage<'a>>,
+    options: SelectMenuOptions,
+    has_selected: bool,
+    was_canceled: bool,
+}
+
+impl<'a> SelectMenu<'a> {
+    pub fn new(
+        ctx: &'a Context<'a>,
+        pages: &'a Vec<CreateMessage<'a>>,
+        options: SelectMenuOptions,
+    ) -> Self {
+        Self {
+            ctx,
+            pages,
+            options,
+            has_selected: false,
+            was_canceled: false,
+        }
+    }
+
+    pub async fn run(mut self) -> Result<(usize, Option<Message>), Error> {
+        self.register().await?;
+
+        while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.discord())
+            .author_id(self.ctx.author().id)
+            .channel_id(self.ctx.channel_id())
+            .timeout(std::time::Duration::from_secs(self.options.timeout))
+            .await
+        {}
+
+        // TODO: implement
+        unimplemented!();
+    }
+
+    async fn register(&mut self) -> Result<(), Error> {
+        self.ctx
+            .send(|m| {
+                m.components(|c| {
+                    for row in self.options.controls.iter() {
+                        c.create_action_row(|a| create_action_row(a, row));
+                    }
+                    c
+                })
+            })
+            .await?;
+        Ok(())
+    }
+}
+
+pub struct SelectMenuOptions {
+    current_page: usize,
+    timeout: u64,
+    msg_id: Option<MessageId>,
+    controls: Vec<Vec<Control>>,
+}
+
+impl SelectMenuOptions {
+    pub fn new(
+        current_page: usize,
+        timeout: u64,
+        msg_id: Option<MessageId>,
+        controls: Vec<Control>,
+    ) -> Self {
+        Self {
+            current_page,
+            timeout,
+            msg_id,
+            controls,
+        }
+    }
+}
+
+impl Default for SelectMenuOptions {
+    fn default() -> SelectMenuOptions {
+        SelectMenuOptions {
+            current_page: 0,
+            timeout: 120,
+            msg_id: None,
+            controls: vec![],
+        }
+    }
+}
+
+pub struct Control {
+    button: MenuComponent,
+    function: ControlFunction,
+}
+
+pub type ControlFunction = Arc<
+    dyn for<'b> Fn(&'b mut SelectMenu<'_>, Button) -> Pin<Box<dyn Future<Output = ()> + 'b + Send>>
+        + Sync
+        + Send,
+>;
+
+pub enum MenuComponent {
+    ButtonComponent {
+        create: CreateButton,
+        id: String,
+    },
+    InputComponent {
+        create: CreateInputText,
+        id: String,
+    },
+    SelectComponent {
+        create: CreateSelectMenu,
+        id: String,
+    },
+}
+
+fn create_action_row<'b>(
+    a: &'b mut CreateActionRow,
+    buttons: &Vec<Control>,
+) -> &'b mut CreateActionRow {
+    for ctrl in buttons {
+        match &ctrl.button {
+            MenuComponent::ButtonComponent { create, id } => a.create_button(|b| {
+                b.clone_from(&create);
+                b.custom_id(id)
+            }),
+            MenuComponent::InputComponent { create, id } => a.create_input_text(|i| {
+                i.clone_from(&create);
+                i.custom_id(id)
+            }),
+            MenuComponent::SelectComponent { create, id } => a.create_select_menu(|sm| {
+                sm.clone_from(&create);
+                sm.custom_id(id)
+            }),
+        };
+    }
+    a
 }
