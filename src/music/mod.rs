@@ -18,7 +18,7 @@ use poise::serenity_prelude::{
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
 use crate::utils::{check_result_ayame, Bar};
-use crate::youtube::{hyperlink_result, YoutubeResult};
+use crate::youtube::YoutubeResult;
 use crate::{music::leave::leave, Context as PoiseContext, Error};
 
 use crate::{error::*, Data};
@@ -357,8 +357,8 @@ pub async fn embed_song(track: &TrackHandle, user: Option<User>) -> CreateEmbed 
 
 pub fn embed_song_for_menu(song: &YoutubeResult) -> CreateEmbed {
     let mut e = CreateEmbed::default();
-    e.author(|a| a.name(song.channel_name()).url(song.channel_url()))
-        .image(song.thumbnail().url())
-        .description(hyperlink_result(&song));
+    e.title(song.title())
+        .url(song.channel_url())
+        .image(song.thumbnail().url());
     e
 }

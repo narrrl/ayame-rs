@@ -53,12 +53,17 @@ impl<'a, T> Menu<'a, T> {
                 .ok_or_else(|| Error::Failure(UNKNOWN_RESPONSE))?;
             let func = Arc::clone(&action.function);
 
-            func(self).await?;
+            // run function of button/context
+            func(self, &mci).await?;
 
-            mci.create_interaction_response(self.ctx.discord(), |ir| {
-                ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
-            })
-            .await?;
+            // check if responded
+            if let Err(_) = mci.get_interaction_response(&self.ctx.discord().http).await {
+                // else respond with empty event
+                mci.create_interaction_response(&self.ctx.discord(), |ir| {
+                    ir.kind(serenity::InteractionResponseType::UpdateMessage)
+                })
+                .await?;
+            }
 
             if !self.is_runnig {
                 break;
@@ -86,20 +91,18 @@ impl<'a, T> Menu<'a, T> {
         Ok(msg_id)
     }
 
-    pub async fn edit_msg(
+    pub async fn update_response(
         &self,
         f: impl for<'b, 'c> FnOnce(
-            &'b mut serenity::EditMessage<'c>,
-        ) -> &'b mut serenity::EditMessage<'c>,
-        msg_id: &serenity::MessageId,
+            &'b mut serenity::CreateInteractionResponseData,
+        ) -> &'b mut serenity::CreateInteractionResponseData,
+        mci: &Arc<serenity::MessageComponentInteraction>,
     ) -> Result<(), Error> {
-        let mut msg = self
-            .ctx
-            .discord()
-            .http
-            .get_message(self.ctx.channel_id().into(), msg_id.0)
-            .await?;
-        msg.edit(&self.ctx.discord().http, |m| f(m)).await?;
+        mci.create_interaction_response(&self.ctx.discord(), |ir| {
+            ir.kind(serenity::InteractionResponseType::UpdateMessage)
+                .interaction_response_data(|m| f(m))
+        })
+        .await?;
         Ok(())
     }
 
@@ -200,6 +203,7 @@ impl<T> Control<T> {
 pub type ControlFunction<T> = Arc<
     dyn for<'a> Fn(
             &'a mut Menu<'_, T>,
+            &'a Arc<serenity::MessageComponentInteraction>,
         ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + 'a + Send>>
         + Sync
         + Send,

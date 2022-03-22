@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use poise::serenity_prelude::{ButtonStyle, CreateButton, Mentionable, Message};
+use poise::serenity_prelude::{self as serenity, ButtonStyle, CreateButton, Mentionable, Message};
 use regex::Regex;
 
 use crate::{
@@ -87,10 +87,10 @@ pub(crate) async fn search(
     #[rest]
     input: String,
 ) -> Result<(), Error> {
-    ctx.defer().await?;
-    let config = ctx.data().config.lock().await;
+    ctx.defer_ephemeral().await?;
+    let config = &ctx.data().config;
+    let color = config.color()?;
     let mut req = YoutubeSearch::new(config.youtube_api_key());
-    drop(config);
     req.set_amount(5).set_filter(Type::VIDEO);
     let res = req.search(&input).await?;
     let results = res.results();
@@ -106,13 +106,13 @@ pub(crate) async fn search(
                     MenuComponent::button("prev", |b: &mut CreateButton| {
                         b.style(ButtonStyle::Primary).label("prev")
                     }),
-                    Arc::new(|m| Box::pin(prev(m))),
+                    Arc::new(|m, mci| Box::pin(prev(m, mci))),
                 ))
                 .add_button(Control::new(
                     MenuComponent::button("next", |b: &mut CreateButton| {
                         b.style(ButtonStyle::Primary).label("next")
                     }),
-                    Arc::new(|m| Box::pin(next(m))),
+                    Arc::new(|m, mci| Box::pin(next(m, mci))),
                 ))
             })
             .add_row(|row| {
@@ -120,13 +120,13 @@ pub(crate) async fn search(
                     MenuComponent::button("play", |b: &mut CreateButton| {
                         b.style(ButtonStyle::Success).label("play")
                     }),
-                    Arc::new(|m| Box::pin(select(m))),
+                    Arc::new(|m, mci| Box::pin(select(m, mci))),
                 ))
                 .add_button(Control::new(
                     MenuComponent::button("cancel", |b: &mut CreateButton| {
                         b.style(ButtonStyle::Danger).label("cancel")
                     }),
-                    Arc::new(|m| Box::pin(cancel(m))),
+                    Arc::new(|m, mci| Box::pin(cancel(m, mci))),
                 ))
             })
     });
@@ -134,9 +134,9 @@ pub(crate) async fn search(
     menu.run(|mes| {
         mes.embed(|e| {
             e.clone_from(&embed_song_for_menu(song));
+            e.color(color);
             e
         })
-        .ephemeral(true)
     })
     .await?;
 
@@ -147,33 +147,67 @@ pub(crate) async fn search(
     music::play::register_and_play(ctx, song.url()).await
 }
 
-async fn cancel(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
-    m.stop();
-    m.ctx.say(EVENT_CANCELED).await?;
-    Ok(())
+async fn cancel(
+    m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
+) -> Result<(), Error> {
+    mci.create_interaction_response(&m.ctx.discord().http, |ir| {
+        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
+    })
+    .await?;
+    Err(Error::Input(EVENT_CANCELED))
 }
-async fn select(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+async fn select(
+    m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
+    _mci: &Arc<serenity::MessageComponentInteraction>,
+) -> Result<(), Error> {
     m.stop();
     Ok(())
 }
 
-async fn next(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+async fn next(
+    m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
+) -> Result<(), Error> {
     let song = m
         .data
         .next()
         .ok_or_else(|| Error::Failure(NO_SEARCH_RESULTS))?;
-    let msg_id = m.msg_id.ok_or_else(|| Error::Failure(COULDNT_GET_MSG))?;
-    m.edit_msg(|m| m.set_embed(embed_song_for_menu(song)), &msg_id)
-        .await
+    let color = m.ctx.data().config.color()?;
+
+    m.update_response(
+        |m| {
+            m.set_embed({
+                let mut e = embed_song_for_menu(song);
+                e.color(color);
+                e
+            })
+        },
+        mci,
+    )
+    .await
 }
-async fn prev(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+async fn prev(
+    m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
+) -> Result<(), Error> {
     let song = m
         .data
         .prev()
         .ok_or_else(|| Error::Failure(NO_SEARCH_RESULTS))?;
-    let msg_id = m.msg_id.ok_or_else(|| Error::Failure(COULDNT_GET_MSG))?;
-    m.edit_msg(|m| m.set_embed(embed_song_for_menu(song)), &msg_id)
-        .await
+    let color = m.ctx.data().config.color()?;
+
+    m.update_response(
+        |m| {
+            m.set_embed({
+                let mut e = embed_song_for_menu(song);
+                e.color(color);
+                e
+            })
+        },
+        mci,
+    )
+    .await
 }
 
 #[poise::command(
@@ -196,9 +230,8 @@ pub(crate) async fn play(
     if re.is_match(input.trim()) {
         return music::play::register_and_play(ctx, input).await;
     }
-    let config = ctx.data().config.lock().await;
+    let config = &ctx.data().config;
     let mut req = YoutubeSearch::new(config.youtube_api_key());
-    drop(config);
     req.set_amount(1).set_filter(Type::VIDEO);
     let res = req.search(&input).await?;
     let song = res
@@ -219,9 +252,8 @@ pub(crate) async fn play_message_content(
     if re.is_match(&message.content.trim()) {
         return music::play::register_and_play(ctx, message.content).await;
     }
-    let config = ctx.data().config.lock().await;
+    let config = &ctx.data().config;
     let mut req = YoutubeSearch::new(config.youtube_api_key());
-    drop(config);
     req.set_amount(1).set_filter(Type::VIDEO);
     let res = req.search(&message.content).await?;
     let song = res

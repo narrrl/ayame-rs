@@ -1,7 +1,10 @@
 use std::fs::File;
 use std::io::prelude::*;
 
+use poise::serenity_prelude::Color;
 use serde::{Deserialize, Serialize};
+
+use crate::Error;
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Config {
@@ -11,6 +14,7 @@ pub struct Config {
     copy_codec: Option<bool>,
     youtube_api_key: String,
     mensa_api_key: Option<String>,
+    color: String,
 }
 
 impl Config {
@@ -43,6 +47,13 @@ impl Config {
     #[allow(dead_code)]
     pub fn youtube_api_key<'a>(&'a self) -> &'a String {
         &self.youtube_api_key
+    }
+
+    pub fn color<'a>(&'a self) -> Result<Color, Error> {
+        Ok(Color::from(
+            u32::from_str_radix(self.color.as_str(), 16)
+                .map_err(|_| Error::Failure("couldn't parse color"))?,
+        ))
     }
 }
 

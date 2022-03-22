@@ -24,7 +24,8 @@ mod youtube;
 
 #[derive(Clone)]
 pub struct Data {
-    config: Arc<Mutex<configuration::Config>>,
+    // only read, can't change
+    config: configuration::Config,
     song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
     song_messages: Arc<Mutex<HashMap<GuildId, MessageId>>>,
     song_status: Arc<Mutex<HashMap<GuildId, bool>>>,
@@ -161,7 +162,7 @@ async fn main() {
                 });
                 // store config in Data
                 Ok(Data {
-                    config: Arc::new(Mutex::new(config)),
+                    config,
                     song_queues: Arc::new(Mutex::new(HashMap::new())),
                     song_messages: Arc::new(Mutex::new(HashMap::new())),
                     song_status: Arc::new(Mutex::new(HashMap::new())),

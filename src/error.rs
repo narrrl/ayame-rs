@@ -1,5 +1,5 @@
 use mensa_swfr_rs::error::MensaError;
-use poise::serenity_prelude::{Color, Error as SerenityError};
+use poise::serenity_prelude::{self as serenity, Color, Error as SerenityError};
 use regex::Error as RegexError;
 use reqwest::Error as ReqwestError;
 use songbird::error::{ConnectionError, JoinError};
@@ -93,5 +93,14 @@ impl AyameError {
             })
             .await,
         )
+    }
+
+    pub fn set_error_embed<'a>(
+        &self,
+        e: &'a mut serenity::CreateEmbed,
+    ) -> &'a mut serenity::CreateEmbed {
+        e.title("Error!")
+            .color(Color::RED)
+            .description(&self.to_string())
     }
 }

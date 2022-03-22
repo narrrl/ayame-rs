@@ -98,9 +98,8 @@ pub(crate) async fn mensa(
     #[description = "The day to look up"] day: Option<String>,
 ) -> Result<(), Error> {
     ctx.defer_or_broadcast().await?;
-    let config = ctx.data().config.lock().await;
+    let config = &ctx.data().config;
     let mensa_key = config.mensa_api_key();
-    drop(&config);
     if let Some(mensa_key) = mensa_key {
         let plan = mensa_swfr_rs::request_rempart(mensa_key).await?;
         let days = plan.days();
