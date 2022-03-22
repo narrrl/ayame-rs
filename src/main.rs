@@ -69,7 +69,11 @@ If you want more information about a specific command, just pass the command as 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Command { error, ctx } => {
-            error.send_error(&ctx).await;
+            if let Error::Input(_) = error {
+                error.send_error(&ctx).await
+            } else {
+                error!("{:?}", error)
+            }
         }
         poise::FrameworkError::Listener { error, event } => {
             error!(

@@ -56,14 +56,9 @@ impl<'a, T> Menu<'a, T> {
             // run function of button/context
             func(self, &mci).await?;
 
-            // check if responded
-            if let Err(_) = mci.get_interaction_response(&self.ctx.discord().http).await {
-                // else respond with empty event
-                mci.create_interaction_response(&self.ctx.discord(), |ir| {
-                    ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
-                })
-                .await?;
-            }
+            // respond and ignore error if already responded
+            //
+            let _ = mci.defer(&self.ctx.discord().http).await;
 
             if !self.is_runnig {
                 break;
