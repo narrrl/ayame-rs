@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use songbird::input::Metadata;
-use songbird::tracks::TrackHandle;
+use songbird::tracks::{TrackHandle, TrackQueue};
 use tracing::error;
 
 use async_trait::async_trait;
@@ -117,10 +117,9 @@ impl EventHandler for NotificationHandler {
 
         let queue = call.queue();
         let current = queue.current();
-        drop(call);
 
         let mut song_status = self.mtx.data.song_status.lock().await;
-        let embed = match current {
+        let mut embed = match current {
             Some(current) => {
                 let user_map = self.mtx.data.song_queues.lock().await;
                 song_status.insert(self.mtx.guild_id, false);
@@ -130,7 +129,7 @@ impl EventHandler for NotificationHandler {
                 };
                 drop(user_map);
 
-                embed_song(&current, user).await
+                embed_upcoming(&queue, embed_song(&current, user).await)
             }
             None => {
                 if *song_status.entry(self.mtx.guild_id).or_insert(true) {
@@ -142,6 +141,10 @@ impl EventHandler for NotificationHandler {
                 e
             }
         };
+        drop(call);
+        if let Ok(c) = self.mtx.data.config.color() {
+            embed.color(c);
+        }
         drop(song_status);
 
         let mut messages_map = self.mtx.data.song_messages.lock().await;
@@ -308,6 +311,25 @@ pub fn duration_format(duration: Option<Duration>) -> String {
         }
     }
     "unknown".to_string()
+}
+
+pub fn embed_upcoming(queue: &TrackQueue, mut embed: CreateEmbed) -> CreateEmbed {
+    let text = queue
+        .current_queue()
+        .iter()
+        .take(6)
+        .enumerate()
+        .skip(1)
+        .filter_map(|(i, s)| match &s.metadata().title {
+            Some(title) => Some(format!("{}. {}\n", i, title)),
+            None => None,
+        })
+        .collect::<String>();
+    if text.is_empty() {
+        return embed;
+    }
+    embed.field("Upcoming:", format!("```\n{}```", text), false);
+    embed
 }
 
 pub async fn embed_song(track: &TrackHandle, user: Option<User>) -> CreateEmbed {
