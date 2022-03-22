@@ -60,7 +60,7 @@ impl<'a, T> Menu<'a, T> {
             if let Err(_) = mci.get_interaction_response(&self.ctx.discord().http).await {
                 // else respond with empty event
                 mci.create_interaction_response(&self.ctx.discord(), |ir| {
-                    ir.kind(serenity::InteractionResponseType::UpdateMessage)
+                    ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
                 })
                 .await?;
             }
