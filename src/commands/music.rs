@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use poise::serenity_prelude::{self as serenity, Mentionable, Message};
+use poise::serenity_prelude::{ButtonStyle, CreateButton, Mentionable, Message};
 use regex::Regex;
 
 use crate::{
+    menu::Menu,
+    menu::{Control, Cursor, MenuComponent},
     music::{self, embed_song_for_menu, MusicContext},
-    utils::{
-        cancel, guild_only, next_page, prev_page, select_page, Control, MenuComponent, SelectMenu,
-        SelectMenuOptions,
-    },
-    youtube::{Type, YoutubeSearch},
+    utils::guild_only,
+    youtube::{Type, YoutubeResult, YoutubeSearch},
     Context, Error,
 };
 
@@ -95,49 +94,86 @@ pub(crate) async fn search(
     req.set_amount(5).set_filter(Type::VIDEO);
     let res = req.search(&input).await?;
     let results = res.results();
-    if results.is_empty() {
-        return Err(Error::Input(NO_SEARCH_RESULTS));
-    }
-    let first_row = vec![
-        Control::new(
-            MenuComponent::button("previous", |b| {
-                b.style(serenity::ButtonStyle::Primary).label("previous")
-            }),
-            Arc::new(|m| Box::pin(prev_page(m))),
-        ),
-        Control::new(
-            MenuComponent::button("next", |b| {
-                b.style(serenity::ButtonStyle::Primary).label("next")
-            }),
-            Arc::new(|m| Box::pin(next_page(m))),
-        ),
-    ];
-    let sec_row = vec![
-        Control::new(
-            MenuComponent::button("play", |b| {
-                b.style(serenity::ButtonStyle::Success).label("play")
-            }),
-            Arc::new(|m| Box::pin(select_page(m))),
-        ),
-        Control::new(
-            MenuComponent::button("cancel", |b| {
-                b.style(serenity::ButtonStyle::Danger).label("cancel")
-            }),
-            Arc::new(|m| Box::pin(cancel(m))),
-        ),
-    ];
-    let options = SelectMenuOptions::new(0, 120, None, vec![first_row, sec_row], true);
-    let pages = results.iter().map(|r| embed_song_for_menu(&r)).collect();
-    let menu = SelectMenu::new(&ctx, &pages, options)?;
-    let (i, _) = menu.run().await?;
-    music::play::register_and_play(
-        ctx,
-        results
-            .get(i)
-            .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?
-            .url(),
-    )
-    .await
+
+    let song = results
+        .first()
+        .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+
+    let mut menu = Menu::new(&ctx, Cursor::from(results), |options| {
+        options
+            .add_row(|row| {
+                row.add_button(Control::new(
+                    MenuComponent::button("prev", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Primary).label("prev")
+                    }),
+                    Arc::new(|m| Box::pin(prev(m))),
+                ))
+                .add_button(Control::new(
+                    MenuComponent::button("next", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Primary).label("next")
+                    }),
+                    Arc::new(|m| Box::pin(next(m))),
+                ))
+            })
+            .add_row(|row| {
+                row.add_button(Control::new(
+                    MenuComponent::button("play", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Success).label("play")
+                    }),
+                    Arc::new(|m| Box::pin(select(m))),
+                ))
+                .add_button(Control::new(
+                    MenuComponent::button("cancel", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Danger).label("cancel")
+                    }),
+                    Arc::new(|m| Box::pin(cancel(m))),
+                ))
+            })
+    });
+
+    menu.run(|mes| {
+        mes.embed(|e| {
+            e.clone_from(&embed_song_for_menu(song));
+            e
+        })
+        .ephemeral(true)
+    })
+    .await?;
+
+    let song = menu
+        .data
+        .current()
+        .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
+    music::play::register_and_play(ctx, song.url()).await
+}
+
+async fn cancel(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+    m.stop();
+    m.ctx.say(EVENT_CANCELED).await?;
+    Ok(())
+}
+async fn select(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+    m.stop();
+    Ok(())
+}
+
+async fn next(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+    let song = m
+        .data
+        .next()
+        .ok_or_else(|| Error::Failure(NO_SEARCH_RESULTS))?;
+    let msg_id = m.msg_id.ok_or_else(|| Error::Failure(COULDNT_GET_MSG))?;
+    m.edit_msg(|m| m.set_embed(embed_song_for_menu(song)), &msg_id)
+        .await
+}
+async fn prev(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+    let song = m
+        .data
+        .prev()
+        .ok_or_else(|| Error::Failure(NO_SEARCH_RESULTS))?;
+    let msg_id = m.msg_id.ok_or_else(|| Error::Failure(COULDNT_GET_MSG))?;
+    m.edit_msg(|m| m.set_embed(embed_song_for_menu(song)), &msg_id)
+        .await
 }
 
 #[poise::command(

@@ -16,6 +16,7 @@ use uuid::Uuid;
 mod commands;
 mod configuration;
 mod error;
+mod menu;
 mod model;
 mod music;
 mod utils;
