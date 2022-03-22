@@ -100,35 +100,32 @@ pub(crate) async fn search(
         .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
 
     let mut menu = Menu::new(&ctx, Cursor::from(results), |options| {
-        options
-            .add_row(|row| {
-                row.add_button(Control::new(
-                    MenuComponent::button("prev", |b: &mut CreateButton| {
-                        b.style(ButtonStyle::Primary).label("prev")
-                    }),
-                    Arc::new(|m, mci| Box::pin(prev(m, mci))),
-                ))
-                .add_button(Control::new(
-                    MenuComponent::button("next", |b: &mut CreateButton| {
-                        b.style(ButtonStyle::Primary).label("next")
-                    }),
-                    Arc::new(|m, mci| Box::pin(next(m, mci))),
-                ))
-            })
-            .add_row(|row| {
-                row.add_button(Control::new(
-                    MenuComponent::button("play", |b: &mut CreateButton| {
-                        b.style(ButtonStyle::Success).label("play")
-                    }),
-                    Arc::new(|m, mci| Box::pin(select(m, mci))),
-                ))
-                .add_button(Control::new(
-                    MenuComponent::button("cancel", |b: &mut CreateButton| {
-                        b.style(ButtonStyle::Danger).label("cancel")
-                    }),
-                    Arc::new(|m, mci| Box::pin(cancel(m, mci))),
-                ))
-            })
+        options.add_row(|row| {
+            row.add_button(Control::new(
+                MenuComponent::button("prev", |b: &mut CreateButton| {
+                    b.style(ButtonStyle::Primary).label("prev")
+                }),
+                Arc::new(|m, mci| Box::pin(prev(m, mci))),
+            ))
+            .add_button(Control::new(
+                MenuComponent::button("next", |b: &mut CreateButton| {
+                    b.style(ButtonStyle::Primary).label("next")
+                }),
+                Arc::new(|m, mci| Box::pin(next(m, mci))),
+            ))
+            .add_button(Control::new(
+                MenuComponent::button("play", |b: &mut CreateButton| {
+                    b.style(ButtonStyle::Success).label("play")
+                }),
+                Arc::new(|m, mci| Box::pin(select(m, mci))),
+            ))
+            .add_button(Control::new(
+                MenuComponent::button("cancel", |b: &mut CreateButton| {
+                    b.style(ButtonStyle::Danger).label("cancel")
+                }),
+                Arc::new(|m, mci| Box::pin(cancel(m, mci))),
+            ))
+        })
     });
 
     menu.run(|mes| {
