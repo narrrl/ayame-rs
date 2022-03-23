@@ -156,9 +156,12 @@ async fn cancel(
 }
 async fn select(
     m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
-    _mci: &Arc<serenity::MessageComponentInteraction>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
 ) -> Result<(), Error> {
     m.stop();
+    let color = m.ctx.data().config.color()?;
+    m.update_response(|m| m.embed(|e| e.title("Song selected!").color(color)), mci)
+        .await?;
     Ok(())
 }
 
