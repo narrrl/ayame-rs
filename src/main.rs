@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::time::Duration;
 
 use commands::general::*;
 use commands::music::*;
@@ -162,6 +165,21 @@ async fn main() {
                     tokio::signal::ctrl_c()
                         .await
                         .expect("Could not register ctrl+c handler");
+                    shard_manager.lock().await.shutdown_all().await;
+                });
+                let shard_manager = framework.shard_manager();
+                tokio::spawn(async move {
+                    let term = Arc::new(AtomicBool::new(false));
+
+                    if let Err(why) =
+                        signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&term))
+                    {
+                        error!("couldn't register sigterm hook {:?}", why);
+                        return;
+                    }
+                    while !term.load(Ordering::Relaxed) {
+                        tokio::time::sleep(Duration::from_secs(2)).await;
+                    }
                     shard_manager.lock().await.shutdown_all().await;
                 });
                 // store config in Data
