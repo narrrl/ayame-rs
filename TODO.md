@@ -1,18 +1,18 @@
 # todo
 
-- [] database (sqlite probably)
-- [] bind command
-- [] bound_channel configuration
+- [ ] database (sqlite probably)
+- [ ] bind command
+- [ ] bound_channel configuration
     - auto delete messages (to keey the channel clean)
     - ... (ideas go here)
-- [] bind check for other commands
-- [] move clusterfuck of hashmaps from data into database
-- [] rework music commands with binds
-- [] docker-compose
-- [] support resize of gifs
+- [ ] bind check for other commands
+- [ ] move clusterfuck of hashmaps from data into database
+- [ ] rework music commands with binds
+- [ ] docker-compose
+- [ ] support resize of gifs
     - maybe even some compression/optimization stuff
     - hf julius
-- [] user prefix or move totally to slash commands only
+- [ ] user prefix or move totally to slash commands only
 
 
 # bind command
