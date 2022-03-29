@@ -12,7 +12,7 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 ## running with docker
 - create `config.toml`
 - build docker image `docker build -t ayame .`
-- run docker container with `docker run -d ayame`
+- run docker container with `docker run --name ayame -d ayame`
 
 ## Contact
 - **Email**: nils@nirusu.codes
