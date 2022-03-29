@@ -5,6 +5,7 @@ use reqwest::Error as ReqwestError;
 use songbird::error::{ConnectionError, JoinError};
 use songbird::input::error::Error as SongbirdError;
 use songbird::tracks::TrackError;
+use sqlx::Error as SQLError;
 use std::io::Error as IOError;
 use thiserror::Error;
 
@@ -72,6 +73,11 @@ pub enum AyameError {
     RegexError {
         #[from]
         source: RegexError,
+    },
+    #[error("{:?}", source)]
+    DatabaseError {
+        #[from]
+        source: SQLError,
     },
 }
 

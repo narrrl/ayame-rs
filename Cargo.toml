@@ -6,6 +6,8 @@ edition = "2018"
 
 
 [dependencies]
+anyhow = "^1"
+sqlx = { version = "0.5.7", features = ["runtime-tokio-rustls", "sqlite", "offline"] }
 serde-xml-rs = "^0"
 tracing = "^0"
 tracing-subscriber = "^0"

@@ -32,6 +32,7 @@ pub struct Data {
     song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
     song_messages: Arc<Mutex<HashMap<GuildId, MessageId>>>,
     song_status: Arc<Mutex<HashMap<GuildId, bool>>>,
+    database: sqlx::SqlitePool,
 }
 pub type Error = error::AyameError;
 
@@ -94,7 +95,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), anyhow::Error> {
     if let Err(_) = std::env::var("RUST_LOG") {
         std::env::set_var("RUST_LOG", "INFO");
     }
@@ -138,6 +139,16 @@ async fn main() {
         },
         ..Default::default()
     };
+
+    let database = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect_with(
+            "sqlite:database/database.sqlite"
+                .parse::<sqlx::sqlite::SqliteConnectOptions>()?
+                .create_if_missing(true),
+        )
+        .await?;
+    sqlx::migrate!("./migrations").run(&database).await?;
 
     let client = poise::Framework::build()
         .client_settings(move |client_builder: serenity::ClientBuilder| {
@@ -188,12 +199,12 @@ async fn main() {
                     song_queues: Arc::new(Mutex::new(HashMap::new())),
                     song_messages: Arc::new(Mutex::new(HashMap::new())),
                     song_status: Arc::new(Mutex::new(HashMap::new())),
+                    database,
                 })
             })
         })
         .options(options);
 
-    if let Err(why) = client.run_autosharded().await {
-        error!("Client error: {:?}", why);
-    }
+    client.run_autosharded().await?;
+    Ok(())
 }
