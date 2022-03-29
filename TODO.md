@@ -1,6 +1,6 @@
 # todo
 
-- [ ] database (sqlite probably)
+- [x] database (sqlite probably)
 - [ ] bind command
 - [ ] bound_channel configuration
     - auto delete messages (to keey the channel clean)
