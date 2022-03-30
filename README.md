@@ -12,9 +12,12 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 ## docker
 
 ### dependencies
+
 - docker
     - ubuntu/debian: [instructions](https://docs.docker.com/engine/install/ubuntu/)
     - arch: `paru -S docker`
+ 
+### build & run with docker
 
 - create `config.toml`
 - build docker image `docker build -t ayame .`
