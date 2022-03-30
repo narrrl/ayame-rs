@@ -4,3 +4,4 @@
 !Cargo.lock
 !/src
 !config.toml
+!/migrations

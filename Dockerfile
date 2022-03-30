@@ -1,5 +1,8 @@
 FROM rust:1.59-slim-buster as builder
 
+ENV SQLX_OFFLINE=true
+ENV DATABASE_URL=sqlite:database/database.sqlite
+
 RUN apt-get update -y \
         && apt-get install -y libssl-dev pkg-config libopus-dev
 
@@ -9,20 +12,18 @@ WORKDIR /ayame-rs
 
 COPY . .
 
-# RUN rm ./target/release/deps/ayame-rs*
-
 RUN cargo build --release
 
 FROM debian:buster-slim
+
 ARG APP=/usr/src/app
 
-ENV TZ=Etc/UTC
 ENV APP_USER=appuser
 
 WORKDIR ${APP}
 
 RUN apt-get update -y \
-        && apt-get install -y libssl-dev pkg-config libopus-dev ffmpeg python3 python3-pip  \
+        && apt-get install -y libssl-dev pkg-config libopus-dev ffmpeg python3 python3-pip ca-certificates \
         && rm -rf /var/lib/apt/lists/*
 RUN groupadd $APP_USER
 RUN useradd -g $APP_USER $APP_USER
@@ -31,6 +32,8 @@ RUN USER=$APP_USER python3 -m pip install --force-reinstall https://github.com/y
 
 COPY --from=builder /ayame-rs/target/release/ayame-rs .
 COPY --from=builder /ayame-rs/config.toml .
+
+RUN mkdir database
 
 RUN chown -R $APP_USER:$APP_USER .
 
