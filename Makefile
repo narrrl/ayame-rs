@@ -16,7 +16,9 @@ run:
 
 .PHONY: clean
 clean:
+ifneq ($(shell type cargo),)
 	cargo clean
+endif
 ifneq ($(strip $(CONTAINER_ID)),)
 	docker rm ${CONTAINER_ID}
 endif

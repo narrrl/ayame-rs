@@ -25,6 +25,8 @@ mod music;
 mod utils;
 mod youtube;
 
+pub const DEFAULT_DATABASE_URL: &str = "sqlite:database/database.sqlite";
+
 #[derive(Clone)]
 pub struct Data {
     // only read, can't change
@@ -99,49 +101,8 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Err(_) = std::env::var("RUST_LOG") {
         std::env::set_var("RUST_LOG", "INFO");
     }
-    let database_url =
-        std::env::var("DATABASE_URL").unwrap_or("sqlite:database/database.sqlite".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or(DEFAULT_DATABASE_URL.to_string());
     tracing_subscriber::fmt::init();
-    let config = configuration::config();
-    let options = poise::FrameworkOptions {
-        commands: vec![
-            avatar(),
-            help(),
-            mock(),
-            mockify(),
-            uwu(),
-            uwuify(),
-            register(),
-            unregister(),
-            mensa(),
-            invite(),
-            join(),
-            leave(),
-            play(),
-            search(),
-            skip(),
-            shutdown(),
-            addemote(),
-            play_message_content(),
-        ],
-        listener: |ctx, event, framework, user_data| {
-            Box::pin(event_listener(ctx, event, framework, user_data))
-        },
-        on_error: |error| Box::pin(on_error(error)),
-        // Options specific to prefix commands, i.e. commands invoked via chat messages
-        prefix_options: poise::PrefixFrameworkOptions {
-            prefix: Some(String::from(config.prefix())),
-
-            mention_as_prefix: true,
-            // An edit tracker needs to be supplied here to make edit tracking in commands work
-            edit_tracker: Some(poise::EditTracker::for_timespan(
-                std::time::Duration::from_secs(3600 * 3),
-            )),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
     let database = sqlx::sqlite::SqlitePoolOptions::new()
         .max_connections(5)
         .connect_with(
@@ -152,6 +113,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .await?;
     sqlx::migrate!("./migrations").run(&database).await?;
 
+    Ok(run_discord_client(database).await?)
+}
+
+async fn run_discord_client(database: sqlx::SqlitePool) -> Result<(), anyhow::Error> {
+    let config = configuration::config();
     let client = poise::Framework::build()
         .client_settings(move |client_builder: serenity::ClientBuilder| {
             // get songbird instance
@@ -165,6 +131,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .type_map_insert::<SongbirdKey>(voice)
         })
         .token(config.token())
+        .options(get_discord_configuration(&config))
         .user_data_setup(|ctx, _data_about_bot, framework| {
             Box::pin(async move {
                 // set activity to "{prefix}help"
@@ -204,9 +171,50 @@ async fn main() -> Result<(), anyhow::Error> {
                     database,
                 })
             })
-        })
-        .options(options);
+        });
 
-    client.run_autosharded().await?;
-    Ok(())
+    Ok(client.run_autosharded().await?)
+}
+
+fn get_discord_configuration(
+    config: &configuration::Config,
+) -> poise::FrameworkOptions<Data, Error> {
+    poise::FrameworkOptions {
+        commands: vec![
+            avatar(),
+            help(),
+            mock(),
+            mockify(),
+            uwu(),
+            uwuify(),
+            register(),
+            unregister(),
+            mensa(),
+            invite(),
+            join(),
+            leave(),
+            play(),
+            search(),
+            skip(),
+            shutdown(),
+            addemote(),
+            play_message_content(),
+        ],
+        listener: |ctx, event, framework, user_data| {
+            Box::pin(event_listener(ctx, event, framework, user_data))
+        },
+        on_error: |error| Box::pin(on_error(error)),
+        // Options specific to prefix commands, i.e. commands invoked via chat messages
+        prefix_options: poise::PrefixFrameworkOptions {
+            prefix: Some(String::from(config.prefix())),
+
+            mention_as_prefix: true,
+            // An edit tracker needs to be supplied here to make edit tracking in commands work
+            edit_tracker: Some(poise::EditTracker::for_timespan(
+                std::time::Duration::from_secs(3600 * 3),
+            )),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
 }
