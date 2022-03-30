@@ -99,6 +99,8 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Err(_) = std::env::var("RUST_LOG") {
         std::env::set_var("RUST_LOG", "INFO");
     }
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or("sqlite:database/database.sqlite".to_string());
     tracing_subscriber::fmt::init();
     let config = configuration::config();
     let options = poise::FrameworkOptions {
@@ -143,7 +145,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let database = sqlx::sqlite::SqlitePoolOptions::new()
         .max_connections(5)
         .connect_with(
-            "sqlite:database/database.sqlite"
+            database_url
                 .parse::<sqlx::sqlite::SqliteConnectOptions>()?
                 .create_if_missing(true),
         )
