@@ -9,10 +9,21 @@ A complete (incomplete) rebuild of the [Nirubot](https://github.com/Nirusu99/nir
 - copy the [example config](./example/config.toml) to your bot directory and paste your token \([Where do I get a discord bot token?](https://discord.com/developers/docs/intro)\), the application_id (usually the bots user id) and the prefix (which will trigger the bot in guilds).
 - execute the executable with `./ayame-rs`
 
-## running with docker
+## docker
+
+### dependencies
+- docker
+    - ubuntu/debian: [instructions](https://docs.docker.com/engine/install/ubuntu/)
+    - arch: `paru -S docker`
+
 - create `config.toml`
 - build docker image `docker build -t ayame .`
 - run docker container with `docker run --name ayame -d ayame`
+
+### automated building and running with docker
+
+- create `config.toml`
+- build and run with `make all`
 
 ## Contact
 - **Email**: nils@nirusu.codes
