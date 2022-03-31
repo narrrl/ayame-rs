@@ -6,7 +6,7 @@
     - [x] auto delete messages (to keep the channel clean)
     - ... (ideas go here)
 - [x] bind check for other commands
-- [ ] <del> move clusterfuck of hashmaps from data into database</del> reduce in memory caching to everything that doesn't need to surviva a restart
+- [ ] <del> move clusterfuck of hashmaps from data into database</del> reduce in memory caching to everything that doesn't need to survive a restart
 - [x] rework music commands with binds
 - [ ] new notification message for songs
 - [ ] docker-compose
