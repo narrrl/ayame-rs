@@ -1,11 +1,11 @@
 # todo
 
 - [x] database (sqlite probably)
-- [ ] bind command
-- [ ] bound_channel configuration
+- [x] bind command
+- [x] bound_channel configuration
     - auto delete messages (to keey the channel clean)
     - ... (ideas go here)
-- [ ] bind check for other commands
+- [x] bind check for other commands
 - [ ] move clusterfuck of hashmaps from data into database
 - [ ] rework music commands with binds
 - [ ] docker-compose
