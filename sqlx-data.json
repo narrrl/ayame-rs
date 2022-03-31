@@ -1,5 +1,15 @@
 {
   "db": "SQLite",
+  "086b980997e9372e0044414dbe7981f8ed0670623b057f507a270c35a4339dac": {
+    "query": "INSERT INTO update_message (guild_id, msg_id) VALUES (?, ?)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
   "1bc5c7d8983f2fba0a42526bda55c7efc0ebcf3442f18995ef014588a624045d": {
     "query": "SELECT bind_id FROM guild_bind WHERE guild_id = ?",
     "describe": {
@@ -30,6 +40,16 @@
   },
   "7de603912eaf480e386bacbf2ea2fc903c74b593a4fdda19d1c171516a58a111": {
     "query": "INSERT OR IGNORE INTO guild_bind (guild_id, bind_id) VALUES (?, ?)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "9c92d05c2446e378d4fe628754582a5edae828603993f0935dd2eae77eb29699": {
+    "query": "DELETE FROM update_message WHERE msg_id = ? AND guild_id = ?",
     "describe": {
       "columns": [],
       "parameters": {

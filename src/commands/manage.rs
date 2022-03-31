@@ -25,25 +25,24 @@ pub(crate) async fn bind(
     let channel = channel
         .guild()
         .ok_or_else(|| Error::Input(WRONG_CHANNEL_TO_BIND))?;
+    let guild_id = guild.id.0 as i64;
+    let bind_id = channel_id.0 as i64;
+    let old_channel = get_bound_channel_id(&ctx.data().database, guild_id).await?;
 
     match channel.kind {
         serenity::ChannelType::Text => {
-            let guild_id = guild.id.0 as i64;
-            let bind_id = channel_id.0 as i64;
-            sqlx::query!(
-                "INSERT OR IGNORE INTO guild_bind (guild_id, bind_id) VALUES (?, ?)",
-                guild_id,
-                bind_id,
-            )
-            .execute(&ctx.data().database)
-            .await?;
-            sqlx::query!(
-                "UPDATE guild_bind SET bind_id = ? WHERE guild_id = ?",
-                bind_id,
-                guild_id
-            )
-            .execute(&ctx.data().database)
-            .await?;
+            if Some(bind_id) == old_channel.map(|n| n as i64) {
+                return Err(Error::Input(CHANNEL_ALREADY_BOUND));
+            }
+            let msg = channel_id
+                .send_message(&ctx.discord().http, |m| m.content("placeholder"))
+                .await?;
+            let msg_id = msg.id.0 as i64;
+            register_msg(&ctx.data().database, guild_id, msg_id).await?;
+            bind_channel(&ctx.data().database, guild_id, bind_id).await?;
+            if let Some(old) = old_channel {
+                unregister_msg(&ctx.data().database, guild_id, old as i64).await?
+            }
             ctx.say(format!("bound channel {} to bot", channel)).await?;
             Ok(())
         }
@@ -103,8 +102,60 @@ pub async fn is_msg_to_keep(
         "SELECT msg_id FROM update_message WHERE guild_id = ?",
         guild_id
     )
-    .fetch_optional(database)
+    .fetch_all(database)
     .await?
-    .map(|entry| entry.msg_id == msg)
-    .unwrap_or(false))
+    .iter()
+    .any(|entry| entry.msg_id == msg))
+}
+
+pub async fn unregister_msg(
+    database: &sqlx::SqlitePool,
+    guild_id: i64,
+    msg_id: i64,
+) -> Result<(), Error> {
+    sqlx::query!(
+        "DELETE FROM update_message WHERE msg_id = ? AND guild_id = ?",
+        msg_id,
+        guild_id
+    )
+    .execute(database)
+    .await?;
+    Ok(())
+}
+
+pub async fn register_msg(
+    database: &sqlx::SqlitePool,
+    guild_id: i64,
+    msg_id: i64,
+) -> Result<(), Error> {
+    sqlx::query!(
+        "INSERT INTO update_message (guild_id, msg_id) VALUES (?, ?)",
+        guild_id,
+        msg_id,
+    )
+    .execute(database)
+    .await?;
+    Ok(())
+}
+
+pub async fn bind_channel(
+    database: &sqlx::SqlitePool,
+    guild_id: i64,
+    bind_id: i64,
+) -> Result<(), Error> {
+    sqlx::query!(
+        "INSERT OR IGNORE INTO guild_bind (guild_id, bind_id) VALUES (?, ?)",
+        guild_id,
+        bind_id,
+    )
+    .execute(database)
+    .await?;
+    sqlx::query!(
+        "UPDATE guild_bind SET bind_id = ? WHERE guild_id = ?",
+        bind_id,
+        guild_id
+    )
+    .execute(database)
+    .await?;
+    Ok(())
 }

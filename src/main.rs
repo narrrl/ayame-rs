@@ -54,6 +54,8 @@ async fn event_listener(
         }
         poise::Event::Message { new_message } => {
             if let Some(guild_id) = new_message.guild_id {
+                // wait to give the bot time to send messages that shouldn't be deleted
+                tokio::time::sleep(Duration::from_secs(5)).await;
                 let (is_bind_channel, keep) = join!(
                     get_bound_channel_id(&data.database, guild_id.0 as i64),
                     is_msg_to_keep(&data.database, guild_id.0 as i64, new_message.id.0 as i64)
@@ -61,7 +63,6 @@ async fn event_listener(
                 let (is_bind_channel, keep) =
                     (is_bind_channel? == Some(new_message.channel_id.0), keep?);
                 if is_bind_channel && !keep {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
                     new_message.delete(&ctx.http).await?;
                 }
             }
@@ -103,6 +104,15 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
                 event.name(),
                 error
             );
+        }
+        poise::FrameworkError::CommandCheckFailed { error, ctx } => {
+            if let Some(why) = error {
+                why.send_error(&ctx).await
+            } else {
+                Error::Input("checks for the command failed")
+                    .send_error(&ctx)
+                    .await
+            }
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {

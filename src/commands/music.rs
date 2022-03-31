@@ -19,8 +19,7 @@ use crate::error::*;
     slash_command,
     category = "Music",
     check = "bind_command",
-    global_cooldown = 3,
-    ephemeral
+    global_cooldown = 3
 )]
 pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
@@ -74,8 +73,7 @@ pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     slash_command,
     category = "Music",
     check = "bind_command",
-    global_cooldown = 3,
-    ephemeral
+    global_cooldown = 3
 )]
 pub(crate) async fn search(
     ctx: Context<'_>,
@@ -148,6 +146,7 @@ async fn cancel(
         ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
     })
     .await?;
+    mci.message.delete(&m.ctx.discord().http).await?;
     Err(Error::Input(EVENT_CANCELED))
 }
 async fn select(
@@ -155,9 +154,15 @@ async fn select(
     mci: &Arc<serenity::MessageComponentInteraction>,
 ) -> Result<(), Error> {
     m.stop();
-    let color = m.ctx.data().config.color()?;
-    m.update_response(|m| m.embed(|e| e.title("Song selected!").color(color)), mci)
-        .await?;
+    let guild_id = m
+        .ctx
+        .guild_id()
+        .ok_or_else(|| Err(Error::Input(NOT_IN_GUILD)))?;
+    mci.create_interaction_response(&m.ctx.discord().http, |ir| {
+        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
+    })
+    .await?;
+    mci.message.delete(&m.ctx.discord().http).await?;
     Ok(())
 }
 
@@ -211,8 +216,7 @@ async fn prev(
     slash_command,
     category = "Music",
     check = "bind_command",
-    global_cooldown = 3,
-    ephemeral
+    global_cooldown = 3
 )]
 pub(crate) async fn play(
     ctx: Context<'_>,
