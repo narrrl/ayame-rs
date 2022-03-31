@@ -34,9 +34,13 @@ impl<'a, T> Menu<'a, T> {
     pub async fn run(
         &mut self,
         f: impl for<'b, 'c> FnOnce(&'b mut CreateReply<'c>) -> &'b mut CreateReply<'c>,
+        hook: Option<Box<HookFunction<T>>>,
     ) -> Result<(), Error> {
         let msg_id = self.send_msg(f).await?;
         self.msg_id = Some(msg_id);
+        if let Some(fun) = hook {
+            fun(self).await?;
+        }
         while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.discord())
             .author_id(self.ctx.author().id)
             .channel_id(self.ctx.channel_id())
@@ -203,6 +207,10 @@ pub type ControlFunction<T> = Arc<
         + Sync
         + Send,
 >;
+
+pub type HookFunction<T> = dyn for<'a> Fn(&'a mut Menu<'_, T>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + 'a + Send>>
+    + Sync
+    + Send;
 
 pub enum MenuComponent {
     ButtonComponent {

@@ -13,7 +13,7 @@ pub(crate) async fn bind(
     ctx: Context<'_>,
     #[description = "the channel that gets bound"] channel: Option<serenity::Channel>,
 ) -> Result<(), Error> {
-    ctx.defer_ephemeral().await?;
+    ctx.defer().await?;
     let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     let channel_id = match channel {
         Some(channel) => channel.id(),
@@ -35,7 +35,7 @@ pub(crate) async fn bind(
                 return Err(Error::Input(CHANNEL_ALREADY_BOUND));
             }
             let msg = channel_id
-                .send_message(&ctx.discord().http, |m| m.content("placeholder"))
+                .send_message(&ctx.discord().http, |m| m.content("placeholder (muss grad bisl was umschreiben, erstmal keine status message)"))
                 .await?;
             let msg_id = msg.id.0 as i64;
             register_msg(&ctx.data().database, guild_id, msg_id).await?;
@@ -93,7 +93,7 @@ pub async fn get_bound_channel_id(
     .map(|entry| entry.bind_id as u64))
 }
 
-pub async fn is_msg_to_keep(
+pub async fn should_be_deleted(
     database: &sqlx::SqlitePool,
     guild_id: i64,
     msg: i64,

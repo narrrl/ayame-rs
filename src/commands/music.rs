@@ -14,6 +14,8 @@ use crate::{
 
 use crate::error::*;
 
+use super::manage::{register_msg, unregister_msg};
+
 #[poise::command(
     prefix_command,
     slash_command,
@@ -122,13 +124,29 @@ pub(crate) async fn search(
         })
     });
 
-    menu.run(|mes| {
-        mes.embed(|e| {
-            e.clone_from(&embed_song_for_menu(song));
-            e.color(color);
-            e
-        })
-    })
+    menu.run(
+        |mes| {
+            mes.embed(|e| {
+                e.clone_from(&embed_song_for_menu(song));
+                e.color(color);
+                e
+            })
+        },
+        Some(Box::new(|m| {
+            Box::pin(async move {
+                if let Some(msg_id) = m.msg_id {
+                    let guild_id = m
+                        .ctx
+                        .guild_id()
+                        .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
+                        .0 as i64;
+
+                    register_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64).await?;
+                }
+                Ok(())
+            })
+        })),
+    )
     .await?;
 
     let song = menu
@@ -142,6 +160,13 @@ async fn cancel(
     m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
     mci: &Arc<serenity::MessageComponentInteraction>,
 ) -> Result<(), Error> {
+    let guild_id = m
+        .ctx
+        .guild_id()
+        .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
+        .0 as i64;
+    let msg_id = mci.message.id.0 as i64;
+    unregister_msg(&m.ctx.data().database, guild_id, msg_id).await?;
     mci.create_interaction_response(&m.ctx.discord().http, |ir| {
         ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
     })
@@ -157,7 +182,10 @@ async fn select(
     let guild_id = m
         .ctx
         .guild_id()
-        .ok_or_else(|| Err(Error::Input(NOT_IN_GUILD)))?;
+        .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
+        .0 as i64;
+    let msg_id = mci.message.id.0 as i64;
+    unregister_msg(&m.ctx.data().database, guild_id, msg_id).await?;
     mci.create_interaction_response(&m.ctx.discord().http, |ir| {
         ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
     })

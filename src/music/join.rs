@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use poise::serenity_prelude::{ChannelId, Mutex};
 use songbird::{Call, Event};
 
-use super::{MusicContext, NotificationHandler, TimeoutHandler};
+use super::{MusicContext, TimeoutHandler};
 use crate::Error;
 
 async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {

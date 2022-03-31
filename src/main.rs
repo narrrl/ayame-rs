@@ -58,7 +58,7 @@ async fn event_listener(
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 let (is_bind_channel, keep) = join!(
                     get_bound_channel_id(&data.database, guild_id.0 as i64),
-                    is_msg_to_keep(&data.database, guild_id.0 as i64, new_message.id.0 as i64)
+                    should_be_deleted(&data.database, guild_id.0 as i64, new_message.id.0 as i64)
                 );
                 let (is_bind_channel, keep) =
                     (is_bind_channel? == Some(new_message.channel_id.0), keep?);
