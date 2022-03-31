@@ -11,6 +11,10 @@ use thiserror::Error;
 
 use crate::{utils::check_result, Context};
 
+pub const ONLY_IN_BOT_CHANNEL: &'static str = "command can only be executed in bot channel";
+pub const NO_BOT_CHANNEL: &'static str = "there is no bot channel, ask an admin to fix this";
+pub const WRONG_CHANNEL_TO_BIND: &'static str = "you can only bind text channel";
+pub const NOT_IN_GUILD: &'static str = "only in guilds";
 pub const NOT_IN_VOICE: &'static str = "not in a voice channel";
 pub const NO_SEARCH_RESULTS: &'static str = "nothing found";
 pub const NOTHING_PLAYING: &'static str = "nothing playing";

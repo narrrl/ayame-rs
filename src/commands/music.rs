@@ -7,7 +7,7 @@ use crate::{
     menu::Menu,
     menu::{Control, Cursor, MenuComponent},
     music::{self, embed_song_for_menu, MusicContext},
-    utils::guild_only,
+    utils::{bind_command, guild_only},
     youtube::{Type, YoutubeResult, YoutubeSearch},
     Context, Error,
 };
@@ -18,15 +18,13 @@ use crate::error::*;
     prefix_command,
     slash_command,
     category = "Music",
-    check = "guild_only",
+    check = "bind_command",
     global_cooldown = 3,
     ephemeral
 )]
 pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
-    let guild = ctx
-        .guild()
-        .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
+    let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
 
     let channel_id = match guild.voice_states.get(&ctx.author().id) {
         Some(state) => match state.channel_id {
@@ -59,14 +57,12 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
     prefix_command,
     slash_command,
     category = "Music",
-    check = "guild_only",
+    check = "bind_command",
     global_cooldown = 3
 )]
 pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
-    let guild = ctx
-        .guild()
-        .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
+    let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     music::leave::leave(&music::get_poise(&ctx).await?, guild.id).await?;
 
     ctx.send(|m| m.content("Left voice")).await?;
@@ -77,7 +73,7 @@ pub(crate) async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     prefix_command,
     slash_command,
     category = "Music",
-    check = "guild_only",
+    check = "bind_command",
     global_cooldown = 3,
     ephemeral
 )]
@@ -87,7 +83,7 @@ pub(crate) async fn search(
     #[rest]
     input: String,
 ) -> Result<(), Error> {
-    ctx.defer_ephemeral().await?;
+    ctx.defer().await?;
     let config = &ctx.data().config;
     let color = config.color()?;
     let mut req = YoutubeSearch::new(config.youtube_api_key());
@@ -214,7 +210,7 @@ async fn prev(
     prefix_command,
     slash_command,
     category = "Music",
-    check = "guild_only",
+    check = "bind_command",
     global_cooldown = 3,
     ephemeral
 )]
@@ -267,14 +263,12 @@ pub(crate) async fn play_message_content(
     prefix_command,
     slash_command,
     category = "Music",
-    check = "guild_only",
+    check = "bind_command",
     global_cooldown = 3
 )]
 pub(crate) async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
-    let guild = ctx
-        .guild()
-        .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
+    let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
 
     music::skip::skip(&ctx, &guild.id).await?;
 

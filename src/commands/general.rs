@@ -51,8 +51,7 @@ pub(crate) async fn mockify(ctx: Context<'_>, msg: serenity::Message) -> Result<
 #[poise::command(prefix_command, slash_command, track_edits, category = "General")]
 pub(crate) async fn invite(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
-    ctx.guild()
-        .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
+    ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     let inv = Invite::create(&ctx.discord().http, ctx.channel_id(), |f| f).await?;
     ctx.send(|m| m.content(inv.url())).await?;
 
@@ -72,9 +71,7 @@ pub(crate) async fn addemote(
     #[description = "The emote that gets added"] emote: serenity::Attachment,
 ) -> Result<(), Error> {
     ctx.defer_or_broadcast().await?;
-    let guild = ctx
-        .guild()
-        .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
+    let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     let file = emote.download().await?;
     let mut dir = crate::utils::bot_dir();
     dir.push("tmp");

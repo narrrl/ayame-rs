@@ -15,10 +15,10 @@ async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {
         TimeoutHandler { mtx: mtx.clone() },
     );
 
-    call.add_global_event(
-        Event::Periodic(Duration::from_millis(5000), None),
-        NotificationHandler { mtx: mtx.clone() },
-    );
+    // call.add_global_event(
+    //     Event::Periodic(Duration::from_millis(5000), None),
+    //     NotificationHandler { mtx: mtx.clone() },
+    // );
 }
 
 pub async fn join(

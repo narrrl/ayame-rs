@@ -9,9 +9,9 @@ use rand::Rng;
 
 use tracing::error;
 
+use crate::commands::manage::get_bound_channel_id;
+use crate::error::*;
 use crate::{Context, Error};
-
-pub const NOT_IN_GUILD: &'static str = "only in guilds";
 
 pub fn bot_dir() -> PathBuf {
     let mut dir = std::env::current_exe().expect("couldn't get bot directory");
@@ -111,6 +111,26 @@ pub(crate) async fn guild_only(ctx: Context<'_>) -> Result<bool, Error> {
     match ctx.guild() {
         Some(_) => Ok(true),
         None => Err(Error::Input(NOT_IN_GUILD)),
+    }
+}
+
+pub(crate) async fn bind_command(ctx: Context<'_>) -> Result<bool, Error> {
+    let guild_id = match ctx.guild_id() {
+        Some(id) => id.0 as i64,
+        None => return Err(Error::Input(NOT_IN_GUILD)),
+    };
+    match get_bound_channel_id(&ctx.data().database, guild_id).await? {
+        Some(bind_id) => {
+            if bind_id == ctx.channel_id().0 {
+                // looks dumb, but i want to send error
+                // as explenation when
+                // user doesn't do stuff right
+                Ok(true)
+            } else {
+                Err(Error::Input(ONLY_IN_BOT_CHANNEL))
+            }
+        }
+        None => Err(Error::Input(NO_BOT_CHANNEL)),
     }
 }
 

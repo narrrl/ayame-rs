@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use commands::general::*;
+use commands::manage::*;
 use commands::music::*;
 use commands::owner::*;
 use poise::serenity_prelude::GuildId;
@@ -13,6 +14,7 @@ use poise::serenity_prelude::UserId;
 use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
 use songbird::SongbirdKey;
+use tokio::join;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -41,14 +43,28 @@ pub type Error = error::AyameError;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 async fn event_listener(
-    _ctx: &serenity::Context,
+    ctx: &serenity::Context,
     event: &poise::Event<'_>,
     _framework: &poise::Framework<Data, Error>,
-    _data: &Data,
+    data: &Data,
 ) -> Result<(), Error> {
     match event {
         poise::Event::Ready { data_about_bot } => {
             info!("{} is connected!", data_about_bot.user.name)
+        }
+        poise::Event::Message { new_message } => {
+            if let Some(guild_id) = new_message.guild_id {
+                let (is_bind_channel, keep) = join!(
+                    get_bound_channel_id(&data.database, guild_id.0 as i64),
+                    is_msg_to_keep(&data.database, guild_id.0 as i64, new_message.id.0 as i64)
+                );
+                let (is_bind_channel, keep) =
+                    (is_bind_channel? == Some(new_message.channel_id.0), keep?);
+                if is_bind_channel && !keep {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    new_message.delete(&ctx.http).await?;
+                }
+            }
         }
         _ => {}
     }
@@ -189,6 +205,8 @@ fn get_discord_configuration(
             uwuify(),
             register(),
             unregister(),
+            bind(),
+            ping_bind(),
             mensa(),
             invite(),
             join(),

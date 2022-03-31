@@ -5,3 +5,4 @@
 !/src
 !config.toml
 !/migrations
+!sqlx-data.json

@@ -18,9 +18,7 @@ pub async fn play(call: &Arc<Mutex<Call>>, source: Input) -> Result<TrackHandle,
 
 pub async fn register_and_play(ctx: Context<'_>, song: String) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
-    let guild = ctx
-        .guild()
-        .ok_or_else(|| Error::Input(crate::utils::NOT_IN_GUILD))?;
+    let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     let channel_id = match guild.voice_states.get(&ctx.author().id) {
         Some(state) => match state.channel_id {
             Some(id) => id,
