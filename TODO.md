@@ -3,7 +3,7 @@
 - [x] database (sqlite probably)
 - [x] bind command
 - [x] bound_channel configuration
-    - [x] auto delete messages (to keey the channel clean)
+    - [x] auto delete messages (to keep the channel clean)
     - ... (ideas go here)
 - [x] bind check for other commands
 - [ ] <del> move clusterfuck of hashmaps from data into database</del> reduce in memory caching to everything that doesn't need to surviva a restart
