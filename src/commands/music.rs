@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use tokio::join;
 
 use poise::serenity_prelude::{self as serenity, ButtonStyle, CreateButton, Mentionable, Message};
 use regex::Regex;
@@ -96,101 +97,101 @@ pub(crate) async fn search(
         .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
 
     let mut menu = Menu::new(&ctx, Cursor::from(results), |options| {
-        options.add_row(|row| {
-            row.add_button(Control::new(
-                MenuComponent::button("prev", |b: &mut CreateButton| {
-                    b.style(ButtonStyle::Primary).label("prev")
-                }),
-                Arc::new(|m, mci| Box::pin(prev(m, mci))),
-            ))
-            .add_button(Control::new(
-                MenuComponent::button("next", |b: &mut CreateButton| {
-                    b.style(ButtonStyle::Primary).label("next")
-                }),
-                Arc::new(|m, mci| Box::pin(next(m, mci))),
-            ))
-            .add_button(Control::new(
-                MenuComponent::button("play", |b: &mut CreateButton| {
-                    b.style(ButtonStyle::Success).label("play")
-                }),
-                Arc::new(|m, mci| Box::pin(select(m, mci))),
-            ))
-            .add_button(Control::new(
-                MenuComponent::button("cancel", |b: &mut CreateButton| {
-                    b.style(ButtonStyle::Danger).label("cancel")
-                }),
-                Arc::new(|m, mci| Box::pin(cancel(m, mci))),
-            ))
-        })
+        options
+            .add_row(|row| {
+                row.add_button(Control::new(
+                    MenuComponent::button("prev", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Primary).label("prev")
+                    }),
+                    Arc::new(|m, mci| Box::pin(prev(m, mci))),
+                ))
+                .add_button(Control::new(
+                    MenuComponent::button("next", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Primary).label("next")
+                    }),
+                    Arc::new(|m, mci| Box::pin(next(m, mci))),
+                ))
+                .add_button(Control::new(
+                    MenuComponent::button("play", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Success).label("play")
+                    }),
+                    Arc::new(|m, mci| Box::pin(select(m, mci))),
+                ))
+                .add_button(Control::new(
+                    MenuComponent::button("cancel", |b: &mut CreateButton| {
+                        b.style(ButtonStyle::Danger).label("cancel")
+                    }),
+                    Arc::new(|m, mci| Box::pin(cancel(m, mci))),
+                ))
+            })
+            .set_pre_hook(Arc::new(|m| Box::pin(pre_hook(m))))
+            .set_post_hook(Arc::new(|m| Box::pin(post_hook(m))))
     });
 
-    menu.run(
-        |mes| {
-            mes.embed(|e| {
-                e.clone_from(&embed_song_for_menu(song));
-                e.color(color);
-                e
-            })
-        },
-        Some(Box::new(|m| {
-            Box::pin(async move {
-                if let Some(msg_id) = m.msg_id {
-                    let guild_id = m
-                        .ctx
-                        .guild_id()
-                        .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
-                        .0 as i64;
-
-                    register_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64).await?;
-                }
-                Ok(())
-            })
-        })),
-    )
+    menu.run(|mes| {
+        mes.embed(|e| {
+            e.clone_from(&embed_song_for_menu(song));
+            e.color(color);
+            e
+        })
+    })
     .await?;
 
     let song = menu
         .data
         .current()
         .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
-    music::play::register_and_play(ctx, song.url()).await
+    music::play::register_and_play(ctx, song.url()).await?;
+    Ok(())
+}
+
+async fn pre_hook(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+    if let Some(msg_id) = m.msg_id {
+        let guild_id = m
+            .ctx
+            .guild_id()
+            .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
+            .0 as i64;
+
+        // register the message that it doesn't get deleted
+        register_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64).await?;
+    }
+    Ok(())
+}
+
+async fn post_hook(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
+    if let Some(msg_id) = m.msg_id {
+        let guild_id = m
+            .ctx
+            .guild_id()
+            .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
+            .0 as i64;
+
+        let (ok, msg) = join!(
+            unregister_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64),
+            m.ctx
+                .discord()
+                .http
+                .get_message(m.ctx.channel_id().0, msg_id.0)
+        );
+        msg?.delete(&m.ctx.discord().http).await?;
+        ok?
+    }
+    Ok(())
 }
 
 async fn cancel(
     m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
     mci: &Arc<serenity::MessageComponentInteraction>,
 ) -> Result<(), Error> {
-    let guild_id = m
-        .ctx
-        .guild_id()
-        .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
-        .0 as i64;
-    let msg_id = mci.message.id.0 as i64;
-    unregister_msg(&m.ctx.data().database, guild_id, msg_id).await?;
-    mci.create_interaction_response(&m.ctx.discord().http, |ir| {
-        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
-    })
-    .await?;
-    mci.message.delete(&m.ctx.discord().http).await?;
+    let _ = mci.defer(&m.ctx.discord().http).await;
     Err(Error::Input(EVENT_CANCELED))
 }
 async fn select(
     m: &mut Menu<'_, Cursor<'_, YoutubeResult>>,
-    mci: &Arc<serenity::MessageComponentInteraction>,
+    _mci: &Arc<serenity::MessageComponentInteraction>,
 ) -> Result<(), Error> {
     m.stop();
-    let guild_id = m
-        .ctx
-        .guild_id()
-        .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
-        .0 as i64;
-    let msg_id = mci.message.id.0 as i64;
-    unregister_msg(&m.ctx.data().database, guild_id, msg_id).await?;
-    mci.create_interaction_response(&m.ctx.discord().http, |ir| {
-        ir.kind(serenity::InteractionResponseType::DeferredUpdateMessage)
-    })
-    .await?;
-    mci.message.delete(&m.ctx.discord().http).await?;
     Ok(())
 }
 
@@ -256,7 +257,13 @@ pub(crate) async fn play(
         r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?",
     )?;
     if re.is_match(input.trim()) {
-        return music::play::register_and_play(ctx, input).await;
+        let track = music::play::register_and_play(ctx, input).await?;
+        ctx.say(format!(
+            "Added song: {}",
+            crate::music::hyperlink_song(track.metadata())
+        ))
+        .await?;
+        return Ok(());
     }
     let config = &ctx.data().config;
     let mut req = YoutubeSearch::new(config.youtube_api_key());
@@ -266,19 +273,32 @@ pub(crate) async fn play(
         .results()
         .first()
         .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
-    music::play::register_and_play(ctx, song.url()).await
+    let track = music::play::register_and_play(ctx, song.url()).await?;
+    ctx.say(format!(
+        "Added song: {}",
+        crate::music::hyperlink_song(track.metadata())
+    ))
+    .await?;
+    Ok(())
 }
 
-#[poise::command(context_menu_command = "play message", check = "guild_only")]
+#[poise::command(context_menu_command = "play message", check = "guild_only", ephemeral)]
 pub(crate) async fn play_message_content(
     ctx: Context<'_>,
     #[description = "Message to be played"] message: Message,
 ) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
     let re = Regex::new(
         r"(http://www\.|https://www\.|http://|https://)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(/.*)?",
     )?;
     if re.is_match(&message.content.trim()) {
-        return music::play::register_and_play(ctx, message.content).await;
+        let track = music::play::register_and_play(ctx, message.content).await?;
+        ctx.say(format!(
+            "Added song: {}",
+            crate::music::hyperlink_song(track.metadata())
+        ))
+        .await?;
+        return Ok(());
     }
     let config = &ctx.data().config;
     let mut req = YoutubeSearch::new(config.youtube_api_key());
@@ -288,7 +308,13 @@ pub(crate) async fn play_message_content(
         .results()
         .first()
         .ok_or_else(|| Error::Input(NO_SEARCH_RESULTS))?;
-    music::play::register_and_play(ctx, song.url()).await
+    let track = music::play::register_and_play(ctx, song.url()).await?;
+    ctx.say(format!(
+        "Added song: {}",
+        crate::music::hyperlink_song(track.metadata())
+    ))
+    .await?;
+    Ok(())
 }
 
 #[poise::command(

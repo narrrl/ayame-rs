@@ -34,12 +34,11 @@ impl<'a, T> Menu<'a, T> {
     pub async fn run(
         &mut self,
         f: impl for<'b, 'c> FnOnce(&'b mut CreateReply<'c>) -> &'b mut CreateReply<'c>,
-        hook: Option<Box<HookFunction<T>>>,
     ) -> Result<(), Error> {
         let msg_id = self.send_msg(f).await?;
         self.msg_id = Some(msg_id);
-        if let Some(fun) = hook {
-            fun(self).await?;
+        if let Some(pre_hook) = &self.options.pre_hook {
+            Arc::clone(pre_hook)(self).await?;
         }
         while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.discord())
             .author_id(self.ctx.author().id)
@@ -47,19 +46,13 @@ impl<'a, T> Menu<'a, T> {
             .timeout(std::time::Duration::from_secs(self.options.timeout))
             .await
         {
-            let action = &self
-                .options
-                .controls
-                .iter()
-                .map(|row| &row.buttons)
-                .flatten()
-                .find(|ctrl| ctrl.button.id() == mci.data.custom_id)
-                .ok_or_else(|| Error::Failure(UNKNOWN_RESPONSE))?;
-            let func = Arc::clone(&action.function);
-
-            // run function of button/context
-            func(self, &mci).await?;
-
+            self.msg_id = Some(mci.message.id);
+            if let Err(why) = self.match_and_run(&mci).await {
+                if let Some(post_hook) = &self.options.post_hook {
+                    Arc::clone(post_hook)(self).await?;
+                }
+                return Err(why);
+            }
             // respond and ignore error if already responded
             //
             let _ = mci.defer(&self.ctx.discord().http).await;
@@ -68,6 +61,28 @@ impl<'a, T> Menu<'a, T> {
                 break;
             }
         }
+        if let Some(post_hook) = &self.options.post_hook {
+            Arc::clone(post_hook)(self).await?;
+        }
+        Ok(())
+    }
+
+    async fn match_and_run(
+        &mut self,
+        mci: &Arc<serenity::MessageComponentInteraction>,
+    ) -> Result<(), Error> {
+        let action = &self
+            .options
+            .controls
+            .iter()
+            .map(|row| &row.buttons)
+            .flatten()
+            .find(|ctrl| ctrl.button.id() == mci.data.custom_id)
+            .ok_or_else(|| Error::Failure(UNKNOWN_RESPONSE))?;
+        let func = Arc::clone(&action.function);
+
+        // run function of button/context
+        func(self, &mci).await?;
         Ok(())
     }
     pub async fn send_msg(
@@ -113,6 +128,8 @@ impl<'a, T> Menu<'a, T> {
 pub struct CreateMenuOptions<T> {
     timeout: u64,
     controls: Vec<ControlRow<T>>,
+    pre_hook: Option<HookFunction<T>>,
+    post_hook: Option<HookFunction<T>>,
 }
 
 impl<T> Default for CreateMenuOptions<T> {
@@ -120,6 +137,8 @@ impl<T> Default for CreateMenuOptions<T> {
         CreateMenuOptions {
             timeout: 120,
             controls: vec![],
+            pre_hook: None,
+            post_hook: None,
         }
     }
 }
@@ -140,10 +159,23 @@ impl<T> CreateMenuOptions<T> {
         self.timeout = timeout;
         self
     }
+
+    pub fn set_pre_hook<'a>(&'a mut self, hook: HookFunction<T>) -> &'a mut Self {
+        self.pre_hook = Some(hook);
+        self
+    }
+
+    pub fn set_post_hook<'a>(&'a mut self, hook: HookFunction<T>) -> &'a mut Self {
+        self.post_hook = Some(hook);
+        self
+    }
+
     pub fn build(self) -> MenuOptions<T> {
         MenuOptions {
             timeout: self.timeout,
             controls: self.controls,
+            pre_hook: self.pre_hook,
+            post_hook: self.post_hook,
         }
     }
 }
@@ -174,6 +206,8 @@ impl<T> CreateControlRow<T> {
 pub struct MenuOptions<T> {
     timeout: u64,
     controls: Vec<ControlRow<T>>,
+    pre_hook: Option<HookFunction<T>>,
+    post_hook: Option<HookFunction<T>>,
 }
 
 pub struct ControlRow<T> {
@@ -208,15 +242,20 @@ pub type ControlFunction<T> = Arc<
         + Send,
 >;
 
-pub type HookFunction<T> = dyn for<'a> Fn(&'a mut Menu<'_, T>) -> Pin<Box<dyn Future<Output = Result<(), Error>> + 'a + Send>>
-    + Sync
-    + Send;
+pub type HookFunction<T> = Arc<
+    dyn for<'a> Fn(
+            &'a mut Menu<'_, T>,
+        ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + 'a + Send>>
+        + Sync
+        + Send,
+>;
 
 pub enum MenuComponent {
     ButtonComponent {
         create: serenity::CreateButton,
         id: String,
     },
+    #[allow(dead_code)]
     SelectComponent {
         create: serenity::CreateSelectMenu,
         id: String,

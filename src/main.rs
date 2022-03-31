@@ -63,7 +63,9 @@ async fn event_listener(
                 let (is_bind_channel, keep) =
                     (is_bind_channel? == Some(new_message.channel_id.0), keep?);
                 if is_bind_channel && !keep {
-                    new_message.delete(&ctx.http).await?;
+                    // we don't care if anything goes wrong
+                    // the message might long be gone
+                    let _ = new_message.delete(&ctx.http).await;
                 }
             }
         }

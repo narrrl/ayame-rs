@@ -16,8 +16,7 @@ pub async fn play(call: &Arc<Mutex<Call>>, source: Input) -> Result<TrackHandle,
     Ok(track_handle)
 }
 
-pub async fn register_and_play(ctx: Context<'_>, song: String) -> Result<(), Error> {
-    ctx.defer_ephemeral().await?;
+pub async fn register_and_play(ctx: Context<'_>, song: String) -> Result<TrackHandle, Error> {
     let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     let channel_id = match guild.voice_states.get(&ctx.author().id) {
         Some(state) => match state.channel_id {
@@ -42,10 +41,5 @@ pub async fn register_and_play(ctx: Context<'_>, song: String) -> Result<(), Err
     requests.insert(uuid, user_id);
     drop(requests);
 
-    ctx.say(format!(
-        "Added song: {}",
-        super::hyperlink_song(track.metadata())
-    ))
-    .await?;
-    Ok(())
+    Ok(track)
 }
