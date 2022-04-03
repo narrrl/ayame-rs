@@ -165,7 +165,7 @@ async fn post_hook(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Er
             .ctx
             .guild_id()
             .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
-            .0 as i64;
+            .into() as i64;
 
         let (ok, msg) = join!(
             unregister_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64),
