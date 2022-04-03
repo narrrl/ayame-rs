@@ -17,7 +17,7 @@ use poise::serenity_prelude::{
 };
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
-use crate::utils::{check_result_ayame, Bar};
+use crate::utils::Bar;
 use crate::youtube::YoutubeResult;
 use crate::{music::leave::leave, Context as PoiseContext, Error};
 
@@ -106,90 +106,8 @@ impl NotificationHandler {
 #[async_trait]
 impl EventHandler for NotificationHandler {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
-        let songbird = &self.mtx.songbird;
-
-        let call = match songbird.get(self.mtx.guild_id) {
-            Some(call) => call,
-            None => return Some(Event::Cancel),
-        };
-
-        let call = call.lock().await;
-
-        let queue = call.queue();
-        let current = queue.current();
-
-        let mut song_status = self.mtx.data.song_status.lock().await;
-        let mut embed = match current {
-            Some(current) => {
-                let user_map = self.mtx.data.song_queues.lock().await;
-                song_status.insert(self.mtx.guild_id, false);
-                let user = match user_map.get(&current.uuid()) {
-                    Some(id) => id.to_user_cached(&self.mtx.cache).await,
-                    None => None,
-                };
-                drop(user_map);
-
-                embed_upcoming(&queue, embed_song(&current, user).await)
-            }
-            None => {
-                if *song_status.entry(self.mtx.guild_id).or_insert(true) {
-                    return None;
-                }
-                song_status.insert(self.mtx.guild_id, true);
-                let mut e = CreateEmbed::default();
-                e.title("Nothing is playing!");
-                e
-            }
-        };
-        drop(call);
-        if let Ok(c) = self.mtx.data.config.color() {
-            embed.color(c);
-        }
-        drop(song_status);
-
-        let mut messages_map = self.mtx.data.song_messages.lock().await;
-        match messages_map.get_mut(&self.mtx.guild_id) {
-            // check if we already have a message
-            Some(id) => {
-                // get the message from the id
-                let mut message = match self.mtx.cache.message(self.mtx.channel_id.0, id.0) {
-                    Some(msg) => msg,
-                    None => match self.mtx.http.get_message(self.mtx.channel_id.0, id.0).await {
-                        Ok(msg) => msg,
-                        Err(_) => {
-                            messages_map.remove(&self.mtx.guild_id);
-                            drop(messages_map);
-                            return None;
-                        }
-                    },
-                };
-                // either delete message and send new
-                // or update old message
-                let message = if !self.is_newest(&message.id).await {
-                    self.send_new_message(&embed, Some(message.id)).await
-                } else {
-                    check_result_ayame(self.edit_message(&embed, &mut message, None).await);
-                    drop(messages_map);
-                    return None;
-                };
-                if let Ok(msg) = message {
-                    messages_map.insert(self.mtx.guild_id, msg.id);
-                }
-            }
-            // else create a message
-            None => {
-                let message = match self.send_new_message(&embed, None).await {
-                    Ok(msg) => msg,
-                    Err(_) => {
-                        drop(messages_map);
-                        return None;
-                    }
-                };
-                messages_map.insert(self.mtx.guild_id, message.id);
-            }
-        };
-        drop(messages_map);
-        None
+        // TODO: implement with new status messages
+        Some(Event::Cancel)
     }
 }
 

@@ -1711,9 +1711,10 @@ dependencies = [
 [[package]]
 name = "poise"
 version = "0.1.0"
-source = "git+https://github.com/nirusu99/poise?branch=develop#0e3706c7984d5555f6655e56aa214166b2f46acf"
+source = "git+https://github.com/kangalioo/poise?branch=master#1b046e56e9bab38333e458b25c7f6858341184a4"
 dependencies = [
  "async-trait",
+ "derivative",
  "futures-core",
  "futures-util",
  "log",
@@ -1727,7 +1728,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.1.0"
-source = "git+https://github.com/nirusu99/poise?branch=develop#0e3706c7984d5555f6655e56aa214166b2f46acf"
+source = "git+https://github.com/kangalioo/poise?branch=master#1b046e56e9bab38333e458b25c7f6858341184a4"
 dependencies = [
  "darling",
  "proc-macro2",

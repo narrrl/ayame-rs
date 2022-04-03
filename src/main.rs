@@ -67,7 +67,7 @@ async fn event_listener(
         }
         poise::Event::VoiceStateUpdate {
             old: Some(state),
-            new,
+            new: _new,
         } => {
             let channel_id = match state.channel_id {
                 Some(channel_id) => channel_id,
@@ -127,13 +127,6 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
             } else {
                 error!("{:?}", error)
             }
-        }
-        poise::FrameworkError::Listener { error, event } => {
-            error!(
-                "Listener returned error during {:?} event: {:?}",
-                event.name(),
-                error
-            );
         }
         poise::FrameworkError::CommandCheckFailed { error, ctx } => {
             if let Some(why) = error {

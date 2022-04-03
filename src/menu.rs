@@ -1,9 +1,6 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use crate::{
-    error::{COULDNT_GET_MSG, UNKNOWN_RESPONSE},
-    Context, Error,
-};
+use crate::{error::UNKNOWN_RESPONSE, Context, Error};
 use poise::{serenity_prelude as serenity, CreateReply};
 
 pub struct Menu<'a, T> {
@@ -99,8 +96,7 @@ impl<'a, T> Menu<'a, T> {
                     cs
                 })
             })
-            .await?
-            .ok_or_else(|| Error::Failure(COULDNT_GET_MSG))?;
+            .await?;
         let msg_id = handle.message().await?.id;
         Ok(msg_id)
     }
@@ -108,8 +104,8 @@ impl<'a, T> Menu<'a, T> {
     pub async fn update_response(
         &self,
         f: impl for<'b, 'c> FnOnce(
-            &'b mut serenity::CreateInteractionResponseData,
-        ) -> &'b mut serenity::CreateInteractionResponseData,
+            &'b mut serenity::CreateInteractionResponseData<'c>,
+        ) -> &'b mut serenity::CreateInteractionResponseData<'c>,
         mci: &Arc<serenity::MessageComponentInteraction>,
     ) -> Result<(), Error> {
         mci.create_interaction_response(&self.ctx.discord(), |ir| {

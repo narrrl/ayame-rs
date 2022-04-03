@@ -161,11 +161,11 @@ async fn pre_hook(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Err
 
 async fn post_hook(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
     if let Some(msg_id) = m.msg_id {
-        let guild_id = m
+        let guild_id = *m
             .ctx
             .guild_id()
             .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
-            .into() as i64;
+            .as_u64() as i64;
 
         let (ok, msg) = join!(
             unregister_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64),

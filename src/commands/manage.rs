@@ -41,9 +41,9 @@ pub(crate) async fn bind(
             register_msg(&ctx.data().database, guild_id, msg_id).await?;
             bind_channel(&ctx.data().database, guild_id, bind_id).await?;
             // TODO: fix the unregistering and unbinding
+            // TODO: remember what wasn't working again
             if let Some(msg) = get_status_msg(&ctx.data().database, guild_id).await? {
-                unregister_msg(&ctx.data().adtabase,
-
+                unregister_msg(&ctx.data().database, guild_id, msg as i64).await?;
             }
             ctx.say(format!("bound channel {} to bot", channel)).await?;
             Ok(())
