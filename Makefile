@@ -26,6 +26,10 @@ stop:
 prepare:
 	DATABASE_URL=${DATABASE_URL} cargo sqlx prepare --database-url ${DATABASE_URL}
 
+.PHONY: save
+save:
+	docker cp ${CONTAINER_NAME}:/usr/src/app/database .
+
 
 .PHONY: clean
 clean:

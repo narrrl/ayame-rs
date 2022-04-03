@@ -32,6 +32,7 @@ RUN USER=$APP_USER python3 -m pip install --force-reinstall https://github.com/y
 
 COPY --from=builder /ayame-rs/target/release/ayame-rs .
 COPY --from=builder /ayame-rs/config.toml .
+COPY --from=builder /ayame-rs/database .
 
 RUN mkdir database
 
