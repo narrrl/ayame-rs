@@ -40,8 +40,10 @@ pub(crate) async fn bind(
             let msg_id = msg.id.0 as i64;
             register_msg(&ctx.data().database, guild_id, msg_id).await?;
             bind_channel(&ctx.data().database, guild_id, bind_id).await?;
-            if let Some(old) = old_channel {
-                unregister_msg(&ctx.data().database, guild_id, old as i64).await?
+            // TODO: fix the unregistering and unbinding
+            if let Some(msg) = get_status_msg(&ctx.data().database, guild_id).await? {
+                unregister_msg(&ctx.data().adtabase,
+
             }
             ctx.say(format!("bound channel {} to bot", channel)).await?;
             Ok(())
@@ -60,9 +62,7 @@ pub(crate) async fn delete_bind(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
     let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     let guild_id = guild.id.0 as i64;
-    sqlx::query!("DELETE FROM guild_bind WHERE guild_id = ?", guild_id)
-        .execute(&ctx.data().database)
-        .await?;
+    unbind_channel(&ctx.data().database, guild_id).await?;
     ctx.say("deleted channel bind").await?;
     Ok(())
 }
@@ -158,4 +158,23 @@ pub async fn bind_channel(
     .execute(database)
     .await?;
     Ok(())
+}
+pub async fn unbind_channel(database: &sqlx::SqlitePool, guild_id: i64) -> Result<(), Error> {
+    sqlx::query!("DELETE FROM guild_bind WHERE guild_id = ?", guild_id)
+        .execute(database)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_status_msg(
+    database: &sqlx::SqlitePool,
+    guild_id: i64,
+) -> Result<Option<u64>, Error> {
+    Ok(sqlx::query!(
+        "SELECT msg_id FROM update_message WHERE guild_id = ?",
+        guild_id
+    )
+    .fetch_optional(database)
+    .await?
+    .map(|entry| entry.msg_id as u64))
 }

@@ -8,8 +8,6 @@ use commands::general::*;
 use commands::manage::*;
 use commands::music::*;
 use commands::owner::*;
-use poise::serenity_prelude::GuildId;
-use poise::serenity_prelude::MessageId;
 use poise::serenity_prelude::UserId;
 use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
@@ -34,8 +32,6 @@ pub struct Data {
     // only read, can't change
     config: configuration::Config,
     song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
-    song_messages: Arc<Mutex<HashMap<GuildId, MessageId>>>,
-    song_status: Arc<Mutex<HashMap<GuildId, bool>>>,
     database: sqlx::SqlitePool,
 }
 pub type Error = error::AyameError;
@@ -69,10 +65,42 @@ async fn event_listener(
                 }
             }
         }
+        poise::Event::VoiceStateUpdate {
+            old: Some(state),
+            new,
+        } => {
+            let channel_id = match state.channel_id {
+                Some(channel_id) => channel_id,
+                _ => return Ok(()),
+            };
+            // wait if user just switched channel/or some other disconnect
+            // also nice for cache update
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            let channel = ctx.http.get_channel(channel_id.into()).await?;
+            let guild_channel = match channel.guild() {
+                Some(guild_channel) => guild_channel,
+                _ => return Ok(()),
+            };
+            let current_user = ctx.http.get_current_user().await?;
+            if is_bot_alone(&guild_channel, ctx, &current_user.id).await? {
+                let songbird = music::get_serenity(ctx).await?;
+                music::leave::leave(&songbird, guild_channel.guild_id).await?;
+            }
+        }
         _ => {}
     }
 
     Ok(())
+}
+
+async fn is_bot_alone(
+    channel: &serenity::GuildChannel,
+    ctx: &serenity::Context,
+    bot_id: &serenity::UserId,
+) -> Result<bool, Error> {
+    let members = channel.members(&ctx.cache).await?;
+    Ok(members.iter().map(|m| &m.user).any(|u| !u.bot)
+        && members.iter().any(|m| m.user.id == *bot_id))
 }
 
 #[poise::command(prefix_command, slash_command)]
@@ -194,8 +222,6 @@ async fn run_discord_client(database: sqlx::SqlitePool) -> Result<(), anyhow::Er
                 Ok(Data {
                     config,
                     song_queues: Arc::new(Mutex::new(HashMap::new())),
-                    song_messages: Arc::new(Mutex::new(HashMap::new())),
-                    song_status: Arc::new(Mutex::new(HashMap::new())),
                     database,
                 })
             })
