@@ -40,7 +40,6 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
         &MusicContext {
             songbird: music::get_poise(&ctx).await?,
             guild_id: guild.id,
-            channel_id: ctx.channel_id(),
             data: ctx.data().clone(),
             http: ctx.discord().http.clone(),
             cache: ctx.discord().cache.clone(),

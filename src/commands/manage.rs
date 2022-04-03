@@ -21,10 +21,10 @@ pub(crate) async fn bind(
     };
 
     let channel = ctx.discord().http.get_channel(channel_id.into()).await?;
-
     let channel = channel
         .guild()
         .ok_or_else(|| Error::Input(WRONG_CHANNEL_TO_BIND))?;
+
     let guild_id = guild.id.0 as i64;
     let bind_id = channel_id.0 as i64;
     let old_channel = get_bound_channel_id(&ctx.data().database, guild_id).await?;
@@ -34,17 +34,18 @@ pub(crate) async fn bind(
             if Some(bind_id) == old_channel.map(|n| n as i64) {
                 return Err(Error::Input(CHANNEL_ALREADY_BOUND));
             }
+
             let msg = channel_id
                 .send_message(&ctx.discord().http, |m| m.content("placeholder (muss grad bisl was umschreiben, erstmal keine status message)"))
                 .await?;
             let msg_id = msg.id.0 as i64;
             register_msg(&ctx.data().database, guild_id, msg_id).await?;
             bind_channel(&ctx.data().database, guild_id, bind_id).await?;
-            // TODO: fix the unregistering and unbinding
-            // TODO: remember what wasn't working again
-            if let Some(msg) = get_status_msg(&ctx.data().database, guild_id).await? {
+
+            if let Some(msg) = old_channel {
                 unregister_msg(&ctx.data().database, guild_id, msg as i64).await?;
             }
+
             ctx.say(format!("bound channel {} to bot", channel)).await?;
             Ok(())
         }

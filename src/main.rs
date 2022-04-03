@@ -8,6 +8,7 @@ use commands::general::*;
 use commands::manage::*;
 use commands::music::*;
 use commands::owner::*;
+use music::MusicContext;
 use poise::serenity_prelude::UserId;
 use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
@@ -67,15 +68,12 @@ async fn event_listener(
         }
         poise::Event::VoiceStateUpdate {
             old: Some(state),
-            new: _new,
+            new,
         } => {
             let channel_id = match state.channel_id {
                 Some(channel_id) => channel_id,
                 _ => return Ok(()),
             };
-            // wait if user just switched channel/or some other disconnect
-            // also nice for cache update
-            tokio::time::sleep(Duration::from_secs(10)).await;
             let channel = ctx.http.get_channel(channel_id.into()).await?;
             let guild_channel = match channel.guild() {
                 Some(guild_channel) => guild_channel,
@@ -84,7 +82,22 @@ async fn event_listener(
             let current_user = ctx.http.get_current_user().await?;
             if is_bot_alone(&guild_channel, ctx, &current_user.id).await? {
                 let songbird = music::get_serenity(ctx).await?;
-                music::leave::leave(&songbird, guild_channel.guild_id).await?;
+                match new.channel_id {
+                    Some(new_id) => {
+                        music::join::join(
+                            &MusicContext {
+                                songbird,
+                                guild_id: guild_channel.guild_id,
+                                data: data.clone(),
+                                http: ctx.http.clone(),
+                                cache: ctx.cache.clone(),
+                            },
+                            &new_id,
+                        )
+                        .await?;
+                    }
+                    None => music::leave::leave(&songbird, guild_channel.guild_id).await?,
+                };
             }
         }
         _ => {}
@@ -99,7 +112,7 @@ async fn is_bot_alone(
     bot_id: &serenity::UserId,
 ) -> Result<bool, Error> {
     let members = channel.members(&ctx.cache).await?;
-    Ok(members.iter().map(|m| &m.user).any(|u| !u.bot)
+    Ok(!members.iter().map(|m| &m.user).any(|u| !u.bot)
         && members.iter().any(|m| m.user.id == *bot_id))
 }
 

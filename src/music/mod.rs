@@ -13,7 +13,7 @@ use tracing::error;
 use async_trait::async_trait;
 use poise::serenity_prelude::{
     self as serenity, Cache, ChannelId, Context as SerenityContext, CreateEmbed, GuildId, Http,
-    Message, MessageId, Mutex, User,
+    Mutex, User,
 };
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
@@ -25,8 +25,6 @@ use crate::{error::*, Data};
 
 #[derive(Clone)]
 pub struct MusicContext {
-    // the text channel
-    pub channel_id: serenity::ChannelId,
     // the guild in which the bot plays music
     pub guild_id: serenity::GuildId,
     // cache for faster operations
@@ -41,66 +39,6 @@ pub struct MusicContext {
 
 struct NotificationHandler {
     pub mtx: MusicContext,
-}
-
-impl NotificationHandler {
-    async fn send_new_message(
-        &self,
-        embed: &CreateEmbed,
-        old_msg: Option<MessageId>,
-    ) -> Result<Message, Error> {
-        if let Some(old_msg) = old_msg {
-            self.delete_old(old_msg).await;
-        }
-        Ok(self
-            .mtx
-            .channel_id
-            .send_message(&self.mtx.http, |m| {
-                m.embed(|e| {
-                    e.clone_from(embed);
-                    e
-                })
-            })
-            .await?)
-    }
-
-    async fn edit_message(
-        &self,
-        embed: &CreateEmbed,
-        message: &mut Message,
-        old_msg: Option<MessageId>,
-    ) -> Result<(), Error> {
-        if let Some(old_msg) = old_msg {
-            self.delete_old(old_msg).await;
-        }
-        message
-            .edit(&self.mtx.http, |m| {
-                m.embed(|e| {
-                    e.clone_from(embed);
-                    e
-                })
-            })
-            .await?;
-        Ok(())
-    }
-
-    async fn delete_old(&self, old_msg: MessageId) {
-        let _ = self
-            .mtx
-            .http
-            .delete_message(self.mtx.channel_id.0, old_msg.0)
-            .await;
-    }
-
-    async fn is_newest<'a>(&'a self, msg_id: &MessageId) -> bool {
-        match self.mtx.http.get_messages(self.mtx.channel_id.0, "").await {
-            Ok(msgs) => msgs
-                .first()
-                .and_then(|m| Some(&m.id == msg_id))
-                .unwrap_or(false),
-            Err(_) => false,
-        }
-    }
 }
 
 #[async_trait]
@@ -189,7 +127,6 @@ pub async fn get_call_else_join(
                 &MusicContext {
                     songbird: get_poise(&ctx).await?,
                     guild_id: *guild_id,
-                    channel_id: ctx.channel_id(),
                     data: ctx.data().clone(),
                     http: ctx.discord().http.clone(),
                     cache: ctx.discord().cache.clone(),
