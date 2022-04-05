@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use poise::serenity_prelude::{ChannelId, Mutex};
 use songbird::{Call, Event};
 
-use super::{MusicContext, TimeoutHandler};
+use super::{MusicContext, NotificationHandler};
 use crate::Error;
 
 async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {
@@ -15,10 +15,10 @@ async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {
     //    TimeoutHandler { mtx: mtx.clone() },
     //);
 
-    // call.add_global_event(
-    //     Event::Periodic(Duration::from_millis(5000), None),
-    //     NotificationHandler { mtx: mtx.clone() },
-    // );
+    call.add_global_event(
+        Event::Periodic(Duration::from_millis(5000), None),
+        NotificationHandler { mtx: mtx.clone() },
+    );
 }
 
 pub async fn join(

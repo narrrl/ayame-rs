@@ -13,7 +13,8 @@ use crate::{utils::check_result, Context};
 
 pub const CHANNEL_ALREADY_BOUND: &'static str = "channel was already bound";
 pub const ONLY_IN_BOT_CHANNEL: &'static str = "command can only be executed in bot channel";
-pub const NO_BOT_CHANNEL: &'static str = "there is no bot channel, ask an admin to fix this";
+pub const NO_BOT_CHANNEL: &'static str =
+    "there is no bot channel, use `/bind` to register a channel as bot channel";
 pub const WRONG_CHANNEL_TO_BIND: &'static str = "you can only bind text channel";
 pub const NOT_IN_GUILD: &'static str = "only in guilds";
 pub const NOT_IN_VOICE: &'static str = "not in a voice channel";
@@ -24,7 +25,7 @@ pub const UNKNOWN_WEEKDAY: &'static str = "unknown weekday";
 pub const NO_MENSA_KEY: &'static str = "no mensa key provided";
 pub const UNKNOWN_RESPONSE: &'static str = "got unknown response";
 pub const EVENT_CANCELED: &'static str = "the event was canceled";
-pub const COULDNT_GET_MSG: &'static str = "couldn't get message";
+// pub const COULDNT_GET_MSG: &'static str = "couldn't get message";
 // pub const EMPTY_MENU: &'static str = "can't initialize empty menu";
 
 #[derive(Error, Debug)]

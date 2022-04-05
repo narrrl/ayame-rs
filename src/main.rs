@@ -13,7 +13,6 @@ use poise::serenity_prelude::UserId;
 use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
 use songbird::SongbirdKey;
-use tokio::join;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -24,6 +23,7 @@ mod menu;
 mod model;
 mod music;
 mod utils;
+mod voice;
 mod youtube;
 
 pub const DEFAULT_DATABASE_URL: &str = "sqlite:database/database.sqlite";
@@ -31,8 +31,9 @@ pub const DEFAULT_DATABASE_URL: &str = "sqlite:database/database.sqlite";
 #[derive(Clone)]
 pub struct Data {
     // only read, can't change
-    config: configuration::Config,
+    config: Arc<configuration::Config>,
     song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
+    playing_messages: Arc<Mutex<HashMap<serenity::GuildId, serenity::MessageId>>>,
     database: sqlx::SqlitePool,
 }
 pub type Error = error::AyameError;
@@ -48,23 +49,6 @@ async fn event_listener(
     match event {
         poise::Event::Ready { data_about_bot } => {
             info!("{} is connected!", data_about_bot.user.name)
-        }
-        poise::Event::Message { new_message } => {
-            if let Some(guild_id) = new_message.guild_id {
-                // wait to give the bot time to send messages that shouldn't be deleted
-                tokio::time::sleep(Duration::from_secs(5)).await;
-                let (is_bind_channel, keep) = join!(
-                    get_bound_channel_id(&data.database, guild_id.0 as i64),
-                    should_be_deleted(&data.database, guild_id.0 as i64, new_message.id.0 as i64)
-                );
-                let (is_bind_channel, keep) =
-                    (is_bind_channel? == Some(new_message.channel_id.0), keep?);
-                if is_bind_channel && !keep {
-                    // we don't care if anything goes wrong
-                    // the message might long be gone
-                    let _ = new_message.delete(&ctx.http).await;
-                }
-            }
         }
         poise::Event::VoiceStateUpdate {
             old: Some(state),
@@ -226,8 +210,9 @@ async fn run_discord_client(database: sqlx::SqlitePool) -> Result<(), anyhow::Er
                 });
                 // store config in Data
                 Ok(Data {
-                    config,
+                    config: Arc::new(config),
                     song_queues: Arc::new(Mutex::new(HashMap::new())),
+                    playing_messages: Arc::new(Mutex::new(HashMap::new())),
                     database,
                 })
             })

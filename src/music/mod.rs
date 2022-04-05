@@ -1,5 +1,6 @@
 pub mod join;
 pub mod leave;
+pub mod now_playing;
 pub mod play;
 pub mod skip;
 
@@ -8,7 +9,6 @@ use std::time::Duration;
 
 use songbird::input::Metadata;
 use songbird::tracks::{TrackHandle, TrackQueue};
-use tracing::error;
 
 use async_trait::async_trait;
 use poise::serenity_prelude::{
@@ -17,9 +17,10 @@ use poise::serenity_prelude::{
 };
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
-use crate::utils::Bar;
+use crate::commands::manage::{get_bound_channel_id, get_status_msg};
+use crate::utils::{check_result_ayame, Bar};
 use crate::youtube::YoutubeResult;
-use crate::{music::leave::leave, Context as PoiseContext, Error};
+use crate::{Context as PoiseContext, Error};
 
 use crate::{error::*, Data};
 
@@ -44,60 +45,72 @@ struct NotificationHandler {
 #[async_trait]
 impl EventHandler for NotificationHandler {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
+        let songbird = &self.mtx.songbird;
+
+        let call = match songbird.get(self.mtx.guild_id) {
+            Some(call) => call,
+            None => return Some(Event::Cancel),
+        };
+        let call = call.lock().await;
+
+        let queue = call.queue();
+        let current = queue.current();
+        let embed = match current {
+            Some(current) => {
+                let user_map = self.mtx.data.song_queues.lock().await;
+                let user = match user_map.get(&current.uuid()) {
+                    Some(id) => id.to_user_cached(&self.mtx.cache).await,
+                    None => None,
+                };
+                drop(user_map);
+
+                embed_upcoming(&queue, embed_song(&current, user).await)
+            }
+            None => {
+                let mut e = CreateEmbed::default();
+                e.title("Nothing is playing!");
+                e
+            }
+        };
+        drop(call);
+        let msg_id =
+            match get_status_msg(&self.mtx.data.database, *self.mtx.guild_id.as_u64() as i64).await
+            {
+                Ok(Some(msg_id)) => msg_id,
+                _ => return None,
+            };
+        let channel_id =
+            match get_bound_channel_id(&self.mtx.data.database, *self.mtx.guild_id.as_u64() as i64)
+                .await
+            {
+                Ok(Some(ch_id)) => ch_id,
+                _ => return None,
+            };
+        let mut msg = match self.mtx.http.get_message(channel_id, msg_id).await {
+            Ok(msg) => msg,
+            Err(_) => return None,
+        };
+        check_result_ayame(self.edit_message(&embed, &mut msg).await);
         // TODO: implement with new status messages
         Some(Event::Cancel)
     }
 }
 
-struct TimeoutHandler {
-    pub mtx: MusicContext,
-}
-
-#[async_trait]
-impl EventHandler for TimeoutHandler {
-    async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
-        let voice_id = match self.mtx.songbird.get(self.mtx.guild_id.0) {
-            Some(call) => {
-                let call = call.lock().await;
-                match call.current_channel() {
-                    Some(ch) => ch,
-                    None => return Some(Event::Cancel),
-                }
-            }
-            None => return Some(Event::Cancel),
-        };
-        let channel = match self.mtx.cache.guild_channel(voice_id.0) {
-            Some(channel) => channel,
-            None => return None,
-        };
-
-        let members = match channel.members(&self.mtx.cache).await {
-            Ok(mems) => mems,
-            Err(why) => {
-                error!("failed to get members of voice channel: {:?}", why);
-                return None;
-            }
-        };
-
-        if self.is_alone(&members) {
-            if let Err(why) = leave(&self.mtx.songbird, self.mtx.guild_id).await {
-                error!("leaving voice channel returned error: {:?}", why);
-            }
-            Some(Event::Cancel)
-        } else {
-            None
-        }
-    }
-}
-
-impl TimeoutHandler {
-    fn is_alone(&self, members: &Vec<serenity::Member>) -> bool {
-        for mem in members.iter() {
-            if !mem.user.bot {
-                return false;
-            }
-        }
-        true
+impl NotificationHandler {
+    async fn edit_message(
+        &self,
+        embed: &CreateEmbed,
+        message: &mut serenity::Message,
+    ) -> Result<(), Error> {
+        message
+            .edit(&self.mtx.http, |m| {
+                m.embed(|e| {
+                    e.clone_from(embed);
+                    e
+                })
+            })
+            .await?;
+        Ok(())
     }
 }
 
@@ -205,7 +218,7 @@ pub async fn embed_song(track: &TrackHandle, user: Option<User>) -> CreateEmbed 
     let bar = match (current_duration, duration) {
         (Some(cd), Some(d)) => {
             let mut bar = Bar {
-                pos_icon: String::from("<a:gandalf_pls:899788418358345809>"),
+                pos_icon: String::from("🔴"),
                 line_icon: String::from("="),
                 ..Default::default()
             };

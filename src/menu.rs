@@ -156,6 +156,7 @@ impl<T> CreateMenuOptions<T> {
         self
     }
 
+    #[allow(dead_code)]
     pub fn set_pre_hook<'a>(&'a mut self, hook: HookFunction<T>) -> &'a mut Self {
         self.pre_hook = Some(hook);
         self

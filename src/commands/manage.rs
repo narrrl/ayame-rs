@@ -35,16 +35,7 @@ pub(crate) async fn bind(
                 return Err(Error::Input(CHANNEL_ALREADY_BOUND));
             }
 
-            let msg = channel_id
-                .send_message(&ctx.discord().http, |m| m.content("placeholder (muss grad bisl was umschreiben, erstmal keine status message)"))
-                .await?;
-            let msg_id = msg.id.0 as i64;
-            register_msg(&ctx.data().database, guild_id, msg_id).await?;
             bind_channel(&ctx.data().database, guild_id, bind_id).await?;
-
-            if let Some(msg) = old_channel {
-                unregister_msg(&ctx.data().database, guild_id, msg as i64).await?;
-            }
 
             ctx.say(format!("bound channel {} to bot", channel)).await?;
             Ok(())
@@ -94,6 +85,7 @@ pub async fn get_bound_channel_id(
     .map(|entry| entry.bind_id as u64))
 }
 
+#[allow(dead_code)]
 pub async fn should_be_deleted(
     database: &sqlx::SqlitePool,
     guild_id: i64,
@@ -109,6 +101,7 @@ pub async fn should_be_deleted(
     .any(|entry| entry.msg_id == msg))
 }
 
+#[allow(dead_code)]
 pub async fn unregister_msg(
     database: &sqlx::SqlitePool,
     guild_id: i64,
@@ -124,6 +117,7 @@ pub async fn unregister_msg(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn register_msg(
     database: &sqlx::SqlitePool,
     guild_id: i64,
@@ -160,6 +154,8 @@ pub async fn bind_channel(
     .await?;
     Ok(())
 }
+
+#[allow(dead_code)]
 pub async fn unbind_channel(database: &sqlx::SqlitePool, guild_id: i64) -> Result<(), Error> {
     sqlx::query!("DELETE FROM guild_bind WHERE guild_id = ?", guild_id)
         .execute(database)

@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use tokio::join;
 
 use poise::serenity_prelude::{self as serenity, ButtonStyle, CreateButton, Mentionable, Message};
 use regex::Regex;
@@ -14,8 +13,6 @@ use crate::{
 };
 
 use crate::error::*;
-
-use super::manage::{register_msg, unregister_msg};
 
 #[poise::command(
     prefix_command,
@@ -123,7 +120,6 @@ pub(crate) async fn search(
                     Arc::new(|m, mci| Box::pin(cancel(m, mci))),
                 ))
             })
-            .set_pre_hook(Arc::new(|m| Box::pin(pre_hook(m))))
             .set_post_hook(Arc::new(|m| Box::pin(post_hook(m))))
     });
 
@@ -144,37 +140,15 @@ pub(crate) async fn search(
     Ok(())
 }
 
-async fn pre_hook(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
-    if let Some(msg_id) = m.msg_id {
-        let guild_id = m
-            .ctx
-            .guild_id()
-            .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
-            .0 as i64;
-
-        // register the message that it doesn't get deleted
-        register_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64).await?;
-    }
-    Ok(())
-}
-
 async fn post_hook(m: &mut Menu<'_, Cursor<'_, YoutubeResult>>) -> Result<(), Error> {
     if let Some(msg_id) = m.msg_id {
-        let guild_id = *m
+        let msg = m
             .ctx
-            .guild_id()
-            .ok_or_else(|| Error::Input(NOT_IN_GUILD))?
-            .as_u64() as i64;
-
-        let (ok, msg) = join!(
-            unregister_msg(&m.ctx.data().database, guild_id, msg_id.0 as i64),
-            m.ctx
-                .discord()
-                .http
-                .get_message(m.ctx.channel_id().0, msg_id.0)
-        );
-        msg?.delete(&m.ctx.discord().http).await?;
-        ok?
+            .discord()
+            .http
+            .get_message(m.ctx.channel_id().into(), msg_id.into())
+            .await?;
+        msg.delete(&m.ctx.discord().http).await?;
     }
     Ok(())
 }
