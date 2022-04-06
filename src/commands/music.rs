@@ -47,10 +47,21 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
 
     ctx.send(|m| m.content(format!("Joined {}", channel_id.mention())))
         .await?;
-
     Ok(())
 }
 
+#[poise::command(
+    prefix_command,
+    slash_command,
+    category = "Music",
+    check = "bind_command",
+    global_cooldown = 3
+)]
+pub(crate) async fn now_playing(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.defer().await?;
+    let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
+    music::now_playing::now_playing(&ctx, &guild.id).await
+}
 #[poise::command(
     prefix_command,
     slash_command,

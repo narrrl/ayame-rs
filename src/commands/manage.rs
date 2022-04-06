@@ -163,6 +163,7 @@ pub async fn unbind_channel(database: &sqlx::SqlitePool, guild_id: i64) -> Resul
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn get_status_msg(
     database: &sqlx::SqlitePool,
     guild_id: i64,

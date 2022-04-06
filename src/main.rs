@@ -241,6 +241,7 @@ fn get_discord_configuration(
             join(),
             leave(),
             play(),
+            now_playing(),
             search(),
             skip(),
             shutdown(),

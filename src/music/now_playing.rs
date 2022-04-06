@@ -1,50 +1,35 @@
 use poise::serenity_prelude as serenity;
 
-use super::MusicContext;
+use crate::error::{AyameError as Error, NOT_IN_VOICE};
+
+use super::get_poise;
 
 pub async fn now_playing(
-    mtx: MusicContext,
-    channel_id: serenity::ChannelId,
+    ctx: &crate::Context<'_>,
+    guild_id: &serenity::GuildId,
 ) -> Result<(), crate::Error> {
-    tokio::spawn(async move {
-        while let Some(call) = mtx.songbird.get(mtx.guild_id) {
-            let call_lock = call.lock().await;
-            let queue = call_lock.queue();
-            let embed = match queue.current() {
-                Some(current) => {
-                    let user_map = mtx.data.song_queues.lock().await;
-                    let user = match user_map.get(&current.uuid()) {
-                        Some(id) => id.to_user_cached(&mtx.cache).await,
-                        None => None,
-                    };
+    let songbird = &get_poise(ctx).await?;
 
-                    super::embed_upcoming(&queue, super::embed_song(&current, user).await)
-                }
-                None => {
-                    let mut e = serenity::CreateEmbed::default();
-                    e.title("Nothing is playing!");
-                    e
-                }
-            };
-            let mut msgs = mtx.data.playing_messages.lock().await;
-            if let Some(msg_id) = msgs.get(&mtx.guild_id) {
-                match mtx
-                    .http
-                    .get_message(*channel_id.as_u64(), *msg_id.as_u64())
-                    .await
-                {
-                    Ok(mut msg) => {
-                        if let Err(_) = msg.edit(&mtx.http, |edit| edit.set_embed(embed)).await {
-                            msgs.remove(&mtx.guild_id);
-                        }
-                    }
-                    Err(_) => {
-                        msgs.remove(&mtx.guild_id);
-                    }
-                };
-            } else {
-            }
-        }
-    });
+    let call = match songbird.get(*guild_id.as_u64()) {
+        Some(call) => call,
+        None => return Err(Error::Input(NOT_IN_VOICE)),
+    };
+    let call = call.lock().await;
+
+    let queue = call.queue();
+    let current = queue.current();
+    let embed =
+        super::get_now_playing_embed(&ctx.data(), &current, queue, &ctx.discord().cache).await;
+    let reply = ctx
+        .send(|m| {
+            m.embed(|e| {
+                e.clone_from(&embed);
+                e
+            })
+        })
+        .await?;
+    let mut ids = ctx.data().playing_messages.lock().await;
+
+    ids.insert(*guild_id, reply.message().await?.id);
     Ok(())
 }

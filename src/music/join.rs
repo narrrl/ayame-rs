@@ -10,11 +10,6 @@ async fn add_events(mtx: &MusicContext, call: Arc<Mutex<Call>>) {
     let mut call = call.lock().await;
     call.remove_all_global_events();
 
-    //call.add_global_event(
-    //    Event::Periodic(Duration::from_secs(60), None),
-    //    TimeoutHandler { mtx: mtx.clone() },
-    //);
-
     call.add_global_event(
         Event::Periodic(Duration::from_millis(5000), None),
         NotificationHandler { mtx: mtx.clone() },

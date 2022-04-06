@@ -17,7 +17,7 @@ use poise::serenity_prelude::{
 };
 use songbird::{Call, Event, EventContext, EventHandler, Songbird, SongbirdKey};
 
-use crate::commands::manage::{get_bound_channel_id, get_status_msg};
+use crate::commands::manage::get_bound_channel_id;
 use crate::utils::{check_result_ayame, Bar};
 use crate::youtube::YoutubeResult;
 use crate::{Context as PoiseContext, Error};
@@ -55,30 +55,12 @@ impl EventHandler for NotificationHandler {
 
         let queue = call.queue();
         let current = queue.current();
-        let embed = match current {
-            Some(current) => {
-                let user_map = self.mtx.data.song_queues.lock().await;
-                let user = match user_map.get(&current.uuid()) {
-                    Some(id) => id.to_user_cached(&self.mtx.cache).await,
-                    None => None,
-                };
-                drop(user_map);
-
-                embed_upcoming(&queue, embed_song(&current, user).await)
-            }
-            None => {
-                let mut e = CreateEmbed::default();
-                e.title("Nothing is playing!");
-                e
-            }
+        let embed = get_now_playing_embed(&self.mtx.data, &current, queue, &self.mtx.cache).await;
+        let msgs = self.mtx.data.playing_messages.lock().await;
+        let msg_id = match msgs.get(&self.mtx.guild_id.into()) {
+            Some(msg_id) => *msg_id.as_u64(),
+            None => return None,
         };
-        drop(call);
-        let msg_id =
-            match get_status_msg(&self.mtx.data.database, *self.mtx.guild_id.as_u64() as i64).await
-            {
-                Ok(Some(msg_id)) => msg_id,
-                _ => return None,
-            };
         let channel_id =
             match get_bound_channel_id(&self.mtx.data.database, *self.mtx.guild_id.as_u64() as i64)
                 .await
@@ -91,8 +73,7 @@ impl EventHandler for NotificationHandler {
             Err(_) => return None,
         };
         check_result_ayame(self.edit_message(&embed, &mut msg).await);
-        // TODO: implement with new status messages
-        Some(Event::Cancel)
+        None
     }
 }
 
@@ -111,6 +92,29 @@ impl NotificationHandler {
             })
             .await?;
         Ok(())
+    }
+}
+
+pub async fn get_now_playing_embed(
+    data: &Data,
+    current: &Option<TrackHandle>,
+    queue: &TrackQueue,
+    cache: &Arc<Cache>,
+) -> CreateEmbed {
+    match current {
+        Some(current) => {
+            let user_map = data.song_queues.lock().await;
+            let user = match user_map.get(&current.uuid()) {
+                Some(id) => id.to_user_cached(cache).await,
+                None => None,
+            };
+            embed_upcoming(&queue, embed_song(&current, user).await)
+        }
+        None => {
+            let mut e = CreateEmbed::default();
+            e.title("Nothing is playing!");
+            e
+        }
     }
 }
 
