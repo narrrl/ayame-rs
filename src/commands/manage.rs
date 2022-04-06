@@ -7,13 +7,13 @@ use poise::serenity_prelude as serenity;
     slash_command,
     category = "server management",
     check = "guild_only",
-    required_permissions = "ADMINISTRATOR"
+    ephemeral
 )]
 pub(crate) async fn bind(
     ctx: Context<'_>,
     #[description = "the channel that gets bound"] channel: Option<serenity::Channel>,
 ) -> Result<(), Error> {
-    ctx.defer().await?;
+    ctx.defer_ephemeral().await?;
     let guild = ctx.guild().ok_or_else(|| Error::Input(NOT_IN_GUILD))?;
     let channel_id = match channel {
         Some(channel) => channel.id(),

@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::{
     menu::Menu,
     menu::{Control, Cursor, MenuComponent},
-    music::{self, embed_song_for_menu, MusicContext},
+    music::{self, embed_song_for_menu},
     utils::{bind_command, guild_only},
     youtube::{Type, YoutubeResult, YoutubeSearch},
     Context, Error,
@@ -33,17 +33,7 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
         None => return Err(Error::Input(NOT_IN_VOICE)),
     };
 
-    music::join::join(
-        &MusicContext {
-            songbird: music::get_poise(&ctx).await?,
-            guild_id: guild.id,
-            data: ctx.data().clone(),
-            http: ctx.discord().http.clone(),
-            cache: ctx.discord().cache.clone(),
-        },
-        &channel_id,
-    )
-    .await?;
+    music::join::join(&ctx, &guild.id, &channel_id).await?;
 
     ctx.send(|m| m.content(format!("Joined {}", channel_id.mention())))
         .await?;

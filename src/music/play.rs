@@ -39,7 +39,5 @@ pub async fn register_and_play(ctx: Context<'_>, song: String) -> Result<TrackHa
 
     let mut requests = ctx.data().song_queues.lock().await;
     requests.insert(uuid, user_id);
-    drop(requests);
-
     Ok(track)
 }

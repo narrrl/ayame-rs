@@ -8,7 +8,6 @@ use commands::general::*;
 use commands::manage::*;
 use commands::music::*;
 use commands::owner::*;
-use music::MusicContext;
 use poise::serenity_prelude::UserId;
 use poise::serenity_prelude::{self as serenity, Mutex};
 use songbird::Songbird;
@@ -68,17 +67,8 @@ async fn event_listener(
                 let songbird = music::get_serenity(ctx).await?;
                 match new.channel_id {
                     Some(new_id) => {
-                        music::join::join(
-                            &MusicContext {
-                                songbird,
-                                guild_id: guild_channel.guild_id,
-                                data: data.clone(),
-                                http: ctx.http.clone(),
-                                cache: ctx.cache.clone(),
-                            },
-                            &new_id,
-                        )
-                        .await?;
+                        music::join::join_serenity(&ctx, data, &guild_channel.guild_id, &new_id)
+                            .await?;
                     }
                     None => music::leave::leave(&songbird, guild_channel.guild_id).await?,
                 };

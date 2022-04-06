@@ -139,19 +139,7 @@ pub async fn get_call_else_join(
 
     match songbird.get(guild_id.0) {
         Some(call) => Ok(call),
-        None => {
-            join::join(
-                &MusicContext {
-                    songbird: get_poise(&ctx).await?,
-                    guild_id: *guild_id,
-                    data: ctx.data().clone(),
-                    http: ctx.discord().http.clone(),
-                    cache: ctx.discord().cache.clone(),
-                },
-                channel_id,
-            )
-            .await
-        }
+        None => join::join(ctx, guild_id, channel_id).await,
     }
 }
 
