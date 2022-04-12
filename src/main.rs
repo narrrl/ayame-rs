@@ -29,10 +29,13 @@ pub const DEFAULT_DATABASE_URL: &str = "sqlite:database/database.sqlite";
 
 #[derive(Clone)]
 pub struct Data {
-    // only read, can't change
+    // config can only be read, can't change
     config: Arc<configuration::Config>,
+    // all uuid of songs mapped to the user that requested it
     song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
+    // all now_playing messages
     playing_messages: Arc<Mutex<HashMap<serenity::GuildId, serenity::MessageId>>>,
+    // database
     database: sqlx::SqlitePool,
 }
 pub type Error = error::AyameError;
@@ -90,7 +93,7 @@ async fn is_bot_alone(
         && members.iter().any(|m| m.user.id == *bot_id))
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command, slash_command, ephemeral)]
 async fn help(
     ctx: Context<'_>,
     #[description = "Command to display specific information about"] command: Option<String>,
@@ -159,7 +162,6 @@ async fn run_discord_client(database: sqlx::SqlitePool) -> Result<(), anyhow::Er
             // get songbird instance
             let voice = Songbird::serenity();
             client_builder
-                // TODO: lazy so use all intents
                 .intents(serenity::GatewayIntents::all())
                 // register songbird as VoiceGatewayManager
                 .voice_manager_arc(voice.clone())
@@ -198,7 +200,7 @@ async fn run_discord_client(database: sqlx::SqlitePool) -> Result<(), anyhow::Er
                     }
                     shard_manager.lock().await.shutdown_all().await;
                 });
-                // store config in Data
+                // create our data
                 Ok(Data {
                     config: Arc::new(config),
                     song_queues: Arc::new(Mutex::new(HashMap::new())),
