@@ -110,21 +110,22 @@ pub(crate) async fn mensa(
 
         let uuid = ctx.id();
         let embed = create_mensa_embed(&days, &day);
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.clone_from(&embed);
-                e
-            })
-            .components(|c| {
-                c.create_action_row(|ar| {
-                    ar.create_select_menu(|menu| {
-                        menu.options(|e| create_mensa_options(e, &day, &days))
-                            .custom_id(uuid)
+        let reply = ctx
+            .send(|m| {
+                m.embed(|e| {
+                    e.clone_from(&embed);
+                    e
+                })
+                .components(|c| {
+                    c.create_action_row(|ar| {
+                        ar.create_select_menu(|menu| {
+                            menu.options(|e| create_mensa_options(e, &day, &days))
+                                .custom_id(uuid)
+                        })
                     })
                 })
             })
-        })
-        .await?;
+            .await?;
 
         while let Some(mci) = serenity::CollectComponentInteraction::new(ctx.discord())
             .author_id(ctx.author().id)
@@ -160,6 +161,8 @@ pub(crate) async fn mensa(
                 .await?;
             }
         }
+        // delete message, but ignore result because we dont want the interaction to fail
+        let _ = reply.message().await?.delete(&ctx.discord().http).await;
         Ok(())
     } else {
         Err(Error::Failure(NO_MENSA_KEY))
