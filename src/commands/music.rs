@@ -33,7 +33,7 @@ pub(crate) async fn join(ctx: Context<'_>) -> Result<(), Error> {
         None => return Err(Error::Input(NOT_IN_VOICE)),
     };
 
-    music::join::join(&ctx, &guild.id, &channel_id).await?;
+    music::join::join_serenity(&ctx.discord(), &ctx.data, &guild.id, &channel_id).await?;
 
     ctx.send(|m| m.content(format!("Joined {}", channel_id.mention())))
         .await?;

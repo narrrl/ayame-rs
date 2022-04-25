@@ -52,7 +52,7 @@ pub async fn join_serenity(
         return Err(Error::from(why));
     }
 
-    add_events(mtx, call.clone()).await;
+    //add_events(mtx, call.clone()).await;
 
     Ok(call)
 }
