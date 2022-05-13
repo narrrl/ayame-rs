@@ -41,7 +41,7 @@ progressing = "3.0.2"
 signal-hook = "0.3.13"
 
 [dependencies.serenity]
-git = "https://github.com/serenity-rs/serenity.git"
+version = "0.11.2"
 features = [
     "cache",
     "builder",
@@ -59,14 +59,10 @@ features = [
     ]
 
 [dependencies.songbird]
-git = "https://github.com/serenity-rs/songbird"
-branch = "next"
+version = "0.2.2"
 features = ["gateway", "builtin-queue", "serenity-native", "driver", "yt-dlp" ]
 
 [profile.release]
 codegen-units = 1
 lto = "fat"
 panic = "abort"
-
-[patch.crates-io]
-serenity = { git = 'https://github.com/serenity-rs/serenity', branch = 'next' }
