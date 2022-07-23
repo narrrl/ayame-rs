@@ -41,7 +41,7 @@ progressing = "3.0.2"
 signal-hook = "0.3.13"
 
 [dependencies.serenity]
-version = "0.11.2"
+version = "^0.11"
 features = [
     "cache",
     "builder",
@@ -60,7 +60,7 @@ features = [
 
 [dependencies.songbird]
 git = "https://github.com/Nirusu99/songbird"
-branch = "next"
+branch = "current"
 features = ["gateway", "builtin-queue", "serenity-native", "driver", "yt-dlp" ]
 
 [profile.release]
