@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -48,16 +47,6 @@ async fn event_listener(
     }
 
     Ok(())
-}
-
-async fn is_bot_alone(
-    channel: &serenity::GuildChannel,
-    ctx: &serenity::Context,
-    bot_id: &serenity::UserId,
-) -> Result<bool, Error> {
-    let members = channel.members(&ctx.cache).await?;
-    Ok(!members.iter().map(|m| &m.user).any(|u| !u.bot)
-        && members.iter().any(|m| m.user.id == *bot_id))
 }
 
 #[poise::command(prefix_command, slash_command, ephemeral)]
@@ -129,7 +118,9 @@ async fn run_discord_client(database: sqlx::SqlitePool) -> Result<(), anyhow::Er
             // get songbird instance
             let voice = Songbird::serenity();
             client_builder
-                .intents(serenity::GatewayIntents::all())
+                .intents(
+                    serenity::GatewayIntents::all() | serenity::GatewayIntents::MESSAGE_CONTENT,
+                )
                 // register songbird as VoiceGatewayManager
                 .voice_manager_arc(voice.clone())
                 // insert songbird into data
