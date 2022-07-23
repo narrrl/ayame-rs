@@ -6,21 +6,17 @@ use std::time::Duration;
 
 use commands::general::*;
 use commands::manage::*;
-use commands::music::*;
 use commands::owner::*;
-use poise::serenity_prelude::UserId;
-use poise::serenity_prelude::{self as serenity, Mutex};
+use poise::serenity_prelude as serenity;
 use songbird::Songbird;
 use songbird::SongbirdKey;
 use tracing::{error, info};
-use uuid::Uuid;
 
 mod commands;
 mod configuration;
 mod error;
 mod menu;
 mod model;
-mod music;
 mod utils;
 mod voice;
 mod youtube;
@@ -31,10 +27,6 @@ pub const DEFAULT_DATABASE_URL: &str = "sqlite:database/database.sqlite";
 pub struct Data {
     // config can only be read, can't change
     config: Arc<configuration::Config>,
-    // all uuid of songs mapped to the user that requested it
-    song_queues: Arc<Mutex<HashMap<Uuid, UserId>>>,
-    // all now_playing messages
-    playing_messages: Arc<Mutex<HashMap<serenity::GuildId, serenity::MessageId>>>,
     // database
     database: sqlx::SqlitePool,
 }
@@ -43,39 +35,14 @@ pub type Error = error::AyameError;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 async fn event_listener(
-    ctx: &serenity::Context,
+    _ctx: &serenity::Context,
     event: &poise::Event<'_>,
     _framework: &poise::Framework<Data, Error>,
-    data: &Data,
+    _data: &Data,
 ) -> Result<(), Error> {
     match event {
         poise::Event::Ready { data_about_bot } => {
             info!("{} is connected!", data_about_bot.user.name)
-        }
-        poise::Event::VoiceStateUpdate {
-            old: Some(state),
-            new,
-        } => {
-            let channel_id = match state.channel_id {
-                Some(channel_id) => channel_id,
-                _ => return Ok(()),
-            };
-            let channel = ctx.http.get_channel(channel_id.into()).await?;
-            let guild_channel = match channel.guild() {
-                Some(guild_channel) => guild_channel,
-                _ => return Ok(()),
-            };
-            let current_user = ctx.http.get_current_user().await?;
-            if is_bot_alone(&guild_channel, ctx, &current_user.id).await? {
-                let songbird = music::get_serenity(ctx).await?;
-                match new.channel_id {
-                    Some(new_id) => {
-                        music::join::join_serenity(&ctx, data, &guild_channel.guild_id, &new_id)
-                            .await?;
-                    }
-                    None => music::leave::leave(&songbird, guild_channel.guild_id).await?,
-                };
-            }
         }
         _ => {}
     }
@@ -203,8 +170,6 @@ async fn run_discord_client(database: sqlx::SqlitePool) -> Result<(), anyhow::Er
                 // create our data
                 Ok(Data {
                     config: Arc::new(config),
-                    song_queues: Arc::new(Mutex::new(HashMap::new())),
-                    playing_messages: Arc::new(Mutex::new(HashMap::new())),
                     database,
                 })
             })
@@ -230,15 +195,8 @@ fn get_discord_configuration(
             ping_bind(),
             mensa(),
             invite(),
-            join(),
-            leave(),
-            play(),
-            now_playing(),
-            search(),
-            skip(),
             shutdown(),
             addemote(),
-            play_message_content(),
         ],
         listener: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
