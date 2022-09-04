@@ -1,12 +1,8 @@
-# usually the bot's user id
-# \@bot_user in any chat, or in discord developer mode right click the bot -> copy id
-application_id = 000000000000000000
 # you have to create a discord application for that
-token = "super_duper_secret_token_that_you_should_never_share"
+discord_token = "super_duper_secret_token_that_you_should_never_share"
 # trigger for the bot
 prefix = "~"
 # youtube data api v3 key
-youtube_api_key = "super_duper_secret_token_that_you_should_never_share"
-
+youtube_token = "super_duper_secret_token_that_you_should_never_share"
 # color for the bot (hex)[https://g.co/kgs/RvXxDR]
 color = "ffffff"
