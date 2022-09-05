@@ -1,9 +1,0 @@
-*
-**
-!Cargo.toml
-!Cargo.lock
-!/src
-!config.toml
-!/migrations
-!sqlx-data.json
-!/database
