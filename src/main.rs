@@ -2,12 +2,14 @@ use figment::{
     providers::{Env, Format, Json, Toml},
     Figment,
 };
-use poise::serenity_prelude as serenity;
+use poise::{futures_util::future::join_all, serenity_prelude as serenity};
 use serde::Deserialize;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+
+pub mod error;
 
 const TOML_CONFIG: &'static str = "config.toml";
 const JSON_CONFIG: &'static str = "config.json";
@@ -55,6 +57,11 @@ async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+#[poise::command(prefix_command, track_edits, slash_command)]
+async fn pingerror(_ctx: Context<'_>) -> Result<(), Error> {
+    Err(Box::new(error::Error::InvalidInput("test exception")))
+}
+
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     // This is our custom error handler
     // They are many errors that can occur, so we only handle the ones we want to customize
@@ -62,7 +69,11 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
-            println!("Error in command `{}`: {:?}", ctx.command().name, error,);
+            if let Some(ayerr) = error.downcast_ref::<error::Error>() {
+                let _ = ctx.say(format!("{}", ayerr)).await;
+            } else {
+                println!("Error in command `{}`: {:?}", ctx.command().name, error,);
+            }
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
@@ -80,13 +91,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .merge(Json::file(JSON_CONFIG))
         .extract()?;
 
-    run_discord(&config).await?;
+    let mut handles = vec![];
+    handles.push(tokio::spawn(async move {
+        if let Err(why) = run_discord(&config).await {
+            tracing::error!("Error: failed to start discord {:#?}", why);
+        }
+    }));
+    join_all(handles).await;
     Ok(())
 }
 
 async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let options = poise::FrameworkOptions {
-        commands: vec![help(), ping()],
+        commands: vec![help(), ping(), pingerror()],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(String::from(
                 &config.prefix.clone().unwrap_or(String::from("~")),
