@@ -94,6 +94,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "figment",
+ "lazy_static",
  "mensa-swfr-rs",
  "poise",
  "regex",

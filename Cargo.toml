@@ -20,6 +20,7 @@ mensa-swfr-rs = {git = "https://github.com/Nirusu99/mensa-swfr-rs", branch = "ma
 thiserror = "^1"
 figment = { version = "0.10.6", features = ["toml", "json", "env"] }
 signal-hook = "0.3.14"
+lazy_static = "1.4.0"
 
 [profile.release]
 codegen-units = 1

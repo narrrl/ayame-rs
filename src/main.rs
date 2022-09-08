@@ -2,18 +2,25 @@ use figment::{
     providers::{Env, Format, Json, Toml},
     Figment,
 };
-use poise::{futures_util::future::join_all, serenity_prelude as serenity};
+use lazy_static::lazy_static;
+use poise::serenity_prelude as serenity;
 use serde::Deserialize;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 
+pub mod commands;
 pub mod error;
+pub mod menu;
+pub mod util;
+
+use commands::*;
 
 const TOML_CONFIG: &'static str = "config.toml";
 const JSON_CONFIG: &'static str = "config.json";
-const ENV_PREFIX: &'static str = "AYAME_";
+const ENV_PREFIX: &'static str = "DISCORD_";
+const DEFAULT_COLOR: &'static str = "23272A";
 
 // configuration
 #[derive(Deserialize, Debug, PartialEq)]
@@ -22,6 +29,35 @@ pub struct Config {
     youtube_token: Option<String>,
     swfr_token: Option<String>,
     prefix: Option<String>,
+    color: Option<String>,
+}
+
+lazy_static! {
+    // we use a static reference to our config
+    pub static ref CONFIG: Config = {
+        Figment::new()
+            .merge(Env::prefixed(ENV_PREFIX))
+            .merge(Toml::file(TOML_CONFIG))
+            .merge(Json::file(JSON_CONFIG))
+            .extract()
+            .expect("Couldn't create config")
+    };
+    // static color for easy access
+    pub static ref COLOR: serenity::Colour = {
+        let color = u32::from_str_radix(
+            &CONFIG
+                .color
+                .clone()
+                .unwrap_or(String::from(DEFAULT_COLOR))
+                // if config is like #000000
+                .replace("#", "")
+                // if config is like 0x000000
+                .replace("0x", ""),
+            16,
+        )
+        .expect("Couldn t convert color in config");
+        serenity::Colour::new(color)
+    };
 }
 
 // Types used by all command functions
@@ -85,25 +121,21 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let config: Config = Figment::new()
-        .merge(Env::prefixed(ENV_PREFIX))
-        .merge(Toml::file(TOML_CONFIG))
-        .merge(Json::file(JSON_CONFIG))
-        .extract()?;
-
-    let mut handles = vec![];
-    handles.push(tokio::spawn(async move {
-        if let Err(why) = run_discord(&config).await {
-            tracing::error!("Error: failed to start discord {:#?}", why);
-        }
-    }));
-    join_all(handles).await;
-    Ok(())
+    run_discord(&CONFIG).await
 }
 
 async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let options = poise::FrameworkOptions {
-        commands: vec![help(), ping(), pingerror()],
+        commands: vec![
+            help(),
+            ping(),
+            pingerror(),
+            avatar(),
+            uwu(),
+            uwuify(),
+            register(),
+            invite(),
+        ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(String::from(
                 &config.prefix.clone().unwrap_or(String::from("~")),
@@ -111,38 +143,10 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
             edit_tracker: Some(poise::EditTracker::for_timespan(
                 std::time::Duration::from_secs(3600),
             )),
-            additional_prefixes: vec![],
             ..Default::default()
         },
         /// The global error handler for all error cases that may occur
         on_error: |error| Box::pin(on_error(error)),
-        /// This code is run before every command
-        pre_command: |ctx| {
-            Box::pin(async move {
-                println!("Executing command {}...", ctx.command().qualified_name);
-            })
-        },
-        /// This code is run after a command if it was successful (returned Ok)
-        post_command: |ctx| {
-            Box::pin(async move {
-                println!("Executed command {}!", ctx.command().qualified_name);
-            })
-        },
-        /// Every command invocation must pass this check to continue execution
-        command_check: Some(|ctx| {
-            Box::pin(async move {
-                if ctx.author().id == 123456789 {
-                    return Ok(false);
-                }
-                Ok(true)
-            })
-        }),
-        listener: |_ctx, event, _framework, _data| {
-            Box::pin(async move {
-                println!("Got an event in listener: {:?}", event.name());
-                Ok(())
-            })
-        },
         ..Default::default()
     };
 
