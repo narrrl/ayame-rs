@@ -15,12 +15,18 @@ tokio-stream = "^0"
 serde = "^1"
 chrono = "^0"
 uwuify = "^0"
-poise = { git = "https://github.com/kangalioo/poise", branch = "master", features = ["collector"] }
+poise = { git = "https://github.com/kangalioo/poise", branch = "develop", features = ["collector"] }
 mensa-swfr-rs = {git = "https://github.com/Nirusu99/mensa-swfr-rs", branch = "main"}
 thiserror = "^1"
 figment = { version = "0.10.6", features = ["toml", "json", "env"] }
 signal-hook = "0.3.14"
 lazy_static = "1.4.0"
+
+# [dependencies.serenity]
+# default-features = false
+# features = ["builder", "client", "gateway", "model", "utils", "collector"]
+#
+# version = "0.11.4"
 
 [profile.release]
 codegen-units = 1

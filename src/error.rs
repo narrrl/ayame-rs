@@ -1,6 +1,18 @@
+use poise::async_trait;
 use std::error::Error as StdError;
 use std::fmt;
 use tracing::instrument;
+
+use crate::Context;
+
+#[async_trait]
+pub trait Sendable<T, E>
+where
+    T: Send + Sync,
+    E: Send + Sync,
+{
+    async fn send(&self, ctx: &T) -> std::result::Result<E, Box<dyn StdError + Send + Sync>>;
+}
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -22,5 +34,23 @@ impl StdError for Error {
         match self {
             _ => None,
         }
+    }
+}
+
+#[async_trait]
+impl Sendable<Context<'_>, ()> for Error {
+    async fn send(
+        &self,
+        ctx: &Context,
+    ) -> std::result::Result<(), Box<dyn StdError + Send + Sync>> {
+        ctx.send(|m| {
+            m.embed(|e| {
+                e.description(format!("Error: {}", &self))
+                    .colour(*crate::COLOR)
+            })
+            .ephemeral(true)
+        })
+        .await?;
+        Ok(())
     }
 }

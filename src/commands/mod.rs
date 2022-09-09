@@ -42,7 +42,8 @@ pub(crate) async fn invite(ctx: Context<'_>) -> Result<(), Error> {
     prefix_command,
     context_menu_command = "get avatar",
     category = "General",
-    ephemeral
+    ephemeral,
+    guild_only
 )]
 pub(crate) async fn avatar(
     ctx: Context<'_>,

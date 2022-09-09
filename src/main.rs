@@ -16,11 +16,13 @@ pub mod menu;
 pub mod util;
 
 use commands::*;
+use error::{Error as AYError, Sendable};
 
 const TOML_CONFIG: &'static str = "config.toml";
 const JSON_CONFIG: &'static str = "config.json";
 const ENV_PREFIX: &'static str = "DISCORD_";
 const DEFAULT_COLOR: &'static str = "23272A";
+const BASE_16: u32 = 16;
 
 // configuration
 #[derive(Deserialize, Debug, PartialEq)]
@@ -53,7 +55,7 @@ lazy_static! {
                 .replace("#", "")
                 // if config is like 0x000000
                 .replace("0x", ""),
-            16,
+            BASE_16,
         )
         .expect("Couldn t convert color in config");
         serenity::Colour::new(color)
@@ -105,15 +107,18 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
-            if let Some(ayerr) = error.downcast_ref::<error::Error>() {
-                let _ = ctx.say(format!("{}", ayerr)).await;
+            if let Some(ayerr) = error.downcast_ref::<AYError>() {
+                // let _ = ctx.say(format!("{}", ayerr)).await;
+                if let Err(e) = ayerr.send(&ctx).await {
+                    tracing::error!("Error while handling error: {}", e);
+                }
             } else {
-                println!("Error in command `{}`: {:?}", ctx.command().name, error,);
+                tracing::error!("Error in command `{}`: {:?}", ctx.command().name, error,);
             }
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
-                println!("Error while handling error: {}", e)
+                tracing::error!("Error while handling error: {}", e);
             }
         }
     }
@@ -150,10 +155,10 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
         ..Default::default()
     };
 
-    Ok(poise::Framework::build()
+    Ok(poise::Framework::builder()
         .token(config.discord_token.to_string())
         .user_data_setup(move |_ctx, _ready, framework| {
-            register_signal_handler(framework.shard_manager());
+            register_signal_handler(framework.shard_manager().clone());
             Box::pin(async move { Ok(Data) })
         })
         .options(options)
@@ -170,7 +175,7 @@ fn register_signal_handler(shard_manager: Arc<serenity::Mutex<serenity::ShardMan
         tokio::signal::ctrl_c()
             .await
             .expect("Could not register ctrl+c handler");
-        tracing::info!("Recieved ctrl+c signal");
+        tracing::info!("Recieved ctrl+c signal, shutting down...");
         sm.lock().await.shutdown_all().await;
     });
     tokio::spawn(async move {
@@ -185,6 +190,7 @@ fn register_signal_handler(shard_manager: Arc<serenity::Mutex<serenity::ShardMan
         while !term.load(Ordering::Relaxed) {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         }
+        tracing::info!("Recieved sigterm, shutting down...");
         shard_manager.lock().await.shutdown_all().await;
     });
 }
