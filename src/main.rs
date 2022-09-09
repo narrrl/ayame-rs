@@ -89,17 +89,6 @@ async fn help(
     Ok(())
 }
 
-#[poise::command(prefix_command, track_edits, slash_command)]
-async fn ping(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("pong!").await?;
-    Ok(())
-}
-
-#[poise::command(prefix_command, track_edits, slash_command)]
-async fn pingerror(_ctx: Context<'_>) -> Result<(), Error> {
-    Err(Box::new(error::Error::InvalidInput("test exception")))
-}
-
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     // This is our custom error handler
     // They are many errors that can occur, so we only handle the ones we want to customize
@@ -108,7 +97,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
         poise::FrameworkError::Command { error, ctx } => {
             if let Some(ayerr) = error.downcast_ref::<AYError>() {
-                // let _ = ctx.say(format!("{}", ayerr)).await;
+                // notify user
                 if let Err(e) = ayerr.send(&ctx).await {
                     tracing::error!("Error while handling error: {}", e);
                 }
@@ -140,6 +129,7 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
             uwuify(),
             register(),
             invite(),
+            shutdown(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(String::from(
