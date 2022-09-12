@@ -15,6 +15,7 @@ pub mod error;
 pub mod menu;
 pub mod util;
 
+// `commands::mod.rs` re-exports all commands for easy importing
 use commands::*;
 use error::{Error as AYError, Sendable};
 
@@ -34,6 +35,7 @@ pub struct Config {
     color: Option<String>,
 }
 
+// some global stuff like configuration etc.
 lazy_static! {
     // we use a static reference to our config
     pub static ref CONFIG: Config = {
@@ -67,9 +69,12 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 // Custom user data passed to all command functions
+// might be expanded in the future
+#[non_exhaustive]
 pub struct Data;
 
 /// Show this help menu
+/// TODO: replace with embed?
 #[poise::command(prefix_command, track_edits, slash_command)]
 async fn help(
     ctx: Context<'_>,
@@ -115,6 +120,11 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // run the discord client with the configuration
+    // we don't actually need to pass the config because its global
+    // but that way we can ensure that this is the first time the config is used
+    // because lazy static is kinda like a singleton (setups config which can fail and stores it in
+    // heap for easy access)
     run_discord(&CONFIG).await
 }
 
@@ -148,7 +158,10 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
     Ok(poise::Framework::builder()
         .token(config.discord_token.to_string())
         .user_data_setup(move |_ctx, _ready, framework| {
+            // we register signal handlers for sigterm, ctrl+c, ...
+            // TODO: better way to do this?
             register_signal_handler(framework.shard_manager().clone());
+            // create user data
             Box::pin(async move { Ok(Data) })
         })
         .options(options)
@@ -159,8 +172,12 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
         .await?)
 }
 
+/// this funcitons registers all the signal handlers
+/// for example sigterm to shutdown the bot the right way
 fn register_signal_handler(shard_manager: Arc<serenity::Mutex<serenity::ShardManager>>) {
     let sm = shard_manager.clone();
+
+    // ctrl+c
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
@@ -168,6 +185,8 @@ fn register_signal_handler(shard_manager: Arc<serenity::Mutex<serenity::ShardMan
         tracing::info!("Recieved ctrl+c signal, shutting down...");
         sm.lock().await.shutdown_all().await;
     });
+
+    // sigterm
     tokio::spawn(async move {
         let term = Arc::new(AtomicBool::new(false));
 
