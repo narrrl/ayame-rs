@@ -7,7 +7,28 @@ pub mod root;
 pub use admin::*;
 pub use root::*;
 
-#[poise::command(prefix_command, slash_command, track_edits, category = "General")]
+/// Show this help menu
+#[poise::command(track_edits, slash_command)]
+pub async fn help(
+    ctx: Context<'_>,
+    #[description = "Specific command to show help about"]
+    #[autocomplete = "poise::builtins::autocomplete_command"]
+    command: Option<String>,
+) -> Result<(), Error> {
+    poise::builtins::help(
+        ctx,
+        command.as_deref(),
+        poise::builtins::HelpConfiguration {
+            show_context_menu_commands: true,
+            ..Default::default()
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+/// UwUify text
+#[poise::command(slash_command, track_edits, category = "General")]
 pub async fn uwu(
     ctx: Context<'_>,
     #[description = "The text to convert"]
@@ -18,20 +39,15 @@ pub async fn uwu(
     Ok(())
 }
 
+/// UwUify a message
 #[poise::command(context_menu_command = "uwuify message")]
 pub async fn uwuify(ctx: Context<'_>, msg: serenity::Message) -> Result<(), Error> {
     ctx.say(uwuifier::uwuify_str_sse(&msg.content)).await?;
     Ok(())
 }
 
-#[poise::command(
-    prefix_command,
-    slash_command,
-    track_edits,
-    category = "Guild",
-    guild_only,
-    ephemeral
-)]
+/// creates an invite to this guild
+#[poise::command(slash_command, track_edits, category = "Guild", guild_only, ephemeral)]
 pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
     ctx.guild()
         .ok_or_else(|| error::Error::InvalidInput("not in a guild"))?;
@@ -41,9 +57,9 @@ pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// get the avatar of a specific user
 #[poise::command(
     slash_command,
-    prefix_command,
     context_menu_command = "get avatar",
     category = "General",
     ephemeral,

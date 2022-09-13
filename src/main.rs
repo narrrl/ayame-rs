@@ -21,7 +21,7 @@ use error::{Error as AYError, Sendable};
 
 const TOML_CONFIG: &'static str = "config.toml";
 const JSON_CONFIG: &'static str = "config.json";
-const ENV_PREFIX: &'static str = "DISCORD_";
+const ENV_PREFIX: &'static str = "AYAME_";
 const DEFAULT_COLOR: &'static str = "23272A";
 const BASE_16: u32 = 16;
 
@@ -73,24 +73,21 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 #[non_exhaustive]
 pub struct Data;
 
-/// Show this help menu
-/// TODO: replace with embed?
-#[poise::command(prefix_command, track_edits, slash_command)]
-async fn help(
-    ctx: Context<'_>,
-    #[description = "Specific command to show help about"]
-    #[autocomplete = "poise::builtins::autocomplete_command"]
-    command: Option<String>,
+/// custom event listener
+async fn event_listener(
+    _ctx: &serenity::Context,
+    event: &poise::Event<'_>,
+    _framework: poise::FrameworkContext<'_, Data, Error>,
+    _data: &Data,
 ) -> Result<(), Error> {
-    poise::builtins::help(
-        ctx,
-        command.as_deref(),
-        poise::builtins::HelpConfiguration {
-            show_context_menu_commands: true,
-            ..Default::default()
-        },
-    )
-    .await?;
+    match event {
+        poise::Event::Ready { data_about_bot } => {
+            tracing::info!("{} is connected!", data_about_bot.user.name);
+            tracing::info!("Total Guilds: {}", data_about_bot.guilds.len())
+        }
+        _ => {}
+    }
+
     Ok(())
 }
 
@@ -120,6 +117,12 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // init tracing
+    tracing_subscriber::fmt()
+        .pretty()
+        // .with_max_level(tracing::Level::INFO)
+        .with_thread_names(true)
+        .init();
     // run the discord client with the configuration
     // we don't actually need to pass the config because its global
     // but that way we can ensure that this is the first time the config is used
@@ -152,6 +155,9 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
         },
         /// The global error handler for all error cases that may occur
         on_error: |error| Box::pin(on_error(error)),
+        listener: |ctx, event, framework, user_data| {
+            Box::pin(event_listener(ctx, event, framework, user_data))
+        },
         ..Default::default()
     };
 
