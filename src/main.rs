@@ -9,6 +9,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use tracing_subscriber::fmt::time::UtcTime;
 
 pub mod commands;
 pub mod error;
@@ -120,6 +121,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // init tracing
     tracing_subscriber::fmt()
         .pretty()
+        .with_timer(UtcTime::new(time::macros::format_description!(
+            "[year]-[month]-[day] [hour]:[minute]:[second]"
+        )))
         // .with_max_level(tracing::Level::INFO)
         .with_thread_names(true)
         .init();
