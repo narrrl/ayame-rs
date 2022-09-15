@@ -36,6 +36,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "apex-rs"
+version = "0.1.0"
+source = "git+https://github.com/nirusu99/apex-rs?branch=main#583f347027bbb00df3e22cce044646e5f439b055"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -92,6 +106,7 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 name = "ayame-rs"
 version = "0.1.0"
 dependencies = [
+ "apex-rs",
  "chrono",
  "figment",
  "lazy_static",

@@ -32,6 +32,7 @@ impl<'a, T> Menu<'a, T> {
         &mut self,
         f: impl for<'b, 'c> FnOnce(&'b mut CreateReply<'c>) -> &'b mut CreateReply<'c>,
     ) -> Result<(), Error> {
+        // TODO: this fails for some reason
         let msg_id = self.send_msg(f).await?;
         self.msg_id = Some(msg_id);
         if let Some(pre_hook) = &self.options.pre_hook {

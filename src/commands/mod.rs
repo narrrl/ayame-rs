@@ -2,13 +2,15 @@ use crate::{error, Context, Error};
 use poise::serenity_prelude as serenity;
 
 pub mod admin;
+pub mod apex;
 pub mod root;
 
 pub use admin::*;
+pub use apex::*;
 pub use root::*;
 
 /// Show this help menu
-#[poise::command(track_edits, slash_command)]
+#[poise::command(track_edits, slash_command, category = "General")]
 pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"]

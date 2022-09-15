@@ -18,12 +18,14 @@ where
 #[non_exhaustive]
 pub enum Error {
     InvalidInput(&'static str),
+    Unavailable(&'static str),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidInput(msg) => f.write_str(msg),
+            Self::Unavailable(msg) => f.write_str(msg),
         }
     }
 }
@@ -46,7 +48,7 @@ impl Sendable<Context<'_>, ()> for Error {
         ctx.send(|m| {
             m.embed(|e| {
                 e.description(format!("Error: {}", &self))
-                    .colour(*crate::COLOR)
+                    .colour(crate::color())
             })
             .ephemeral(true)
         })

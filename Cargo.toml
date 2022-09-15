@@ -15,6 +15,7 @@ chrono = "^0"
 uwuify = "^0"
 poise = { git = "https://github.com/kangalioo/poise", branch = "develop", features = ["collector"] }
 mensa-swfr-rs = {git = "https://github.com/Nirusu99/mensa-swfr-rs", branch = "main"}
+apex-rs = {git = "https://github.com/nirusu99/apex-rs", branch = "main"}
 thiserror = "^1"
 figment = { version = "^0", features = ["toml", "json", "env"] }
 signal-hook = "^0"

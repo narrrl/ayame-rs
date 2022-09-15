@@ -31,6 +31,7 @@ const BASE_16: u32 = 16;
 pub struct Config {
     discord_token: String,
     youtube_token: Option<String>,
+    apex_token: Option<String>,
     swfr_token: Option<String>,
     prefix: Option<String>,
     color: Option<String>,
@@ -48,8 +49,8 @@ lazy_static! {
             .expect("Couldn't create config")
     };
     // static color for easy access
-    pub static ref COLOR: serenity::Colour = {
-        let color = u32::from_str_radix(
+    static ref COLOR: Option<serenity::Colour> = {
+        u32::from_str_radix(
             &CONFIG
                 .color
                 .clone()
@@ -59,10 +60,31 @@ lazy_static! {
                 // if config is like 0x000000
                 .replace("0x", ""),
             BASE_16,
-        )
-        .expect("Couldn t convert color in config");
-        serenity::Colour::new(color)
+        ).map(|color| Some(serenity::Colour::new(color))).unwrap_or(None)
     };
+
+    static ref APEX_CLIENT: Option<apex_rs::ApexClient<'static>> = {
+        let token = &CONFIG.apex_token;
+        match token {
+            Some(token) => Some(apex_rs::ApexClient::new(token)),
+            None => None
+        }
+    };
+}
+
+// kinda like a singleton, because I wanted to remove the unwrap
+pub fn apex_client<'a>() -> Result<&'a apex_rs::ApexClient<'static>, Error> {
+    match &*APEX_CLIENT {
+        Some(client) => Ok(client),
+        None => Err(Box::new(AYError::Unavailable("apex token not in config"))),
+    }
+}
+
+pub fn color() -> serenity::Colour {
+    match *COLOR {
+        Some(color) => color,
+        None => serenity::Colour::new(0x23272A),
+    }
 }
 
 // Types used by all command functions
@@ -147,6 +169,7 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
             register(),
             invite(),
             shutdown(),
+            maps(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(String::from(
@@ -169,7 +192,6 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
         .token(config.discord_token.to_string())
         .user_data_setup(move |_ctx, _ready, framework| {
             // we register signal handlers for sigterm, ctrl+c, ...
-            // TODO: better way to do this?
             register_signal_handler(framework.shard_manager().clone());
             // create user data
             Box::pin(async move { Ok(Data) })
