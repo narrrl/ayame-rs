@@ -1,16 +1,12 @@
 use std::sync::Arc;
 
-use crate::{apex_client, error::Error as AYError, menu, util, Context, Error};
+use crate::{apex_client, menu, util, Context, Error};
 use poise::serenity_prelude as serenity;
 
 /// Show this help menu
 #[poise::command(track_edits, slash_command, category = "Apex")]
 pub async fn maps(ctx: Context<'_>) -> Result<(), Error> {
-    let rotation = apex_client()?.get_map_rotations().await?;
-    let rotation = rotation.battle_royal().map_or(
-        Err(AYError::Unavailable("map rotations are unavailable")),
-        |rot| Ok(rot),
-    )?;
+    let rotation = apex_client()?.battle_royal_rotation().await?;
     let (current, next) = (rotation.current(), rotation.next());
     let mut menu = menu::Menu::new(&ctx, &rotation, |options| {
         options.add_row(|row| {

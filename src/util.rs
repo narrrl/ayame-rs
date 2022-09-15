@@ -26,7 +26,9 @@ pub fn embed_map(map: &Map) -> serenity::CreateEmbed {
                 + " seconds",
             true,
         )
-        .image(map.asset())
         .color(crate::color());
+    if let Some(url) = map.asset() {
+        embed.image(url);
+    }
     embed
 }
