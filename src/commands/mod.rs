@@ -10,7 +10,7 @@ pub use apex::*;
 pub use root::*;
 
 /// Show this help menu
-#[poise::command(track_edits, slash_command, category = "General")]
+#[poise::command(track_edits, slash_command)]
 pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"]
@@ -30,7 +30,7 @@ pub async fn help(
 }
 
 /// UwUify text
-#[poise::command(slash_command, track_edits, category = "General")]
+#[poise::command(slash_command, track_edits)]
 pub async fn uwu(
     ctx: Context<'_>,
     #[description = "The text to convert"]
@@ -63,7 +63,7 @@ pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(
     slash_command,
     context_menu_command = "get avatar",
-    category = "General",
+    category = "Guild",
     ephemeral,
     guild_only
 )]
