@@ -6,7 +6,6 @@ use poise::{serenity_prelude as serenity, CreateReply};
 pub struct Menu<'a, T> {
     pub ctx: &'a Context<'a>,
     options: MenuOptions<T>,
-    pub msg_id: Option<serenity::MessageId>,
     pub data: T,
     is_runnig: bool,
 }
@@ -23,7 +22,6 @@ impl<'a, T> Menu<'a, T> {
             ctx,
             data,
             options: co.build(),
-            msg_id: None,
             is_runnig: true,
         }
     }
@@ -33,8 +31,7 @@ impl<'a, T> Menu<'a, T> {
         f: impl for<'b, 'c> FnOnce(&'b mut CreateReply<'c>) -> &'b mut CreateReply<'c>,
     ) -> Result<(), Error> {
         // TODO: this fails for some reason
-        let msg_id = self.send_msg(f).await?;
-        self.msg_id = Some(msg_id);
+        let mes = &self.send_msg(f).await?;
         if let Some(pre_hook) = &self.options.pre_hook {
             Arc::clone(pre_hook)(self).await?;
         }
@@ -44,7 +41,7 @@ impl<'a, T> Menu<'a, T> {
             .timeout(std::time::Duration::from_secs(self.options.timeout))
             .await
         {
-            self.msg_id = Some(mci.message.id);
+            let m = &mci.message;
             if let Err(why) = self.match_and_run(&mci).await {
                 if let Some(post_hook) = &self.options.post_hook {
                     Arc::clone(post_hook)(self).await?;
@@ -56,9 +53,12 @@ impl<'a, T> Menu<'a, T> {
             let _ = mci.defer(&self.ctx.discord().http).await;
 
             if !self.is_runnig {
+                let _ = m.delete(&self.ctx.discord().http).await;
                 break;
             }
         }
+        let _ = mes.delete(&self.ctx.discord().http).await;
+
         if let Some(post_hook) = &self.options.post_hook {
             Arc::clone(post_hook)(self).await?;
         }
@@ -86,7 +86,7 @@ impl<'a, T> Menu<'a, T> {
     pub async fn send_msg(
         &self,
         f: impl for<'b, 'c> FnOnce(&'b mut CreateReply<'c>) -> &'b mut CreateReply<'c>,
-    ) -> Result<serenity::MessageId, Error> {
+    ) -> Result<serenity::Message, Error> {
         let handle = self
             .ctx
             .send(|m| {
@@ -98,8 +98,7 @@ impl<'a, T> Menu<'a, T> {
                 })
             })
             .await?;
-        let msg_id = handle.message().await?.id;
-        Ok(msg_id)
+        Ok(handle.message().await?.into_owned())
     }
 
     pub async fn update_response(
