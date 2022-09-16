@@ -354,3 +354,15 @@ impl<'a, T> From<&'a Vec<T>> for Cursor<'a, T> {
         }
     }
 }
+
+pub async fn generic_select<T, F>(
+    m: &mut Menu<'_, T>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
+    f: impl for<'b, 'c> FnOnce(
+        &'b mut serenity::CreateInteractionResponseData<'c>,
+        &T,
+    ) -> &'b mut serenity::CreateInteractionResponseData<'c>,
+) -> Result<(), Error> {
+    m.update_response(|mes| f(mes, &m.data), mci).await?;
+    Ok(())
+}
