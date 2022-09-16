@@ -1,68 +1,76 @@
 use std::sync::Arc;
 
-use crate::{apex_client, menu, util, Context, Error};
+use crate::{
+    apex_client,
+    error::Error as AYError,
+    menu::{self, Menu},
+    util, Context, Error,
+};
+use apex_rs::model::Map;
 use poise::serenity_prelude as serenity;
 
-/// Show this help menu
+/// get the current map rotation for battle royal in apex legends
 #[poise::command(track_edits, slash_command, category = "Apex")]
 pub async fn maps(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let rotation = apex_client()?.battle_royal_rotation().await?;
-    let (current, next) = (rotation.current(), rotation.next());
-    let mut menu = menu::Menu::new(&ctx, &rotation, |options| {
-        options.add_row(|row| {
-            row.add_button(menu::Control::new(
-                menu::MenuComponent::button("current", |button| {
-                    if current.is_none() {
-                        button.disabled(true);
-                    }
-                    button
-                        .style(serenity::ButtonStyle::Primary)
-                        .label("current")
-                }),
-                Arc::new(|menu, mci| {
-                    Box::pin(async {
-                        // we can unwrap because the button is disabled
-                        // when none
-                        let map = menu.data.current().unwrap();
-                        menu.update_response(|m| m.set_embed(util::embed_map(map, false)), mci)
-                            .await?;
-
-                        Ok(())
-                    })
-                }),
-            ))
-            .add_button(menu::Control::new(
-                menu::MenuComponent::button("next", |button| {
-                    if next.is_none() {
-                        button.disabled(true);
-                    }
-                    button.style(serenity::ButtonStyle::Primary).label("next")
-                }),
-                Arc::new(|menu, mci| {
-                    Box::pin(async {
-                        // we can unwrap because the button is disabled
-                        // when none
-                        let map = menu.data.next().unwrap();
-                        menu.update_response(|m| m.set_embed(util::embed_map(map, true)), mci)
-                            .await?;
-
-                        Ok(())
-                    })
-                }),
-            ))
-        })
+    let (current, next) = (
+        rotation.current().map_or(
+            Err(AYError::InvalidInput("maps are currently not available")),
+            |map| Ok(map),
+        )?,
+        rotation.next().map_or(
+            Err(AYError::InvalidInput("maps are currently not available")),
+            |map| Ok(map),
+        )?,
+    );
+    let button_current = menu::MenuComponent::button("current", |button| {
+        button
+            .style(serenity::ButtonStyle::Primary)
+            .label("current")
+    });
+    let action_current = menu::Control::new(
+        button_current,
+        Arc::new(|menu, mci| Box::pin(select_current(menu, mci))),
+    );
+    let next_button = menu::MenuComponent::button("next", |button| {
+        button.style(serenity::ButtonStyle::Primary).label("next")
+    });
+    let next_action = menu::Control::new(
+        next_button,
+        Arc::new(|menu, mci| Box::pin(select_next(menu, mci))),
+    );
+    let mut menu = menu::Menu::new(&ctx, (current, next), |options| {
+        options.add_row(|row| row.add_button(action_current).add_button(next_action))
     });
 
     menu.run(|m| {
-        m.embed(|e| match current {
-            Some(map) => {
-                e.clone_from(&util::embed_map(map, false));
-                e
-            }
-            None => e.title("Unavailable"),
+        m.embed(|e| {
+            e.clone_from(&util::embed_map(current, false));
+            e
         })
     })
     .await?;
+    Ok(())
+}
+
+async fn select_current(
+    m: &mut Menu<'_, (&Map, &Map)>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
+) -> Result<(), Error> {
+    let map = m.data.0;
+    m.update_response(|m| m.set_embed(util::embed_map(map, true)), mci)
+        .await?;
+
+    Ok(())
+}
+async fn select_next(
+    m: &mut Menu<'_, (&Map, &Map)>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
+) -> Result<(), Error> {
+    let map = m.data.1;
+    m.update_response(|m| m.set_embed(util::embed_map(map, true)), mci)
+        .await?;
+
     Ok(())
 }
