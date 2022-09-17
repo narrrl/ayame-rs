@@ -3,11 +3,14 @@ use poise::serenity_prelude as serenity;
 
 pub mod admin;
 pub mod apex;
+pub mod freiburg;
 pub mod root;
 
 pub use admin::*;
 pub use apex::*;
+pub use freiburg::*;
 pub use root::*;
+pub use uwuifier::*;
 
 /// Show this help menu
 #[poise::command(track_edits, slash_command)]
