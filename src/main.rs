@@ -170,6 +170,7 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
             invite(),
             shutdown(),
             maps(),
+            mensa(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(String::from(

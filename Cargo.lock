@@ -114,7 +114,10 @@ dependencies = [
  "poise",
  "regex",
  "serde",
+ "serde_json",
  "signal-hook",
+ "strum",
+ "strum_macros",
  "thiserror",
  "time 0.3.14",
  "tokio",
@@ -726,7 +729,7 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 [[package]]
 name = "mensa-swfr-rs"
 version = "0.1.0"
-source = "git+https://github.com/Nirusu99/mensa-swfr-rs?branch=main#e9d977d338f2fac88898ff355a9a2007f682f7f7"
+source = "git+https://github.com/Nirusu99/mensa-swfr-rs?branch=main#9272c5205bc8acf5ddec35b2519e19499a546ed3"
 dependencies = [
  "chrono",
  "humantime",
@@ -996,7 +999,7 @@ checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 [[package]]
 name = "poise"
 version = "0.3.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#ced8cf8e9c4b83c29e2841f3d8a1c8617e32d20b"
+source = "git+https://github.com/kangalioo/poise?branch=develop#5ba00794e65766a9c4d72a1560043940210b9f89"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1014,7 +1017,7 @@ dependencies = [
 [[package]]
 name = "poise_macros"
 version = "0.3.0"
-source = "git+https://github.com/kangalioo/poise?branch=develop#ced8cf8e9c4b83c29e2841f3d8a1c8617e32d20b"
+source = "git+https://github.com/kangalioo/poise?branch=develop#5ba00794e65766a9c4d72a1560043940210b9f89"
 dependencies = [
  "darling",
  "proc-macro2",

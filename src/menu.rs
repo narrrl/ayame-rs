@@ -30,7 +30,6 @@ impl<'a, T> Menu<'a, T> {
         &mut self,
         f: impl for<'b, 'c> FnOnce(&'b mut CreateReply<'c>) -> &'b mut CreateReply<'c>,
     ) -> Result<(), Error> {
-        // TODO: this fails for some reason
         let mes = &self.send_msg(f).await?;
         if let Some(pre_hook) = &self.options.pre_hook {
             Arc::clone(pre_hook)(self).await?;
@@ -296,17 +295,25 @@ fn create_action_row<'a, T>(
     buttons: &Vec<Control<T>>,
 ) -> &'a mut serenity::CreateActionRow {
     for ctrl in buttons {
-        match &ctrl.button {
-            MenuComponent::ButtonComponent { create, id } => a.create_button(|b| {
-                b.clone_from(&create);
-                b.custom_id(id)
-            }),
-            MenuComponent::SelectComponent { create, id } => a.create_select_menu(|sm| {
-                sm.clone_from(&create);
-                sm.custom_id(id)
-            }),
-        };
+        set_button(a, &ctrl.button);
     }
+    a
+}
+
+pub fn set_button<'a>(
+    a: &'a mut serenity::CreateActionRow,
+    button: &MenuComponent,
+) -> &'a mut serenity::CreateActionRow {
+    match button {
+        MenuComponent::ButtonComponent { create, id } => a.create_button(|b| {
+            b.clone_from(&create);
+            b.custom_id(id)
+        }),
+        MenuComponent::SelectComponent { create, id } => a.create_select_menu(|sm| {
+            sm.clone_from(&create);
+            sm.custom_id(id)
+        }),
+    };
     a
 }
 
