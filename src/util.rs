@@ -1,6 +1,6 @@
 use apex_rs::model::Map;
-use chrono::{DateTime, Datelike, Utc, Weekday};
-use mensa_swfr_rs::{mensa, MensaPlace};
+use chrono::{DateTime, Datelike, Utc};
+use mensa_swfr_rs::mensa;
 use poise::serenity_prelude::{self as serenity, CreateEmbed};
 use regex::Regex;
 
@@ -46,45 +46,14 @@ pub fn to_short_timestamp(date: DateTime<Utc>) -> String {
     format!("<t:{}:t>", unix_time)
 }
 
-pub fn weekday_to_full_name<'a>(weekday: &Weekday) -> &'a str {
-    match weekday {
-        Weekday::Mon => "Monday",
-        Weekday::Tue => "Tuesday",
-        Weekday::Wed => "Wednesday",
-        Weekday::Thu => "Thursday",
-        Weekday::Fri => "Friday",
-        Weekday::Sat => "Saturday",
-        Weekday::Sun => "Sunday",
-    }
-}
-
-pub fn weekday_german(wd: &Weekday) -> String {
-    match wd {
-        Weekday::Mon => String::from("Montag"),
-        Weekday::Tue => String::from("Dienstag"),
-        Weekday::Wed => String::from("Mittwoch"),
-        Weekday::Thu => String::from("Donnerstag"),
-        Weekday::Fri => String::from("Freitag"),
-        Weekday::Sat => String::from("Samstag"),
-        Weekday::Sun => String::from("Sonntag"),
-    }
-}
-
-pub fn mensa_place_to_full_name<'a>(place: &MensaPlace) -> &'a str {
-    match place {
-        MensaPlace::Rempartstraße => "Rempartstraße",
-        MensaPlace::Institutsviertel => "Institutsviertel",
-        MensaPlace::Littenweiler => "Littenweiler",
-        MensaPlace::Flugplatz => "Flugplatz",
-    }
-}
-
 pub fn create_mensa_plan_by_day(day: &mensa::Day) -> CreateEmbed {
     let mut embed = CreateEmbed::default();
     embed
         .title(format!(
             "{} ({})",
-            weekday_german(&day.weekday().unwrap_or(chrono::Utc::now().weekday())),
+            &day.weekday()
+                .unwrap_or(chrono::Utc::now().weekday().into())
+                .full_name(),
             day.to_chrono().unwrap().format("%d.%m.%Y")
         ))
         .color(crate::color());

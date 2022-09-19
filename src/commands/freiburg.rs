@@ -1,13 +1,13 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     error::Error as AYError,
     menu::{self, set_button, Menu},
-    util::{create_mensa_plan_by_day, mensa_place_to_full_name, weekday_to_full_name},
+    util::create_mensa_plan_by_day,
     Context, Error,
 };
-use chrono::{Datelike, Weekday};
-use mensa_fr::{id, mensa::Plan, MensaPlace, UrlBuilder};
+use chrono::Datelike;
+use mensa_fr::{mensa::Plan, mensa::Weekday, MensaPlace, UrlBuilder};
 use mensa_swfr_rs as mensa_fr;
 use poise::serenity_prelude as serenity;
 use strum::IntoEnumIterator;
@@ -31,7 +31,7 @@ pub async fn mensa(ctx: Context<'_>) -> Result<(), Error> {
 
     let weekday_control = menu::Control::new(
         menu::MenuComponent::select("weekday", |button| {
-            button.options(|opts| opts.set_options(create_day_options(Some(weekday_today))))
+            button.options(|opts| opts.set_options(create_day_options(Some(weekday_today.into()))))
         }),
         Arc::new(|menu, mci| Box::pin(select_weekday(menu, mci))),
     );
@@ -45,7 +45,7 @@ pub async fn mensa(ctx: Context<'_>) -> Result<(), Error> {
 
     let mut menu = Menu::new(
         &ctx,
-        (Some(chrono::Utc::now().weekday()), None, mensa_cache),
+        (Some(chrono::Utc::now().weekday().into()), None, mensa_cache),
         |options| {
             options
                 .add_row(|row| row.add_button(weekday_control))
@@ -83,16 +83,6 @@ impl<'a> MensaCache {
     }
 }
 
-pub fn from_id(id: &str) -> MensaPlace {
-    match id {
-        "610" => MensaPlace::Rempartstraße,
-        "620" => MensaPlace::Institutsviertel,
-        "630" => MensaPlace::Littenweiler,
-        "681" => MensaPlace::Flugplatz,
-        _ => DEFAULT_PLACE,
-    }
-}
-
 async fn select_weekday(
     menu: &mut Menu<'_, (Option<Weekday>, Option<MensaPlace>, MensaCache)>,
     mci: &Arc<serenity::MessageComponentInteraction>,
@@ -100,8 +90,8 @@ async fn select_weekday(
     let dds = &mci.data.values;
     let weekday = dds
         .get(0)
-        .map(|day| Weekday::from_str(day))
-        .unwrap_or(Ok(chrono::Utc::now().weekday()))?;
+        .map(|day| Weekday::try_from(day.as_str()))
+        .unwrap_or(Ok(chrono::Utc::now().weekday().into()))?;
     menu.data.0 = Some(weekday);
 
     let (day, place, mensa_cache) = &mut menu.data;
@@ -191,8 +181,8 @@ async fn select_mensa(
     let dds = &mci.data.values;
     let place = dds
         .get(0)
-        .map(|place| from_id(place))
-        .unwrap_or(DEFAULT_PLACE);
+        .map(|place| MensaPlace::try_from(place.as_str()))
+        .unwrap_or(Ok(DEFAULT_PLACE))?;
     menu.data.1 = Some(place);
 
     let (day, place, mensa_cache) = &mut menu.data;
@@ -249,8 +239,7 @@ fn create_mensa_options(selected: Option<MensaPlace>) -> Vec<serenity::CreateSel
     let mut mensa_options: Vec<serenity::CreateSelectMenuOption> = Vec::new();
 
     for place in MensaPlace::iter().filter(|place| *place != MensaPlace::Flugplatz) {
-        let mut option =
-            serenity::CreateSelectMenuOption::new(mensa_place_to_full_name(&place), id(&place));
+        let mut option = serenity::CreateSelectMenuOption::new(place, &place.id());
         if Some(place) == selected {
             option.default_selection(true);
         }
@@ -271,7 +260,7 @@ fn create_day_options(selected: Option<Weekday>) -> Vec<serenity::CreateSelectMe
         Weekday::Sat,
         Weekday::Sun,
     ] {
-        let mut option = serenity::CreateSelectMenuOption::new(weekday_to_full_name(&day), day);
+        let mut option = serenity::CreateSelectMenuOption::new(day.full_name(), day);
         if Some(day) == selected {
             option.default_selection(true);
         }

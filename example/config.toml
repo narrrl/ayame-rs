@@ -1,8 +1,12 @@
 # you have to create a discord application for that
 discord_token = "super_duper_secret_token_that_you_should_never_share"
-# trigger for the bot
+# trigger for the bot (optional)
 prefix = "~"
-# youtube data api v3 key
+# youtube data api v3 key (optional)
 youtube_token = "super_duper_secret_token_that_you_should_never_share"
-# color for the bot (hex)[https://g.co/kgs/RvXxDR]
+# color for the bot (hex)[https://g.co/kgs/RvXxDR] (optional)
 color = "ffffff"
+# mensa swfr token (optional)
+swfr_token = ""
+# apex status api token (optional)
+apex_token = ""
