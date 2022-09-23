@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use crate::{
     error::Error as AYError,
@@ -235,36 +235,42 @@ async fn select_mensa(
     Ok(())
 }
 
-fn create_mensa_options(selected: Option<MensaPlace>) -> Vec<serenity::CreateSelectMenuOption> {
-    let mut mensa_options: Vec<serenity::CreateSelectMenuOption> = Vec::new();
+fn create_options<T: Sized + PartialEq, F: Copy, V: Copy>(
+    selected: Option<T>,
+    iter: Box<dyn Iterator<Item = T>>,
+    display: F,
+    value: V,
+) -> Vec<serenity::CreateSelectMenuOption>
+where
+    F: FnOnce(&T) -> Box<dyn Display>,
+    V: FnOnce(&T) -> Box<dyn Display>,
+{
+    let mut options: Vec<serenity::CreateSelectMenuOption> = Vec::new();
 
-    for place in MensaPlace::iter().filter(|place| *place != MensaPlace::Flugplatz) {
-        let mut option = serenity::CreateSelectMenuOption::new(place, &place.id());
-        if Some(place) == selected {
+    for obj in iter {
+        let mut option = serenity::CreateSelectMenuOption::new(display(&obj), value(&obj));
+        if Some(obj) == selected {
             option.default_selection(true);
         }
-        mensa_options.push(option);
+        options.push(option);
     }
-    mensa_options
+    options
+}
+
+fn create_mensa_options(selected: Option<MensaPlace>) -> Vec<serenity::CreateSelectMenuOption> {
+    create_options(
+        selected,
+        Box::new(MensaPlace::iter().filter(|place| *place != MensaPlace::Flugplatz)),
+        |place| Box::new(*place),
+        |place| Box::new(place.id()),
+    )
 }
 
 fn create_day_options(selected: Option<Weekday>) -> Vec<serenity::CreateSelectMenuOption> {
-    let mut weekday_options: Vec<serenity::CreateSelectMenuOption> = Vec::new();
-
-    for day in [
-        Weekday::Mon,
-        Weekday::Tue,
-        Weekday::Wed,
-        Weekday::Thu,
-        Weekday::Fri,
-        Weekday::Sat,
-        Weekday::Sun,
-    ] {
-        let mut option = serenity::CreateSelectMenuOption::new(day.full_name(), day);
-        if Some(day) == selected {
-            option.default_selection(true);
-        }
-        weekday_options.push(option);
-    }
-    weekday_options
+    create_options(
+        selected,
+        Box::new(Weekday::iter()),
+        |day| Box::new(day.full_name()),
+        |day| Box::new(*day),
+    )
 }
