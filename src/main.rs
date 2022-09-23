@@ -139,7 +139,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> Result<(), Error> {
     // init tracing
     tracing_subscriber::fmt()
         .pretty()
