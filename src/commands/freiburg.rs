@@ -50,6 +50,7 @@ pub async fn mensa(ctx: Context<'_>) -> Result<(), Error> {
             options
                 .add_row(|row| row.add_button(weekday_control))
                 .add_row(|row| row.add_button(mensa_control))
+                .set_timeout(3600)
         },
     );
 
