@@ -35,7 +35,6 @@ impl<'a, T> Menu<'a, T> {
             Arc::clone(pre_hook)(self).await?;
         }
         while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.discord())
-            .author_id(self.ctx.author().id)
             .channel_id(self.ctx.channel_id())
             .timeout(std::time::Duration::from_secs(self.options.timeout))
             .await
