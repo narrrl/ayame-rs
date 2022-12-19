@@ -802,6 +802,7 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 [[package]]
 name = "mensa-swfr-rs"
 version = "0.1.0"
+source = "git+https://github.com/Nirusu99/mensa-swfr-rs?branch=main#e2ba64ce54be5a2f2888f602bf85c90dd0af5482"
 dependencies = [
  "chrono",
  "humantime",
