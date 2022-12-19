@@ -183,7 +183,7 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
         },
         /// The global error handler for all error cases that may occur
         on_error: |error| Box::pin(on_error(error)),
-        listener: |ctx, event, framework, user_data| {
+        event_handler: |ctx, event, framework, user_data| {
             Box::pin(event_listener(ctx, event, framework, user_data))
         },
         ..Default::default()
@@ -191,7 +191,7 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
 
     Ok(poise::Framework::builder()
         .token(config.discord_token.to_string())
-        .user_data_setup(move |_ctx, _ready, framework| {
+        .setup(move |_ctx, _ready, framework| {
             // we register signal handlers for sigterm, ctrl+c, ...
             register_signal_handler(framework.shard_manager().clone());
             // create user data

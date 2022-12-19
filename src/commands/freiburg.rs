@@ -107,7 +107,7 @@ async fn select_weekday(
                 embed.description("no mensa today").color(crate::color());
                 embed
             });
-        mes.edit(&menu.ctx.discord(), |edit| {
+        mes.edit(&menu.ctx.serenity_context(), |edit| {
             edit.set_embed(embed)
                 .set_components({
                     let mut comp = serenity::CreateComponents::default();
@@ -142,7 +142,7 @@ async fn select_weekday(
         })
         .await?;
     } else if let Some(day) = day {
-        mes.edit(&menu.ctx.discord(), |edit| {
+        mes.edit(&menu.ctx.serenity_context(), |edit| {
             edit.set_components({
                 let mut comp = serenity::CreateComponents::default();
                 comp.add_action_row({
@@ -198,7 +198,7 @@ async fn select_mensa(
                 embed
             });
         let mut mes = mci.message.clone();
-        mes.edit(&menu.ctx.discord(), |edit| {
+        mes.edit(&menu.ctx.serenity_context(), |edit| {
             edit.set_embed(embed)
                 .set_components({
                     let mut comp = serenity::CreateComponents::default();

@@ -34,7 +34,7 @@ impl<'a, T> Menu<'a, T> {
         if let Some(pre_hook) = &self.options.pre_hook {
             Arc::clone(pre_hook)(self).await?;
         }
-        while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.discord())
+        while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.serenity_context())
             .channel_id(self.ctx.channel_id())
             .timeout(std::time::Duration::from_secs(self.options.timeout))
             .await
@@ -48,14 +48,14 @@ impl<'a, T> Menu<'a, T> {
             }
             // respond and ignore error if already responded
             //
-            let _ = mci.defer(&self.ctx.discord().http).await;
+            let _ = mci.defer(&self.ctx.serenity_context().http).await;
 
             if !self.is_runnig {
-                let _ = m.delete(&self.ctx.discord().http).await;
+                let _ = m.delete(&self.ctx.serenity_context().http).await;
                 break;
             }
         }
-        let _ = mes.delete(&self.ctx.discord().http).await;
+        let _ = mes.delete(&self.ctx.serenity_context().http).await;
 
         if let Some(post_hook) = &self.options.post_hook {
             Arc::clone(post_hook)(self).await?;
@@ -106,7 +106,7 @@ impl<'a, T> Menu<'a, T> {
         ) -> &'b mut serenity::CreateInteractionResponseData<'c>,
         mci: &Arc<serenity::MessageComponentInteraction>,
     ) -> Result<(), Error> {
-        mci.create_interaction_response(&self.ctx.discord(), |ir| {
+        mci.create_interaction_response(&self.ctx.serenity_context(), |ir| {
             ir.kind(serenity::InteractionResponseType::UpdateMessage)
                 .interaction_response_data(|m| f(m))
         })
