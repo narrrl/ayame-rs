@@ -88,11 +88,6 @@ impl<'a> MensaCache {
     }
 
     pub async fn mensa_plan(&'a mut self, place: &MensaPlace) -> Result<&'a Plan, Error> {
-        if *place == MensaPlace::Flugplatz {
-            return Err(Box::new(AYError::InvalidInput(
-                "the flugplatz mensa is currently under construction",
-            )));
-        }
         let mut url_builder = UrlBuilder::new(&self.mensa_token);
         let future = mensa_fr::request(url_builder.set_place(&place));
         Ok(self.cache_map.entry(*place).or_insert(future.await?))
@@ -276,7 +271,7 @@ where
 fn create_mensa_options(selected: Option<MensaPlace>) -> Vec<serenity::CreateSelectMenuOption> {
     create_options(
         selected,
-        Box::new(MensaPlace::iter().filter(|place| *place != MensaPlace::Flugplatz)),
+        Box::new(MensaPlace::iter()),
         |place| Box::new(*place),
         |place| Box::new(place.id()),
     )
