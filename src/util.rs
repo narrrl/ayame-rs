@@ -46,6 +46,7 @@ pub fn to_short_timestamp(date: DateTime<Utc>) -> String {
     format!("<t:{}:t>", unix_time)
 }
 
+const SWFR_LOGO: &'static str = "https://cloud.nirusu.codes/s/McBDNYTkNjoEFyc/preview";
 pub fn create_mensa_plan_by_day(day: &mensa::Day) -> CreateEmbed {
     let mut embed = CreateEmbed::default();
     embed
@@ -56,7 +57,8 @@ pub fn create_mensa_plan_by_day(day: &mensa::Day) -> CreateEmbed {
                 .full_name(),
             day.to_chrono().unwrap().format("%d.%m.%Y")
         ))
-        .color(crate::color());
+        .color(crate::color())
+        .thumbnail(SWFR_LOGO);
     for menu in day.menues.iter() {
         let price = &menu.price;
         embed.field(

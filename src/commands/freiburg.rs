@@ -26,8 +26,17 @@ pub async fn mensa(ctx: Context<'_>) -> Result<(), Error> {
         Err(AYError::InvalidInput("no mensa swfr token in config")),
         |token| Ok(token),
     )?;
-    let mensa_cache = MensaCache::new(&token);
+    let mut mensa_cache = MensaCache::new(&token);
     let weekday_today = chrono::Utc::now().weekday();
+    let mensa_today = mensa_cache.mensa_plan(&DEFAULT_PLACE).await?;
+    let embed = mensa_today
+        .day(weekday_today.into())
+        .map(|day| create_mensa_plan_by_day(day))
+        .unwrap_or({
+            let mut embed = serenity::CreateEmbed::default();
+            embed.description("no mensa today").color(crate::color());
+            embed
+        });
 
     let weekday_control = menu::Control::new(
         menu::MenuComponent::select("weekday", |button| {
@@ -38,7 +47,7 @@ pub async fn mensa(ctx: Context<'_>) -> Result<(), Error> {
 
     let mensa_control = menu::Control::new(
         menu::MenuComponent::select("mensa", |button| {
-            button.options(|opts| opts.set_options(create_mensa_options(None)))
+            button.options(|opts| opts.set_options(create_mensa_options(Some(DEFAULT_PLACE))))
         }),
         Arc::new(|menu, mci| Box::pin(select_mensa(menu, mci))),
     );
@@ -54,7 +63,13 @@ pub async fn mensa(ctx: Context<'_>) -> Result<(), Error> {
         },
     );
 
-    menu.run(|m| m.content("Select a Mensa and a day!")).await?;
+    menu.run(|m| {
+        m.embed(|e| {
+            e.clone_from(&embed);
+            e
+        })
+    })
+    .await?;
     Ok(())
 }
 
