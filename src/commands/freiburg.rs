@@ -151,36 +151,6 @@ async fn select_weekday(
                 .content("")
         })
         .await?;
-    } else if let Some(day) = day {
-        mes.edit(&menu.ctx.serenity_context(), |edit| {
-            edit.set_components({
-                let mut comp = serenity::CreateComponents::default();
-                comp.add_action_row({
-                    let mut row = serenity::CreateActionRow::default();
-                    set_button(
-                        &mut row,
-                        &menu::MenuComponent::select("weekday", |button| {
-                            button.options(|opts| opts.set_options(create_day_options(Some(*day))))
-                        }),
-                    );
-                    row
-                })
-                .add_action_row({
-                    let mut row = serenity::CreateActionRow::default();
-                    set_button(
-                        &mut row,
-                        &menu::MenuComponent::select("mensa", |button| {
-                            button.options(|opts| opts.set_options(create_mensa_options(*place)))
-                        }),
-                    );
-                    row
-                });
-
-                comp
-            })
-            .content("Select a Mensa!")
-        })
-        .await?;
     }
     Ok(())
 }
