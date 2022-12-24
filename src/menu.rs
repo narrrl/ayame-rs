@@ -34,10 +34,11 @@ impl<'a, T> Menu<'a, T> {
         if let Some(pre_hook) = &self.options.pre_hook {
             Arc::clone(pre_hook)(self).await?;
         }
-        while let Some(mci) = serenity::CollectComponentInteraction::new(self.ctx.serenity_context())
-            .channel_id(self.ctx.channel_id())
-            .timeout(std::time::Duration::from_secs(self.options.timeout))
-            .await
+        while let Some(mci) =
+            serenity::CollectComponentInteraction::new(self.ctx.serenity_context())
+                .channel_id(self.ctx.channel_id())
+                .timeout(std::time::Duration::from_secs(self.options.timeout))
+                .await
         {
             let m = &mci.message;
             if let Err(why) = self.match_and_run(&mci).await {

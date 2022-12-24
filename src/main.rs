@@ -174,7 +174,7 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(String::from(
-                &config.prefix.clone().unwrap_or(String::from("~")),
+                &config.prefix.clone().unwrap_or(String::from(">")),
             )),
             edit_tracker: Some(poise::EditTracker::for_timespan(
                 std::time::Duration::from_secs(3600),

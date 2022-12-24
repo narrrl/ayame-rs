@@ -56,7 +56,8 @@ pub async fn uwuify(ctx: Context<'_>, msg: serenity::Message) -> Result<(), Erro
 pub async fn invite(ctx: Context<'_>) -> Result<(), Error> {
     ctx.guild()
         .ok_or_else(|| error::Error::InvalidInput("not in a guild"))?;
-    let inv = serenity::Invite::create(&ctx.serenity_context().http, ctx.channel_id(), |f| f).await?;
+    let inv =
+        serenity::Invite::create(&ctx.serenity_context().http, ctx.channel_id(), |f| f).await?;
     ctx.send(|m| m.content(inv.url())).await?;
 
     Ok(())
