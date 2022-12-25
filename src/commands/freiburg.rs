@@ -104,54 +104,7 @@ async fn select_weekday(
         .map(|day| Weekday::try_from(day.as_str()))
         .unwrap_or(Ok(chrono::Utc::now().weekday().into()))?;
     menu.data.0 = Some(weekday);
-
-    let (day, place, mensa_cache) = &mut menu.data;
-    let mut mes = mci.message.clone();
-    if let (Some(day), Some(place)) = (&day, &place) {
-        let mensa = mensa_cache.mensa_plan(place).await?;
-        let embed = mensa
-            .day(*day)
-            .map(|day| create_mensa_plan_by_day(day))
-            .unwrap_or({
-                let mut embed = serenity::CreateEmbed::default();
-                embed.description("no mensa today").color(crate::color());
-                embed
-            });
-        mes.edit(&menu.ctx.serenity_context(), |edit| {
-            edit.set_embed(embed)
-                .set_components({
-                    let mut comp = serenity::CreateComponents::default();
-                    comp.add_action_row({
-                        let mut row = serenity::CreateActionRow::default();
-                        set_button(
-                            &mut row,
-                            &menu::MenuComponent::select("weekday", |button| {
-                                button.options(|opts| {
-                                    opts.set_options(create_day_options(Some(*day)))
-                                })
-                            }),
-                        );
-                        row
-                    })
-                    .add_action_row({
-                        let mut row = serenity::CreateActionRow::default();
-                        set_button(
-                            &mut row,
-                            &menu::MenuComponent::select("mensa", |button| {
-                                button.options(|opts| {
-                                    opts.set_options(create_mensa_options(Some(*place)))
-                                })
-                            }),
-                        );
-                        row
-                    });
-
-                    comp
-                })
-                .content("")
-        })
-        .await?;
-    }
+    update_message(menu, mci).await?;
     Ok(())
 }
 
@@ -165,8 +118,16 @@ async fn select_mensa(
         .map(|place| MensaPlace::try_from(place.as_str()))
         .unwrap_or(Ok(DEFAULT_PLACE))?;
     menu.data.1 = Some(place);
+    update_message(menu, mci).await?;
+    Ok(())
+}
 
+async fn update_message(
+    menu: &mut Menu<'_, (Option<Weekday>, Option<MensaPlace>, MensaCache)>,
+    mci: &Arc<serenity::MessageComponentInteraction>,
+) -> Result<(), Error> {
     let (day, place, mensa_cache) = &mut menu.data;
+    let mut mes = mci.message.clone();
     if let (Some(day), Some(place)) = (&day, &place) {
         let mensa = mensa_cache.mensa_plan(place).await?;
         let embed = mensa
@@ -177,7 +138,6 @@ async fn select_mensa(
                 embed.description("no mensa today").color(crate::color());
                 embed
             });
-        let mut mes = mci.message.clone();
         mes.edit(&menu.ctx.serenity_context(), |edit| {
             edit.set_embed(embed)
                 .set_components({
