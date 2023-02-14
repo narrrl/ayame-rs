@@ -54,7 +54,7 @@ pub async fn mensa(ctx: Context<'_>) -> Result<(), Error> {
 
     let mut menu = Menu::new(
         &ctx,
-        (Some(chrono::Utc::now().weekday().into()), None, mensa_cache),
+        (Some(chrono::Utc::now().weekday().into()), Some(DEFAULT_PLACE), mensa_cache),
         |options| {
             options
                 .add_row(|row| row.add_button(weekday_control))
