@@ -1,10 +1,11 @@
+use crate::Result;
 use apex_rs::model::Map;
 use chrono::{DateTime, Datelike, Utc};
 use mensa_swfr_rs::mensa;
 use poise::serenity_prelude::{self as serenity, CreateEmbed};
 use regex::Regex;
 
-pub fn type_of<T>(_: T) -> &'static str {
+pub fn type_of<T>() -> &'static str {
     std::any::type_name::<T>()
 }
 
@@ -78,4 +79,77 @@ pub fn create_mensa_plan_by_day(day: &mensa::Day) -> CreateEmbed {
         );
     }
     embed
+}
+
+pub struct Exclusion((u64, u64));
+
+impl Exclusion {
+    pub fn users(&self) -> &(u64, u64) {
+        &self.0
+    }
+}
+
+impl From<(i64, i64)> for Exclusion {
+    fn from(tuple: (i64, i64)) -> Exclusion {
+        Exclusion {
+            0: (tuple.0 as u64, tuple.1 as u64),
+        }
+    }
+}
+impl From<(u64, u64)> for Exclusion {
+    fn from(tuple: (u64, u64)) -> Exclusion {
+        Exclusion {
+            0: (tuple.0, tuple.1),
+        }
+    }
+}
+
+pub async fn get_user_exclusions(
+    database: &sqlx::SqlitePool,
+    guild_id: i64,
+) -> Result<Vec<Exclusion>> {
+    Ok(
+        sqlx::query!("SELECT * FROM exclusions WHERE guild_id = ?", guild_id)
+            .fetch_all(database)
+            .await?
+            .iter()
+            .map(|record| (record.user_1, record.user_2).into())
+            .collect(),
+    )
+}
+
+pub async fn add_user_exclusion(
+    database: &sqlx::SqlitePool,
+    guild_id: i64,
+    exclusion: &Exclusion,
+) -> Result<()> {
+    let user_1 = exclusion.0 .0 as i64;
+    let user_2 = exclusion.0 .1 as i64;
+    sqlx::query!(
+        "INSERT INTO exclusions (guild_id, user_1, user_2) VALUES (?, ?, ?)",
+        guild_id,
+        user_1,
+        user_2,
+    )
+    .execute(database)
+    .await?;
+    Ok(())
+}
+
+pub async fn remove_user_exclusion(
+    database: &sqlx::SqlitePool,
+    guild_id: i64,
+    exclusion: &Exclusion,
+) -> Result<()> {
+    let user_1 = exclusion.0 .0 as i64;
+    let user_2 = exclusion.0 .1 as i64;
+    sqlx::query!(
+        "DELETE FROM exclusions WHERE guild_id = ? AND user_1 = ? AND user_2 = ?",
+        guild_id,
+        user_1,
+        user_2
+    )
+    .execute(database)
+    .await?;
+    Ok(())
 }

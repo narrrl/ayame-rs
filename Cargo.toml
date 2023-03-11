@@ -15,6 +15,7 @@ chrono = "^0"
 uwuify = "^0"
 poise = { git = "https://github.com/kangalioo/poise", branch = "develop", features = ["collector"] }
 mensa-swfr-rs = {git = "https://github.com/Nirusu99/mensa-swfr-rs", branch = "main"}
+# mensa-swfr-rs = { path = "../mensa-swfr-rs" }
 apex-rs = {git = "https://github.com/nirusu99/apex-rs", branch = "main"}
 thiserror = "^1"
 figment = { version = "^0", features = ["toml", "json", "env"] }
@@ -26,6 +27,7 @@ time = {version = "^0", features = ["macros"]}
 strum = "^0"
 strum_macros = "^0"
 serde_json = "^1"
+sqlx = { version = "^0", features = ["runtime-tokio-rustls", "sqlite", "offline"] }
 
 # [dependencies.serenity]
 # default-features = false

@@ -5,6 +5,8 @@ use figment::{
 use lazy_static::lazy_static;
 use poise::serenity_prelude as serenity;
 use serde::Deserialize;
+use sqlx::SqlitePool;
+use std::result::Result as StdResult;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -14,12 +16,14 @@ use tracing_subscriber::fmt::time::UtcTime;
 pub mod commands;
 pub mod error;
 pub mod menu;
+pub mod penis;
 pub mod util;
 
 // `commands::mod.rs` re-exports all commands for easy importing
 use commands::*;
 use error::{Error as AYError, Sendable};
 
+pub const DEFAULT_DATABASE_URL: &str = "sqlite:database/database.sqlite";
 const TOML_CONFIG: &'static str = "config.toml";
 const JSON_CONFIG: &'static str = "config.json";
 const ENV_PREFIX: &'static str = "AYAME_";
@@ -73,7 +77,7 @@ lazy_static! {
 }
 
 // kinda like a singleton, because I wanted to remove the unwrap
-pub fn apex_client<'a>() -> Result<&'a apex_rs::ApexClient<'static>, Error> {
+pub fn apex_client<'a>() -> Result<&'a apex_rs::ApexClient<'static>> {
     match &*APEX_CLIENT {
         Some(client) => Ok(client),
         None => Err(Box::new(AYError::Unavailable("apex token not in config"))),
@@ -90,11 +94,14 @@ pub fn color() -> serenity::Colour {
 // Types used by all command functions
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
+type Result<T> = StdResult<T, Error>;
 
 // Custom user data passed to all command functions
 // might be expanded in the future
 #[non_exhaustive]
-pub struct Data;
+pub struct Data {
+    pub database: sqlx::SqlitePool,
+}
 
 /// custom event listener
 async fn event_listener(
@@ -102,7 +109,7 @@ async fn event_listener(
     event: &poise::Event<'_>,
     _framework: poise::FrameworkContext<'_, Data, Error>,
     _data: &Data,
-) -> Result<(), Error> {
+) -> Result<()> {
     match event {
         poise::Event::Ready { data_about_bot } => {
             tracing::info!("{} is connected!", data_about_bot.user.name);
@@ -139,7 +146,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     // init tracing
     tracing_subscriber::fmt()
         .pretty()
@@ -149,15 +156,25 @@ async fn main() -> Result<(), Error> {
         // .with_max_level(tracing::Level::INFO)
         .with_thread_names(true)
         .init();
+    let database_url = std::env::var("DATABASE_URL").unwrap_or(DEFAULT_DATABASE_URL.to_string());
+    let database = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect_with(
+            database_url
+                .parse::<sqlx::sqlite::SqliteConnectOptions>()?
+                .create_if_missing(true),
+        )
+        .await?;
+    sqlx::migrate!("./migrations").run(&database).await?;
     // run the discord client with the configuration
     // we don't actually need to pass the config because its global
     // but that way we can ensure that this is the first time the config is used
     // because lazy static is kinda like a singleton (setups config which can fail and stores it in
     // heap for easy access)
-    run_discord(&CONFIG).await
+    run_discord(&CONFIG, database).await
 }
 
-async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn run_discord(config: &Config, database: SqlitePool) -> Result<()> {
     let options = poise::FrameworkOptions {
         commands: vec![
             help(),
@@ -195,7 +212,7 @@ async fn run_discord(config: &Config) -> Result<(), Box<dyn std::error::Error + 
             // we register signal handlers for sigterm, ctrl+c, ...
             register_signal_handler(framework.shard_manager().clone());
             // create user data
-            Box::pin(async move { Ok(Data) })
+            Box::pin(async move { Ok(Data { database }) })
         })
         .options(options)
         .intents(
