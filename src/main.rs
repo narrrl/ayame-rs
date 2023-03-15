@@ -105,15 +105,19 @@ pub struct Data {
 
 /// custom event listener
 async fn event_listener(
-    _ctx: &serenity::Context,
+    ctx: &serenity::Context,
     event: &poise::Event<'_>,
     _framework: poise::FrameworkContext<'_, Data, Error>,
-    _data: &Data,
+    data: &Data,
 ) -> Result<()> {
     match event {
         poise::Event::Ready { data_about_bot } => {
             tracing::info!("{} is connected!", data_about_bot.user.name);
             tracing::info!("Total Guilds: {}", data_about_bot.guilds.len())
+        }
+        poise::Event::VoiceStateUpdate { old, new } => {}
+        poise::Event::ChannelUpdate { old: _, new } => {
+            util::check_for_exclusion_collision(ctx, new.clone(), data).await?
         }
         _ => {}
     }
@@ -177,6 +181,7 @@ async fn main() -> Result<()> {
 async fn run_discord(config: &Config, database: SqlitePool) -> Result<()> {
     let options = poise::FrameworkOptions {
         commands: vec![
+            exclusions(),
             help(),
             ping(),
             pingerror(),

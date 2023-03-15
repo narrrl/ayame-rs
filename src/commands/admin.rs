@@ -5,8 +5,19 @@ use crate::{
 use poise::serenity_prelude as serenity;
 
 /// overview about all exclusions on this server
-#[poise::command(track_edits, slash_command, subcommands("add", "remove"), guild_only)]
+#[poise::command(
+    track_edits,
+    slash_command,
+    subcommands("add", "remove", "list", "update"),
+    guild_only
+)]
 pub async fn exclusions(ctx: Context<'_>) -> Result<()> {
+    Ok(())
+}
+
+/// list all exclusions on this server
+#[poise::command(track_edits, slash_command, guild_only)]
+pub async fn list(ctx: Context<'_>) -> Result<()> {
     let exclusions = get_user_exclusions(
         &ctx.data().database,
         ctx.guild_id().unwrap_or(Default::default()).into(),
@@ -14,6 +25,13 @@ pub async fn exclusions(ctx: Context<'_>) -> Result<()> {
     .await?;
     ctx.send(|m| m.embed(|embed| embed_exclusions(embed, exclusions)))
         .await?;
+    Ok(())
+}
+
+/// list all exclusions on this server
+#[poise::command(track_edits, slash_command, guild_only)]
+pub async fn update(ctx: Context<'_>) -> Result<()> {
+    let channel = ctx.guild().map_or();
     Ok(())
 }
 

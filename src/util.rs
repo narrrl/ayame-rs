@@ -1,8 +1,8 @@
-use crate::Result;
+use crate::{error::Error, Context, Data, Result};
 use apex_rs::model::Map;
 use chrono::{DateTime, Datelike, Utc};
 use mensa_swfr_rs::mensa;
-use poise::serenity_prelude::{self as serenity, CreateEmbed};
+use poise::serenity_prelude::{self as serenity, CacheHttp, CreateEmbed};
 use regex::Regex;
 
 pub fn type_of<T>() -> &'static str {
@@ -151,5 +151,57 @@ pub async fn remove_user_exclusion(
     )
     .execute(database)
     .await?;
+    Ok(())
+}
+
+pub async fn check_for_exclusion_collision(
+    ctx: &serenity::Context,
+    channel: serenity::Channel,
+    data: &Data,
+) -> Result<()> {
+    let guild_channel = channel
+        .guild()
+        .map_or(Err(Error::InvalidInput("Not in a guild")), |channel| {
+            Ok(channel)
+        })?;
+    let guild_id = guild_channel.guild_id;
+    let exclusions = get_user_exclusions(&data.database, guild_id.into()).await?;
+    let users = guild_channel
+        .members(
+            ctx.cache()
+                .map_or(Err(Error::InvalidInput("Cache unavailable")), |cache| {
+                    Ok(cache)
+                })?,
+        )
+        .await?
+        .iter()
+        .map(|member| member.user.id.0)
+        .collect::<Vec<u64>>();
+    for exclusion in exclusions {
+        let (user_1, user_2) = exclusion.users();
+        if users.contains(user_1) {
+            exclude_user_from_channel(ctx, &guild_channel, *user_2).await?;
+        } else if users.contains(user_2) {
+            exclude_user_from_channel(ctx, &guild_channel, *user_1).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn exclude_user_from_channel(
+    ctx: &serenity::Context,
+    channel: &serenity::GuildChannel,
+    user: u64,
+) -> Result<()> {
+    channel
+        .create_permission(
+            ctx.http(),
+            &serenity::PermissionOverwrite {
+                allow: serenity::Permissions::empty(),
+                deny: serenity::Permissions::VIEW_CHANNEL,
+                kind: serenity::PermissionOverwriteType::Member(user.into()),
+            },
+        )
+        .await?;
     Ok(())
 }
