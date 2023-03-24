@@ -1,4 +1,4 @@
-use crate::{error::Error, Context, Data, Result};
+use crate::{error::Error, Data, Result};
 use apex_rs::model::Map;
 use chrono::{DateTime, Datelike, Utc};
 use mensa_swfr_rs::mensa;
@@ -48,6 +48,7 @@ pub fn to_short_timestamp(date: DateTime<Utc>) -> String {
 }
 
 const SWFR_LOGO: &'static str = "https://cloud.nirusu.codes/s/McBDNYTkNjoEFyc/preview";
+
 pub fn create_mensa_plan_by_day(day: &mensa::Day) -> CreateEmbed {
     let mut embed = CreateEmbed::default();
     embed
@@ -193,12 +194,17 @@ async fn exclude_user_from_channel(
     channel: &serenity::GuildChannel,
     user: u64,
 ) -> Result<()> {
+    let permission = if channel.is_text_based() {
+        serenity::Permissions::VIEW_CHANNEL
+    } else {
+        serenity::Permissions::CONNECT
+    };
     channel
         .create_permission(
             ctx.http(),
             &serenity::PermissionOverwrite {
                 allow: serenity::Permissions::empty(),
-                deny: serenity::Permissions::VIEW_CHANNEL,
+                deny: permission,
                 kind: serenity::PermissionOverwriteType::Member(user.into()),
             },
         )
